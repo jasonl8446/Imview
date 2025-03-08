@@ -29,6 +29,9 @@
                 <DataTemplate DataType="{x:Type vm:PacketQuestViewModel}">
                     <views:PacketQuestView />
                 </DataTemplate>
+                <DataTemplate DataType="{x:Type vm:ObjectPropertyBlobViewModel}">
+                    <views:ObjectPropertyBlobView />
+                </DataTemplate>
             </ContentControl.DataTemplates>
         </ContentControl>
 

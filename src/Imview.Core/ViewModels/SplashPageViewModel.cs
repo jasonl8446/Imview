@@ -20,63 +20,71 @@ modification, are permitted provided that the following conditions are met:
 
 using ReactiveUI;
 using System.Windows.Input;
-using Imview.Core.Controls.Templates;
 using System.Collections.ObjectModel;
 
 namespace Imview.Core.ViewModels;
 
-public class SplashPageViewModel : ViewModelBase {
+public class SplashPageViewModel(MainWindowViewModel mainViewModel) : ViewModelBase {
 
-    public ObservableCollection<SplashSectionViewModel> Sections { get; }
-
-    public SplashPageViewModel(MainWindowViewModel mainViewModel)
-        => Sections = [
-            new SplashSectionViewModel(
-                "Quests",
-                "Create Quest",
-                "Load Quest",
-                "Get Quests From Packet Capture",
-                mainViewModel.CreateNewQuest,
-                mainViewModel.LoadQuest,
-                mainViewModel.GetQuestsFromPacketCapture),
-            new SplashSectionViewModel(
-                "Files",
-                "Unpack KIWADs",
-                "Unpack KIWADs & Deserialize",
-                "",
-                () => mainViewModel.UnpackKiwad(false),
-                () => mainViewModel.UnpackKiwad(true),
-                null)
-        ];
+    public ObservableCollection<SplashSectionViewModel> Sections { get; } = [
+        new SplashSectionViewModel(
+            "Quests",
+            "Create Quest",
+            "Load Quest",
+            "Get Quests From Packet Capture",
+            mainViewModel.CreateNewQuest,
+            mainViewModel.LoadQuest,
+            mainViewModel.GetQuestsFromPacketCapture),
+        new SplashSectionViewModel(
+            "Files",
+            "Unpack KIWADs",
+            "Unpack KIWADs & Deserialize",
+            "",
+            () => mainViewModel.UnpackKiwad(false),
+            () => mainViewModel.UnpackKiwad(true),
+            null),
+        new SplashSectionViewModel(
+            "Object Property",
+            "Analyze Blob",
+            "",
+            "",
+            mainViewModel.AnalyzeObjectPropertyBlob,
+            null,
+            null)
+    ];
+    
 }
 
 public class SplashSectionViewModel(
     string title,
-    string createButtonText,
-    string loadButtonText,
-    string getQuestsFromPacketCaptureButtonText,
-    System.Action? createAction,
-    System.Action? loadAction,
-    System.Action? getQuestsFromPacketCaptureAction) {
+    string firstButtonText,
+    string secondButtonText,
+    string thirdButtonText,
+    System.Action? firstButtonAction,
+    System.Action? secontButtonAction,
+    System.Action? thirdButtonAction) {
 
     public string Title { get; } = title;
-    public string CreateButtonText { get; } = createButtonText;
-    public string LoadButtonText { get; } = loadButtonText;
-    public string GetQuestsFromPacketCaptureButtonText { get; } = getQuestsFromPacketCaptureButtonText;
-    public ICommand? CreateCommand { get; }
-        = createAction != null
-            ? ReactiveCommand.Create(createAction)
+    public string FirstButtonText { get; } = firstButtonText;
+    public string SecondButtonText { get; } = secondButtonText;
+    public string ThirdButtonText { get; } = thirdButtonText;
+    public ICommand? FirstButtonCommand { get; }
+        = firstButtonAction != null
+            ? ReactiveCommand.Create(firstButtonAction)
             : null;
-    public ICommand? LoadCommand { get; }
-        = loadAction != null
-            ? ReactiveCommand.Create(loadAction)
+    public ICommand? SecondButtonCommand { get; }
+        = secontButtonAction != null
+            ? ReactiveCommand.Create(secontButtonAction)
             : null;
-    public ICommand? GetQuestsFromPacketCaptureCommand { get; }
-        = getQuestsFromPacketCaptureAction != null
-            ? ReactiveCommand.Create(getQuestsFromPacketCaptureAction)
+    public ICommand? ThirdButtonCommand { get; }
+        = thirdButtonAction != null
+            ? ReactiveCommand.Create(thirdButtonAction)
             : null;
+    public bool HasSecondButton
+        => !string.IsNullOrEmpty(SecondButtonText)
+        && SecondButtonCommand != null;
     public bool HasThirdButton
-        => !string.IsNullOrEmpty(GetQuestsFromPacketCaptureButtonText)
-        && GetQuestsFromPacketCaptureCommand != null;
+        => !string.IsNullOrEmpty(ThirdButtonText)
+        && ThirdButtonCommand != null;
 
 }

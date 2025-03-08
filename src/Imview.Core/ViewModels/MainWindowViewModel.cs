@@ -187,6 +187,9 @@ public class MainWindowViewModel : ViewModelBase {
         }
     }
 
+    public void AnalyzeObjectPropertyBlob()
+        => CurrentViewModel = new ObjectPropertyBlobViewModel(this);
+
     /// <summary>
     /// Returns the main window instance.
     /// </summary>

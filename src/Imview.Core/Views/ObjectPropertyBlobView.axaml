@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Imview.Core.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
+             x:Class="Imview.Core.Views.ObjectPropertyBlobView"
+             x:DataType="vm:ObjectPropertyBlobViewModel">
+
+    <Grid Background="#1E1E1E" Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0" 
+                   Text="Object Property Blob Analyzer" 
+                   FontSize="24" 
+                   FontWeight="Bold" 
+                   Margin="0,0,0,20"/>
+
+        <!-- Content -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*,Auto,Auto,*">
+            <TextBlock Grid.Row="0" 
+                       Text="Hex Blob Input" 
+                       FontSize="16" 
+                       Margin="0,0,0,10"/>
+
+            <ScrollViewer Grid.Row="1">
+                <TextBox Text="{Binding HexBlob}" 
+                         AcceptsReturn="True"
+                         Height="150"
+                         TextWrapping="Wrap"
+                         Watermark="Paste hex blob here (e.g., 32 01 00 00 ...)"/>
+            </ScrollViewer>
+
+            <Button Grid.Row="2" 
+                    Content="Deserialize Blob" 
+                    Command="{Binding DeserializeBlobCommand}"
+                    Margin="0,10"
+                    IsEnabled="{Binding !IsDeserializing}"/>
+
+            <ScrollViewer Grid.Row="4">
+                <TextBox Text="{Binding DeserializedResult}" 
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"/>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Spacing="10"
+                    Margin="0,20,0,0">
+            <Button Content="Return to Main Menu"
+                    Command="{Binding BackToSplashCommand}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

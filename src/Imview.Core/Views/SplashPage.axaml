@@ -37,13 +37,19 @@
 
             <!-- Sections -->
             <ItemsControl ItemsSource="{Binding Sections}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="2" Rows="2" HorizontalAlignment="Center" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Background="#333333"
                                 CornerRadius="8"
-                                Margin="0,8"
+                                Margin="10"
                                 Padding="20"
-                                Width="400">
+                                Width="350"
+                                MinHeight="250">
                             <StackPanel Spacing="16">
                                 <TextBlock Text="{Binding Title}"
                                          FontSize="24"
@@ -51,19 +57,20 @@
                                          Foreground="White"/>
                                 
                                 <StackPanel Spacing="8">
-                                    <Button Content="{Binding CreateButtonText}"
-                                            Command="{Binding CreateCommand}"
+                                    <Button Content="{Binding FirstButtonText}"
+                                            Command="{Binding FirstButtonCommand}"
                                             HorizontalAlignment="Stretch"
                                             Height="40"
                                             Classes="accent"/>
                                             
-                                    <Button Content="{Binding LoadButtonText}"
-                                            Command="{Binding LoadCommand}"
+                                    <Button Content="{Binding SecondButtonText}"
+                                            Command="{Binding SecondButtonCommand}"
                                             HorizontalAlignment="Stretch"
-                                            Height="40"/>
+                                            Height="40"
+                                            IsVisible="{Binding HasSecondButton}"/>
 
-                                    <Button Content="{Binding GetQuestsFromPacketCaptureButtonText}"
-                                            Command="{Binding GetQuestsFromPacketCaptureCommand}"
+                                    <Button Content="{Binding ThirdButtonText}"
+                                            Command="{Binding ThirdButtonCommand}"
                                             HorizontalAlignment="Stretch"
                                             Height="40"
                                             IsVisible="{Binding HasThirdButton}"/>

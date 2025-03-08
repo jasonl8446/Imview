@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.CoreObject\Imcodec.CoreObject.csproj" />
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.ObjectProperty\Imcodec.ObjectProperty.csproj" />
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.Wad\Imcodec.Wad.csproj" />
     <ProjectReference Include="..\Imview.PacketReader\Imview.PacketReader.csproj" />
