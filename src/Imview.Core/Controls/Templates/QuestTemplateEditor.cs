@@ -70,10 +70,7 @@ public partial class QuestTemplateEditor : UserControl {
     private NumericUpDown _questLevelBox;
     private ListBox _goalsList;
     private ListBox _goalLogicsList;
-    private TextBox _questInfoBox;
-    private TextBox _questPrepBox;
-    private TextBox _questUnderwayBox;
-    private TextBox _questCompleteBox;
+    private QuestDialogEditor _questDialogEditor;
     private TextBox _onStartScriptBox;
     private TextBox _onEndScriptBox;
 
@@ -110,10 +107,7 @@ public partial class QuestTemplateEditor : UserControl {
         _questLevelBox = new NumericUpDown();
         _goalsList = new ListBox();
         _goalLogicsList = new ListBox();
-        _questInfoBox = new TextBox();
-        _questPrepBox = new TextBox();
-        _questUnderwayBox = new TextBox();
-        _questCompleteBox = new TextBox();
+        _questDialogEditor = new QuestDialogEditor();
         _onStartScriptBox = new TextBox();
         _onEndScriptBox = new TextBox();
         _isHiddenBox = new CheckBox();
@@ -136,7 +130,7 @@ public partial class QuestTemplateEditor : UserControl {
         InitializeControls();
 
         mainPanel.Children.Add(CreateBasicInfoSection());
-        mainPanel.Children.Add(CreateTextSection());
+        mainPanel.Children.Add(CreateDialogSection());
         mainPanel.Children.Add(CreateScriptSection());
         mainPanel.Children.Add(CreateFlagsSection());
         mainPanel.Children.Add(CreateGoalsSection());
@@ -156,10 +150,7 @@ public partial class QuestTemplateEditor : UserControl {
             Value = 1
         };
 
-        _questInfoBox = new TextBox { AcceptsReturn = true, Height = 60 };
-        _questPrepBox = new TextBox { AcceptsReturn = true, Height = 60 };
-        _questUnderwayBox = new TextBox { AcceptsReturn = true, Height = 60 };
-        _questCompleteBox = new TextBox { AcceptsReturn = true, Height = 60 };
+        // Dialog editor is initialized above
 
         // Script controls. These are the names of scripts that 
         // will be executed when the quest starts or ends.
@@ -280,18 +271,8 @@ public partial class QuestTemplateEditor : UserControl {
         return CreateGroupBox("Basic Quest Information", content);
     }
 
-    private Control CreateTextSection() {
-        var content = new StackPanel {
-            Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
-            Children = {
-                CreateLabeledControl("Quest Info:", _questInfoBox),
-                CreateLabeledControl("Quest Prep:", _questPrepBox),
-                CreateLabeledControl("Quest Underway:", _questUnderwayBox),
-                CreateLabeledControl("Quest Complete:", _questCompleteBox)
-            }
-        };
-
-        return CreateGroupBox("Quest Text", content);
+    private Control CreateDialogSection() {
+        return CreateGroupBox("Quest Dialogue System", _questDialogEditor);
     }
 
     private Control CreateScriptSection() {
@@ -458,10 +439,10 @@ public partial class QuestTemplateEditor : UserControl {
         _questNameBox.Text = _template.m_questName?.ToString();
         _questTitleBox.Text = _template.m_questTitle?.ToString();
         _questLevelBox.Value = _template.m_questLevel;
-        _questInfoBox.Text = _template.m_questInfo?.ToString();
-        _questPrepBox.Text = _template.m_questPrep?.ToString();
-        _questUnderwayBox.Text = _template.m_questUnderway?.ToString();
-        _questCompleteBox.Text = _template.m_questComplete?.ToString();
+        
+        // Initialize dialog editor with quest's dialog list
+        _questDialogEditor.DialogList = _template.m_dialogList as ActorDialogList;
+        
         _onStartScriptBox.Text = _template.m_onStartQuestScript?.ToString();
         _onEndScriptBox.Text = _template.m_onEndQuestScript?.ToString();
 
@@ -545,10 +526,10 @@ public partial class QuestTemplateEditor : UserControl {
             _template.m_questName = new ByteString(_questNameBox.Text ?? string.Empty);
             _template.m_questTitle = new ByteString(_questTitleBox.Text ?? string.Empty);
             _template.m_questLevel = (int) (_questLevelBox.Value ?? 1);
-            _template.m_questInfo = new ByteString(_questInfoBox.Text ?? string.Empty);
-            _template.m_questPrep = new ByteString(_questPrepBox.Text ?? string.Empty);
-            _template.m_questUnderway = new ByteString(_questUnderwayBox.Text ?? string.Empty);
-            _template.m_questComplete = new ByteString(_questCompleteBox.Text ?? string.Empty);
+            
+            // Save dialog system - convert from editor back to ActorDialogList
+            _template.m_dialogList = _questDialogEditor.ToActorDialogList();
+            
             _template.m_onStartQuestScript = new ByteString(_onStartScriptBox.Text ?? string.Empty);
             _template.m_onEndQuestScript = new ByteString(_onEndScriptBox.Text ?? string.Empty);
 

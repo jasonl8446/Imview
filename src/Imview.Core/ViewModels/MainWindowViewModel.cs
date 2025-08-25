@@ -37,11 +37,12 @@ public class MainWindowViewModel : ViewModelBase {
     public ICommand CreateQuestCommand { get; }
     public ICommand LoadQuestCommand { get; }
 
-    private ViewModelBase _currentViewModel;
     private Avalonia.Controls.Window? _mainWindow;
 
     public MainWindowViewModel() {
-        _currentViewModel = new SplashPageViewModel(this);
+        TabManager = new TabManagerViewModel();
+        TabManager.Initialize(this);
+        
         CreateQuestCommand = ReactiveCommand.Create(CreateNewQuest);
         LoadQuestCommand = ReactiveCommand.Create(LoadQuest);
 
@@ -52,13 +53,11 @@ public class MainWindowViewModel : ViewModelBase {
         _mainWindow = window;
     }
 
-    public ViewModelBase CurrentViewModel {
-        get => _currentViewModel;
-        set => this.RaiseAndSetIfChanged(ref _currentViewModel, value);
-    }
+    public TabManagerViewModel TabManager { get; }
 
     public void CreateNewQuest() {
-        CurrentViewModel = new QuestTemplateEditorViewModel(this);
+        var tab = TabManager.AddTab("New Quest", new QuestTemplateEditorViewModel(this));
+        TabManager.SelectTab(tab);
     }
 
     public async void LoadQuest() {
@@ -73,7 +72,8 @@ public class MainWindowViewModel : ViewModelBase {
 
             var template = await TemplateSerializer.LoadTemplateAsync(_mainWindow);
             if (template != null) {
-                CurrentViewModel = new QuestTemplateEditorViewModel(this, template);
+                var tab = TabManager.AddTab("Loaded Quest", new QuestTemplateEditorViewModel(this, template));
+                TabManager.SelectTab(tab);
                 MessageService.Info("Quest template loaded successfully!")
                     .WithDuration(TimeSpan.FromSeconds(3))
                     .Send();
@@ -124,7 +124,9 @@ public class MainWindowViewModel : ViewModelBase {
             var questTemplates = await QuestPacketReaderService.ReadQuestsFromPacketCaptureAsync(filePath);
 
             // Switch to the packet view with the extracted quest templates.
-            CurrentViewModel = new PacketQuestViewModel(this, filePath, questTemplates);
+            var fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
+            var tab = TabManager.AddTab($"Packets: {fileName}", new PacketQuestViewModel(this, filePath, questTemplates));
+            TabManager.SelectTab(tab);
         }
         catch (Exception ex) {
             MessageService.Error($"Failed to load packet capture: {ex.Message}")
@@ -134,23 +136,14 @@ public class MainWindowViewModel : ViewModelBase {
     }
 
     /// <summary>
-    /// Opens a quest template editor in a new window.
+    /// Opens a quest template editor in a new tab.
     /// </summary>
     /// <param name="template">The quest template to edit</param>
-    /// <returns>A task that completes when the editor is closed</returns>
-    public async Task OpenQuestEditorInNewWindow(QuestTemplate template) {
+    public void OpenQuestEditorInNewTab(QuestTemplate template) {
         try {
-            if (_mainWindow == null) {
-                MessageService.Error("Main window is not initialized.")
-                    .WithDuration(TimeSpan.FromSeconds(5))
-                    .Send();
-
-                return;
-            }
-
-            // Create the editor window in read-only mode.
-            var editorWindow = new Views.QuestEditorWindow(template, isReadOnly: true);
-            await editorWindow.ShowDialog(_mainWindow);
+            // Create the editor in read-only mode in a new tab
+            var tab = TabManager.AddTab("Quest Editor (Read-Only)", new QuestTemplateEditorViewModel(this, template));
+            TabManager.SelectTab(tab);
         }
         catch (Exception ex) {
             MessageService.Error($"Error opening quest editor: {ex.Message}")
@@ -187,8 +180,10 @@ public class MainWindowViewModel : ViewModelBase {
         }
     }
 
-    public void AnalyzeObjectPropertyBlob()
-        => CurrentViewModel = new ObjectPropertyBlobViewModel(this);
+    public void AnalyzeObjectPropertyBlob() {
+        var tab = TabManager.AddTab("Analyze Blob", new ObjectPropertyBlobViewModel(this));
+        TabManager.SelectTab(tab);
+    }
 
     /// <summary>
     /// Returns the main window instance.
@@ -196,7 +191,11 @@ public class MainWindowViewModel : ViewModelBase {
     public Avalonia.Controls.Window? GetMainWindow()
         => _mainWindow;
 
-    public void ReturnToSplash()
-        => CurrentViewModel = new SplashPageViewModel(this);
+    public void ReturnToSplash() {
+        var homeTab = TabManager.FindTabByContent<SplashPageViewModel>();
+        if (homeTab != null) {
+            TabManager.SelectTab(homeTab);
+        }
+    }
 
 }

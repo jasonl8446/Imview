@@ -96,14 +96,6 @@ public static class QuestZipService {
                     continue;
                 }
                 
-                if (data is null) {
-                    MessageService.Error($"Serialized data is null for template: {questName}")
-                        .WithDuration(TimeSpan.FromSeconds(3))
-                        .Send();
-
-                    continue;
-                }
-                
                 // Write the serialized data to the temp file.
                 await File.WriteAllBytesAsync(tempFilePath, data);
             }

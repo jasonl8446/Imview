@@ -74,9 +74,9 @@ public class PacketQuestViewModel : ViewModelBase {
         }
     }
 
-    private async void EditSelectedQuest() {
+    private void EditSelectedQuest() {
         if (SelectedQuest is not null) {
-            await _mainViewModel.OpenQuestEditorInNewWindow(SelectedQuest);
+            _mainViewModel.OpenQuestEditorInNewTab(SelectedQuest);
         }
     }
 

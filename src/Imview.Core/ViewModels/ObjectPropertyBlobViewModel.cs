@@ -90,14 +90,14 @@ public class ObjectPropertyBlobViewModel : ViewModelBase {
         var serializerConfigs = new List<(string Name, Func<ObjectSerializer> Factory, bool IsVerbose)> {
                 // Standard serializers.
                 ("ObjectCompact",               static () => new ObjectSerializer(false, SerializerFlags.None), false),
-                ("ObjectCompactCompressed",     static () => new ObjectSerializer(false, SerializerFlags.UseFlags | SerializerFlags.Compress), false),
+                ("ObjectCompactCompressed",     static () => new ObjectSerializer(false, SerializerFlags.Compress), false),
                 ("ObjectVerbose",               static () => new ObjectSerializer(true, SerializerFlags.None), true),
-                ("ObjectVerboseCompressed",     static () => new ObjectSerializer(true, SerializerFlags.UseFlags | SerializerFlags.Compress), true),
+                ("ObjectVerboseCompressed",     static () => new ObjectSerializer(true, SerializerFlags.Compress), true),
                 // Core serializers.
                 ("CoreObject",                  static () => new CoreObjectSerializer(false, SerializerFlags.None), false),
-                ("CoreObjectCompressed",        static () => new CoreObjectSerializer(false, SerializerFlags.UseFlags | SerializerFlags.Compress), false),
+                ("CoreObjectCompressed",        static () => new CoreObjectSerializer(false, SerializerFlags.Compress), false),
                 ("CoreObjectVerbose",           static () => new CoreObjectSerializer(true, SerializerFlags.None), true),
-                ("CoreObjectVerboseCompressed", static () => new CoreObjectSerializer(true, SerializerFlags.UseFlags | SerializerFlags.Compress), true)
+                ("CoreObjectVerboseCompressed", static () => new CoreObjectSerializer(true, SerializerFlags.Compress), true)
             };
 
         foreach (var (Name, Factory, IsVerbose) in serializerConfigs) {
