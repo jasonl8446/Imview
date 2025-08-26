@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Imview.Core.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="500"
+        x:Class="Imview.Core.Views.ClientFileConfigWindow"
+        x:DataType="vm:ClientFileConfigViewModel"
+        Title="Client File Configuration"
+        Width="600" Height="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="Client File Configuration"
+                      FontSize="18"
+                      FontWeight="SemiBold"/>
+            <TextBlock Text="Configure the URL for fetching Wizard101 client file revisions and select which revision to use."
+                      FontSize="12"
+                      Foreground="Gray"
+                      TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- URL Configuration -->
+        <StackPanel Grid.Row="1" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="Revisions URL:" FontWeight="Medium"/>
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                       Content="Test Connection"
+                       Command="{Binding TestConnectionCommand}"
+                       IsEnabled="{Binding !IsTestingConnection}"
+                       Margin="10,0,0,0"
+                       Padding="15,8"/>
+                <TextBox Text="{Binding RevisionsUrl}"
+                        Watermark="Enter the URL for fetching revisions..."
+                        IsEnabled="{Binding !IsTestingConnection}"/>
+            </DockPanel>
+            
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                       Content="Refresh List"
+                       Command="{Binding LoadRevisionsCommand}"
+                       IsEnabled="{Binding !IsLoadingRevisions}"
+                       Margin="10,0,0,0"
+                       Padding="15,8"/>
+                <TextBlock DockPanel.Dock="Left"
+                          Text="{Binding ConnectionStatus}"
+                          VerticalAlignment="Center"
+                          FontSize="12"/>
+            </DockPanel>
+        </StackPanel>
+
+        <!-- Revision Selection -->
+        <StackPanel Grid.Row="2" Spacing="10">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left"
+                          Text="Available Revisions:" 
+                          FontWeight="Medium"
+                          VerticalAlignment="Center"/>
+                <TextBlock DockPanel.Dock="Right"
+                          Text="Loading..."
+                          IsVisible="{Binding IsLoadingRevisions}"
+                          FontSize="12"
+                          Foreground="Gray"
+                          VerticalAlignment="Center"/>
+            </DockPanel>
+            
+            <ListBox ItemsSource="{Binding Revisions}"
+                    SelectedItem="{Binding SelectedRevision}"
+                    Height="200"
+                    Background="#2D2D30"
+                    BorderBrush="#3E3E42"
+                    BorderThickness="1">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" 
+                                  Margin="5"
+                                  FontFamily="Consolas"
+                                  FontSize="12"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            
+            <TextBlock Text="{Binding SelectedRevision, StringFormat='Selected: {0}'}"
+                      FontSize="12"
+                      FontWeight="Medium"
+                      IsVisible="{Binding SelectedRevision, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3" 
+                   Orientation="Horizontal" 
+                   HorizontalAlignment="Right" 
+                   Spacing="10" 
+                   Margin="0,20,0,0">
+            <Button Content="Save"
+                   Command="{Binding SaveCommand}"
+                   Classes="accent"
+                   Padding="20,8"
+                   MinWidth="80"/>
+            <Button Content="Cancel"
+                   Command="{Binding CancelCommand}"
+                   Padding="20,8"
+                   MinWidth="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

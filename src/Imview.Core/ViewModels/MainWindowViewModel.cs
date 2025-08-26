@@ -258,4 +258,64 @@ public class MainWindowViewModel : ViewModelBase {
         }
     }
 
+    /// <summary>
+    /// Shows the client file configuration dialog.
+    /// </summary>
+    public async void ShowClientFileConfig() {
+        try {
+            if (_mainWindow == null) {
+                MessageService.Error("Main window is not initialized.")
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+                return;
+            }
+
+            var configDialog = new ClientFileConfigWindow();
+            var result = await configDialog.ShowDialog<bool?>(_mainWindow);
+            
+            if (result == true) {
+                MessageService.Info("Client file configuration updated successfully!")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+            }
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Error showing client file configuration: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+        }
+    }
+
+    /// <summary>
+    /// Shows the client file download dialog.
+    /// </summary>
+    public void ShowClientFileDownload() {
+        try {
+            if (_mainWindow == null) {
+                MessageService.Error("Main window is not initialized.")
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+                return;
+            }
+
+            var clientFileService = new Services.ClientFileService();
+            var selectedRevision = clientFileService.GetSelectedRevision();
+            
+            if (string.IsNullOrEmpty(selectedRevision)) {
+                MessageService.Info("Please configure and select a client revision first.")
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+                return;
+            }
+
+            var downloadWindow = new ClientFileDownloadWindow();
+            downloadWindow.Show(_mainWindow);
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Error showing client file download: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+        }
+    }
+
 }

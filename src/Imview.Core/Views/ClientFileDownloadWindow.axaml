@@ -1,0 +1,228 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Imview.Core.ViewModels"
+        xmlns:models="clr-namespace:Imview.Core.Models"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="Imview.Core.Views.ClientFileDownloadWindow"
+        x:DataType="vm:ClientFileDownloadViewModel"
+        Title="Download Client Files"
+        Width="800" Height="600"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="Download Client Files"
+                      FontSize="18"
+                      FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding SelectedRevision, StringFormat='Revision: {0}'}"
+                      FontSize="12"
+                      Foreground="Gray"/>
+        </StackPanel>
+
+        <!-- Search and Controls -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,10">
+            <TextBox Grid.Column="0"
+                    Text="{Binding SearchFilter}"
+                    Watermark="Search files..."
+                    Margin="0,0,10,0"/>
+            
+            <Button Grid.Column="1"
+                   Content="Select All"
+                   Command="{Binding SelectAllCommand}"
+                   Margin="0,0,5,0"
+                   Padding="10,5"/>
+            
+            <Button Grid.Column="2"
+                   Content="Deselect All"
+                   Command="{Binding DeselectAllCommand}"
+                   Margin="0,0,5,0"
+                   Padding="10,5"/>
+            
+            <Button Grid.Column="3"
+                   Content="Refresh"
+                   Command="{Binding LoadFilesCommand}"
+                   IsEnabled="{Binding !IsLoadingFiles}"
+                   Margin="0,0,5,0"
+                   Padding="10,5"/>
+            
+            <Button Grid.Column="4"
+                   Content="Clear Cache"
+                   Command="{Binding ClearCacheCommand}"
+                   Margin="0,0,0,0"
+                   Padding="10,5"/>
+        </Grid>
+
+        <!-- File List -->
+        <Border Grid.Row="2" 
+               BorderBrush="#3E3E42" 
+               BorderThickness="1" 
+               Background="#2D2D30"
+               Margin="0,0,0,10">
+            <DockPanel>
+                <!-- Header -->
+                <Grid DockPanel.Dock="Top" Background="#404040" Height="25">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="250"/>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBlock Grid.Column="0" Text="☑" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontWeight="Bold"/>
+                    <TextBlock Grid.Column="1" Text="File Name" VerticalAlignment="Center" Foreground="White" FontWeight="Bold" Margin="5,0"/>
+                    <TextBlock Grid.Column="2" Text="Size" VerticalAlignment="Center" Foreground="White" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,0,5,0"/>
+                    <TextBlock Grid.Column="3" Text="Status" VerticalAlignment="Center" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Grid.Column="4" Text="Full Path" VerticalAlignment="Center" Foreground="White" FontWeight="Bold" Margin="10,0,0,0"/>
+                </Grid>
+                
+                <ListBox ItemsSource="{Binding FilteredFiles}"
+                    Background="#2D2D30"
+                    Foreground="White"
+                    SelectionMode="Multiple"
+                    ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30"/>
+                                <ColumnDefinition Width="250"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <CheckBox Grid.Column="0" 
+                                     IsChecked="{Binding IsSelected}" 
+                                     VerticalAlignment="Center"
+                                     Foreground="White"/>
+                            
+                            <TextBlock Grid.Column="1" 
+                                      Text="{Binding FileRecord.DisplayName}" 
+                                      VerticalAlignment="Center"
+                                      Foreground="White"
+                                      FontFamily="Consolas"/>
+                            
+                            <TextBlock Grid.Column="2" 
+                                      Text="{Binding FileRecord.SizeFormatted}" 
+                                      VerticalAlignment="Center"
+                                      Foreground="LightGray"
+                                      HorizontalAlignment="Right"/>
+                            
+                            <TextBlock Grid.Column="3" 
+                                      Text="{Binding CacheStatus}" 
+                                      VerticalAlignment="Center"
+                                      Foreground="LightBlue"
+                                      HorizontalAlignment="Center"/>
+                            
+                            <TextBlock Grid.Column="4" 
+                                      Text="{Binding FileRecord.SourceFileName}" 
+                                      VerticalAlignment="Center"
+                                      Foreground="Gray"
+                                      FontFamily="Consolas"
+                                      FontSize="10"
+                                      Margin="10,0,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:selected">
+                        <Setter Property="Background" Value="#404040"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover">
+                        <Setter Property="Background" Value="#353535"/>
+                    </Style>
+                </ListBox.Styles>
+            </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Download Progress -->
+        <Border Grid.Row="3" 
+               BorderBrush="#3E3E42" 
+               BorderThickness="1" 
+               Background="#2D2D30"
+               Margin="0,0,0,10"
+               Height="120"
+               IsVisible="{Binding DownloadProgress.Count}">
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding DownloadProgress}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="models:DownloadProgress">
+                            <Grid Margin="5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <TextBlock Grid.Column="0" 
+                                          Text="{Binding FileName}" 
+                                          FontFamily="Consolas"
+                                          FontSize="11"
+                                          VerticalAlignment="Center"/>
+                                
+                                <ProgressBar Grid.Column="1" 
+                                           Value="{Binding PercentComplete}"
+                                           Maximum="100"
+                                           Height="16"
+                                           Margin="5,0"/>
+                                
+                                <TextBlock Grid.Column="2" 
+                                          Text="{Binding Status}"
+                                          FontSize="10"
+                                          VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Status and Buttons -->
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding DownloadStatus}" 
+                          VerticalAlignment="Center"/>
+                <TextBlock Text="Loading..." 
+                          IsVisible="{Binding IsLoadingFiles}"
+                          Foreground="Orange"
+                          Margin="10,0,0,0"
+                          VerticalAlignment="Center"/>
+                <TextBlock Text="Downloading..." 
+                          IsVisible="{Binding IsDownloading}"
+                          Foreground="LightBlue"
+                          Margin="10,0,0,0"
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+            
+            <Button Grid.Column="1"
+                   Content="Download Selected"
+                   Command="{Binding DownloadSelectedCommand}"
+                   Classes="accent"
+                   Padding="15,8"
+                   Margin="0,0,10,0"/>
+            
+            <Button Grid.Column="2"
+                   Content="Close"
+                   Command="{Binding CloseCommand}"
+                   Padding="15,8"/>
+        </Grid>
+    </Grid>
+</Window>

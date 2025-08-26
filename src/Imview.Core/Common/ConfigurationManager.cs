@@ -190,6 +190,10 @@ DatabaseWaitForNonStaleResultsTimeout = 5
 
 [Application]
 FirstRun = True
+
+[ClientFiles]
+RevisionsUrl = https://patcher.r10.one/revisions
+SelectedRevision = 
 ";
 
         File.WriteAllText(iniFilePath, defaultConfig);

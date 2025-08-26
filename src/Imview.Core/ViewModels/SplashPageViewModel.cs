@@ -41,11 +41,11 @@ public class SplashPageViewModel(MainWindowViewModel mainViewModel) : ViewModelB
             "Files",
             "Unpack KIWADs",
             "Unpack KIWADs & Deserialize",
-            "",
+            "Download Client Files",
             "",
             () => mainViewModel.UnpackKiwad(false),
             () => mainViewModel.UnpackKiwad(true),
-            null,
+            mainViewModel.ShowClientFileDownload,
             null),
         new SplashSectionViewModel(
             "Object Property",
@@ -60,11 +60,11 @@ public class SplashPageViewModel(MainWindowViewModel mainViewModel) : ViewModelB
         new SplashSectionViewModel(
             "Settings",
             "Configure Database",
-            "",
+            "Configure Client Files",
             "",
             "",
             mainViewModel.ShowDatabaseConfig,
-            null,
+            mainViewModel.ShowClientFileConfig,
             null,
             null)
     ];
