@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Imview.Core.Views.QuestSaveOptionsDialog"
+        Title="Save Quest"
+        Width="400" Height="280"
+        WindowStartupLocation="CenterOwner"
+        CanResize="false">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="10">
+            <TextBlock Text="Save Quest Template" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="Choose how you would like to save your quest template." 
+                      TextWrapping="Wrap" Foreground="Gray"/>
+        </StackPanel>
+        
+        <!-- Options -->
+        <StackPanel Grid.Row="1" Spacing="15" Margin="0,20,0,0">
+            <Button Name="SaveLocalButton" 
+                    Content="Save to Local File"
+                    HorizontalAlignment="Stretch"
+                    Height="45"
+                    Classes="accent"
+                    Click="OnSaveLocalClick"
+                    ToolTip.Tip="Save as a .view file on your computer"/>
+            
+            <Button Name="UploadButton"
+                    Content="Upload to Database"
+                    HorizontalAlignment="Stretch"
+                    Height="45"
+                    Click="OnUploadClick"
+                    ToolTip.Tip="Save to the remote RavenDB database"/>
+            
+            <Button Name="SaveBothButton"
+                    Content="Save Both Local and Upload"
+                    HorizontalAlignment="Stretch"
+                    Height="45"
+                    Click="OnSaveBothClick"
+                    ToolTip.Tip="Save locally and upload to database"/>
+        </StackPanel>
+        
+        <!-- Cancel Button -->
+        <Button Grid.Row="2" 
+                Name="CancelButton" 
+                Content="Cancel" 
+                HorizontalAlignment="Center"
+                Width="100"
+                Margin="0,20,0,0"
+                Click="OnCancelClick"/>
+    </Grid>
+</Window>

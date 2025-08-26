@@ -51,10 +51,17 @@
                                 Width="350"
                                 MinHeight="250">
                             <StackPanel Spacing="16">
-                                <TextBlock Text="{Binding Title}"
-                                         FontSize="24"
-                                         FontWeight="SemiBold"
-                                         Foreground="White"/>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding Title}"
+                                             FontSize="24"
+                                             FontWeight="SemiBold"
+                                             Foreground="White"/>
+                                    <TextBlock Text="Some options require authentication"
+                                             FontSize="12"
+                                             FontStyle="Italic"
+                                             Foreground="#AAAAAA"
+                                             IsVisible="{Binding IsQuestSection}"/>
+                                </StackPanel>
                                 
                                 <StackPanel Spacing="8">
                                     <Button Content="{Binding FirstButtonText}"
@@ -74,6 +81,12 @@
                                             HorizontalAlignment="Stretch"
                                             Height="40"
                                             IsVisible="{Binding HasThirdButton}"/>
+
+                                    <Button Content="{Binding FourthButtonText}"
+                                            Command="{Binding FourthButtonCommand}"
+                                            HorizontalAlignment="Stretch"
+                                            Height="40"
+                                            IsVisible="{Binding HasFourthButton}"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

@@ -28,6 +28,7 @@ using Avalonia.Controls;
 using System.Collections.Generic;
 using Imcodec.ObjectProperty.TypeCache;
 using System.Threading.Tasks;
+using Imview.Core.Views;
 
 namespace Imview.Core.ViewModels;
 
@@ -195,6 +196,52 @@ public class MainWindowViewModel : ViewModelBase {
         var homeTab = TabManager.FindTabByContent<SplashPageViewModel>();
         if (homeTab != null) {
             TabManager.SelectTab(homeTab);
+        }
+    }
+
+    /// <summary>
+    /// Opens the quest browser in a new tab.
+    /// </summary>
+    public async void ShowQuestBrowser() {
+        // Check if database is configured first
+        var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(_mainWindow);
+        
+        if (!isConfigured) {
+            MessageService.Info("Database configuration required to browse remote quests.")
+                .WithDuration(TimeSpan.FromSeconds(3))
+                .Send();
+            return;
+        }
+
+        var tab = TabManager.AddTab("Quest Browser", new QuestBrowserViewModel());
+        TabManager.SelectTab(tab);
+    }
+
+    /// <summary>
+    /// Shows the database configuration dialog.
+    /// </summary>
+    public async void ShowDatabaseConfig() {
+        try {
+            if (_mainWindow == null) {
+                MessageService.Error("Main window is not initialized.")
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+                return;
+            }
+
+            var configDialog = new DatabaseConfigWindow();
+            var result = await configDialog.ShowDialog<bool?>(_mainWindow);
+            
+            if (result == true) {
+                MessageService.Info("Database configuration updated successfully!")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+            }
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Error showing database configuration: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
         }
     }
 

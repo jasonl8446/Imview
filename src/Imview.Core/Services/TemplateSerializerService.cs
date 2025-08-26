@@ -26,6 +26,8 @@ using System.Collections.Generic;
 using Avalonia.Platform.Storage;
 using System.Text.Json;
 using Imcodec.ObjectProperty;
+using Imview.Core.Database.Collections;
+using Imview.Core.Views;
 
 namespace Imview.Core.Services;
 
@@ -37,12 +39,63 @@ public static class TemplateSerializer {
     private const string VIEW_FILE_EXTENSION = ".view";
 
     /// <summary>
-    /// Saves a quest template to a .view file.
+    /// Shows save options dialog and saves the quest template according to user choice.
     /// </summary>
     /// <param name="template">The template to save</param>
     /// <param name="parentWindow">The parent window for the save dialog</param>
     /// <returns>A task that completes when the save operation is done, with a bool indicating success</returns>
     public static async Task<bool> SaveTemplateAsync(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
+        ArgumentNullException.ThrowIfNull(template);
+
+        try {
+            // Show save options dialog
+            var optionsDialog = new QuestSaveOptionsDialog();
+            var selectedOption = await optionsDialog.ShowDialog<QuestSaveOption>(parentWindow);
+            
+            return selectedOption switch {
+                QuestSaveOption.SaveLocal => await SaveTemplateToFileAsync(template, parentWindow),
+                QuestSaveOption.Upload => await SaveTemplateToDatabase(template, parentWindow),
+                QuestSaveOption.SaveBoth => await SaveTemplateToBoth(template, parentWindow),
+                _ => false // User cancelled
+            };
+        }
+        catch {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Saves a quest template to the database.
+    /// </summary>
+    private static async Task<bool> SaveTemplateToDatabase(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
+        // Check if database is configured first
+        var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(parentWindow);
+        
+        if (!isConfigured) {
+            return false;
+        }
+
+        var questId = await DatabaseTemplateSerializer.SaveTemplateAsync(template, parentWindow);
+        return !string.IsNullOrEmpty(questId);
+    }
+
+    /// <summary>
+    /// Saves a quest template to both local file and database.
+    /// </summary>
+    private static async Task<bool> SaveTemplateToBoth(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
+        var localSuccess = await SaveTemplateToFileAsync(template, parentWindow);
+        var databaseSuccess = await SaveTemplateToDatabase(template, parentWindow);
+        
+        return localSuccess || databaseSuccess; // Success if either works
+    }
+
+    /// <summary>
+    /// Saves a quest template to a .view file (legacy file-based saving).
+    /// </summary>
+    /// <param name="template">The template to save</param>
+    /// <param name="parentWindow">The parent window for the save dialog</param>
+    /// <returns>A task that completes when the save operation is done, with a bool indicating success</returns>
+    public static async Task<bool> SaveTemplateToFileAsync(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
         ArgumentNullException.ThrowIfNull(template);
 
         try {

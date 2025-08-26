@@ -392,10 +392,6 @@ public partial class QuestTemplateEditor : UserControl {
                 new Avalonia.Controls.Button {
                     Content = "Save Template",
                     Command = ReactiveCommand.Create(SaveTemplate)
-                },
-                new Avalonia.Controls.Button {
-                    Content = "Load Template",
-                    Command = ReactiveCommand.Create(LoadTemplate)
                 }
             }
         };
@@ -581,38 +577,6 @@ public partial class QuestTemplateEditor : UserControl {
         }
     }
 
-    private async void LoadTemplate() {
-        try {
-            // Get the parent window for the load dialog
-            var parentWindow = this.FindAncestorOfType<Avalonia.Controls.Window>();
-            if (parentWindow == null) {
-                var appLifetime = Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
-                parentWindow = appLifetime?.MainWindow;
-            }
-
-            if (parentWindow == null) {
-                MessageService
-                    .Error("Could not find parent window for load dialog.")
-                    .Send();
-                return;
-            }
-
-            var loadedTemplate = await TemplateSerializer.LoadTemplateAsync(parentWindow);
-
-            if (loadedTemplate != null) {
-                PopulateFieldsWithTemplate(loadedTemplate);
-
-                MessageService
-                    .Info("Quest template loaded successfully.")
-                    .Send();
-            }
-        }
-        catch (Exception ex) {
-            MessageService
-                .Error($"Error loading template: {ex.Message}")
-                .Send();
-        }
-    }
 
     private void PopulateFieldsWithTemplate(QuestTemplate template) {
         // Update the current template with the loaded one.

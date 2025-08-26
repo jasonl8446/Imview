@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Imview.Core.Views;
+using Imview.Core.Common;
+using System.Threading.Tasks;
 
 namespace Imview.Core;
 
