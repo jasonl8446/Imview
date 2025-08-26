@@ -188,7 +188,16 @@ public class SplashPageViewModel : ViewModelBase {
             
             var downloadedPath = await _clientFileService.DownloadFileAsync(rootWadRecord, selectedRevision, progress);
             
-            RootWadDownloadStatus = "Root.wad downloaded successfully!";
+            RootWadDownloadStatus = "Loading Root.wad into memory...";
+            
+            // Load the downloaded Root.wad into memory
+            var loaded = await RootWadService.Instance.LoadFromFileAsync(downloadedPath);
+            if (loaded) {
+                var info = RootWadService.Instance.GetInfo();
+                RootWadDownloadStatus = $"Root.wad ready: {info.FileCount} files ({info.SizeFormatted})";
+            } else {
+                RootWadDownloadStatus = "Root.wad downloaded but failed to load into memory";
+            }
             
             // Refresh the warning display
             this.RaisePropertyChanged(nameof(HasRootWadWarning));

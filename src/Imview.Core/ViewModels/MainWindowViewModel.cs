@@ -53,6 +53,26 @@ public class MainWindowViewModel : ViewModelBase {
 
     public void Initialize(Avalonia.Controls.Window window) {
         _mainWindow = window;
+        
+        // Try to load Root.wad from cache on startup
+        _ = Task.Run(LoadRootWadAsync);
+    }
+    
+    private async Task LoadRootWadAsync() {
+        try {
+            var loaded = await RootWadService.Instance.LoadFromCacheAsync();
+            if (loaded) {
+                var info = RootWadService.Instance.GetInfo();
+                MessageService.Info($"Root.wad loaded: {info.FileCount} files ({info.SizeFormatted})")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+            }
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Failed to load Root.wad: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+        }
     }
 
     public TabManagerViewModel TabManager { get; }
