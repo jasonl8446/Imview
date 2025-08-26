@@ -124,6 +124,17 @@ public sealed class RootWadService {
             }
             
             Console.WriteLine($"Root.wad loaded successfully: {newArchive.FileCount} files, {newArchive.Size()} bytes");
+            
+            // Automatically load locale data after Root.wad is loaded
+            _ = Task.Run(async () => {
+                try {
+                    await LocaleService.Instance.LoadFromRootWadAsync();
+                }
+                catch (Exception ex) {
+                    Console.WriteLine($"Failed to load locale data: {ex.Message}");
+                }
+            });
+            
             return true;
         }
         catch (Exception ex) {

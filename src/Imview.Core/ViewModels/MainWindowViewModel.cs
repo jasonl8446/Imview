@@ -66,6 +66,15 @@ public class MainWindowViewModel : ViewModelBase {
                 MessageService.Info($"Root.wad loaded: {info.FileCount} files ({info.SizeFormatted})")
                     .WithDuration(TimeSpan.FromSeconds(3))
                     .Send();
+                
+                // Wait a moment for locale loading to complete, then show status
+                await Task.Delay(2000);
+                var localeInfo = LocaleService.Instance.GetInfo();
+                if (localeInfo.IsLoaded) {
+                    MessageService.Info($"Locale data loaded: {localeInfo.CategoryCount} categories, {localeInfo.TotalStringCount} strings")
+                        .WithDuration(TimeSpan.FromSeconds(3))
+                        .Send();
+                }
             }
         }
         catch (Exception ex) {
