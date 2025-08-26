@@ -35,6 +35,51 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- Client File Status Warning -->
+            <Border Background="#8B4513" 
+                   CornerRadius="5" 
+                   Padding="20"
+                   Margin="20,0"
+                   IsVisible="{Binding HasRootWadWarning}">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="{Binding RootWadWarning}"
+                              Foreground="White"
+                              FontWeight="Medium"
+                              TextWrapping="Wrap"
+                              HorizontalAlignment="Center"/>
+                    
+                    <!-- Download Button - only show if connection is available and revision selected -->
+                    <StackPanel Orientation="Horizontal" 
+                               HorizontalAlignment="Center" 
+                               Spacing="10"
+                               IsVisible="{Binding IsConnectionAvailable}">
+                        <Button Content="Download Root.wad Now"
+                               Command="{Binding DownloadRootWadCommand}"
+                               Classes="accent"
+                               Padding="15,8"
+                               IsEnabled="{Binding !IsDownloadingRootWad}"
+                               IsVisible="{Binding HasSelectedRevision}"/>
+                        
+                        <TextBlock Text="{Binding RootWadDownloadStatus}"
+                                  VerticalAlignment="Center"
+                                  Foreground="White"
+                                  FontStyle="Italic"
+                                  IsVisible="{Binding IsDownloadingRootWad}"/>
+                    </StackPanel>
+                    
+                    <!-- Settings Button - show when connection fails or no revision -->
+                    <StackPanel Orientation="Horizontal" 
+                               HorizontalAlignment="Center" 
+                               Spacing="10">
+                        <Button Content="Open Client File Settings"
+                               Command="{Binding OpenClientFileSettingsCommand}"
+                               Classes="accent"
+                               Padding="15,8"
+                               IsVisible="{Binding ShouldShowSettingsButton}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Sections -->
             <ItemsControl ItemsSource="{Binding Sections}">
                 <ItemsControl.ItemsPanel>

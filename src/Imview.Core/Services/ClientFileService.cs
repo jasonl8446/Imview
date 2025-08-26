@@ -125,10 +125,25 @@ public class ClientFileService {
                     // Skip text nodes and comments
                     if (fileGroupNode.NodeType != XmlNodeType.Element) continue;
                     
-                    // Look for RECORD child element
-                    var recordNode = fileGroupNode.SelectSingleNode("RECORD");
-                    if (recordNode != null) {
-                        var fileRecord = ParseFileRecord(recordNode);
+                    // Handle Base section specially - only include Root.wad
+                    if (fileGroupNode.Name.Equals("Base", StringComparison.OrdinalIgnoreCase)) {
+                        var recordNodes = fileGroupNode.SelectNodes("RECORD");
+                        if (recordNodes != null) {
+                            foreach (XmlNode recordNode in recordNodes) {
+                                var fileRecord = ParseFileRecord(recordNode);
+                                if (fileRecord != null && fileRecord.SourceFileName.Contains("Root.wad", StringComparison.OrdinalIgnoreCase)) {
+                                    fileList.Records.Add(fileRecord);
+                                    break; // Found Root.wad, no need to continue
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    // Look for RECORD child element in other sections
+                    var recordNode2 = fileGroupNode.SelectSingleNode("RECORD");
+                    if (recordNode2 != null) {
+                        var fileRecord = ParseFileRecord(recordNode2);
                         if (fileRecord != null) {
                             fileList.Records.Add(fileRecord);
                         }
@@ -297,6 +312,14 @@ public class ClientFileService {
             Directory.Delete(_cacheDirectory, true);
             Directory.CreateDirectory(_cacheDirectory);
         }
+    }
+
+    public bool IsRootWadCached() {
+        var selectedRevision = GetSelectedRevision();
+        if (string.IsNullOrEmpty(selectedRevision)) return false;
+        
+        var rootWadPath = Path.Combine(_cacheDirectory, selectedRevision, "Root.wad");
+        return File.Exists(rootWadPath);
     }
 
     public void Dispose() {
