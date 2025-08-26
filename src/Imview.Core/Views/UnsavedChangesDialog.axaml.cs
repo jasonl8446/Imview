@@ -19,33 +19,26 @@ modification, are permitted provided that the following conditions are met:
 */
 
 using Avalonia.Controls;
-using Imview.Core.Controls.Templates;
+using Avalonia.Interactivity;
 using Imview.Core.ViewModels;
 
 namespace Imview.Core.Views;
 
-public partial class QuestTemplateEditorView : UserControl {
-   
-   public QuestTemplateEditorView() {
-      InitializeComponent();
+public partial class UnsavedChangesDialog : Window {
+    
+    public UnsavedChangesDialog() {
+        InitializeComponent();
+    }
 
-      // Wait for DataContext to be set
-      DataContextChanged += (s, e) => {
-         if (DataContext is QuestTemplateEditorViewModel vm) {
-            var editor = this.FindControl<QuestTemplateEditor>("QuestEditor");
-            if (editor != null) {
-               editor.Template = vm.Template;
-            }
-         }
-      };
-   }
+    private void SaveButton_Click(object? sender, RoutedEventArgs e) {
+        Close(UnsavedChangesResult.Save);
+    }
 
-   /// <summary>
-   /// Saves the current editor changes back to the template
-   /// </summary>
-   public void SaveChangesToTemplate() {
-      var editor = this.FindControl<QuestTemplateEditor>("QuestEditor");
-      editor?.SaveChangesToTemplate();
-   }
+    private void DiscardButton_Click(object? sender, RoutedEventArgs e) {
+        Close(UnsavedChangesResult.Discard);
+    }
 
+    private void CancelButton_Click(object? sender, RoutedEventArgs e) {
+        Close(UnsavedChangesResult.Cancel);
+    }
 }

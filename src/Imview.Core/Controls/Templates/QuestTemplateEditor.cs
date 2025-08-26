@@ -48,6 +48,7 @@ public partial class QuestTemplateEditor : UserControl {
     public static new readonly StyledProperty<QuestTemplate> TemplateProperty =
         AvaloniaProperty.Register<QuestTemplateEditor, QuestTemplate>(nameof(Template));
 
+
     public new QuestTemplate Template {
         get => GetValue(TemplateProperty);
         set {
@@ -57,6 +58,7 @@ public partial class QuestTemplateEditor : UserControl {
             }
         }
     }
+
 
     // Core properties
     private QuestTemplate _template;
@@ -383,18 +385,14 @@ public partial class QuestTemplateEditor : UserControl {
         return CreateGroupBox("Goal Completion Logic", content);
     }
 
-    private Control CreateActionButtons()
-        => new StackPanel {
+    private Control CreateActionButtons() {
+        // No action buttons - save functionality is handled by the parent container
+        return new StackPanel {
             Orientation = Orientation.Horizontal,
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Children = {
-                new Avalonia.Controls.Button {
-                    Content = "Save Template",
-                    Command = ReactiveCommand.Create(SaveTemplate)
-                }
-            }
+            HorizontalAlignment = HorizontalAlignment.Right
         };
+    }
 
     private static Control CreateLabeledControl(string labelText, Control control)
         => new StackPanel {
@@ -516,37 +514,45 @@ public partial class QuestTemplateEditor : UserControl {
         }
     }
 
+    /// <summary>
+    /// Saves the current UI state back to the template object without showing file dialog
+    /// </summary>
+    public void SaveChangesToTemplate() {
+        // Save basic quest properties.
+        _template.m_questName = new ByteString(_questNameBox.Text ?? string.Empty);
+        _template.m_questTitle = new ByteString(_questTitleBox.Text ?? string.Empty);
+        _template.m_questLevel = (int) (_questLevelBox.Value ?? 1);
+        
+        // Save dialog system - convert from editor back to ActorDialogList
+        _template.m_dialogList = _questDialogEditor.ToActorDialogList();
+        
+        _template.m_onStartQuestScript = new ByteString(_onStartScriptBox.Text ?? string.Empty);
+        _template.m_onEndQuestScript = new ByteString(_onEndScriptBox.Text ?? string.Empty);
+
+        // Save quest flags.
+        _template.m_isHidden = _isHiddenBox.IsChecked ?? false;
+        _template.m_noQuestHelper = _noQuestHelperBox.IsChecked ?? false;
+        _template.m_prepAlways = _prepAlwaysBox.IsChecked ?? false;
+        _template.m_questRepeat = (_questRepeatBox.IsChecked ?? false) ? 1 : 0;
+        _template.m_outdated = _outdatedBox.IsChecked ?? false;
+
+        // Save quest goals.
+        _template.m_goals = _goals.Select(wrapper => wrapper.Goal).ToList();
+
+        // Save starting goals.
+        _template.m_startGoals = _goals
+            .Where(wrapper => wrapper.IsStartGoal)
+            .Select(wrapper => wrapper.Goal.m_goalName?.ToString() ?? string.Empty)
+            .ToList();
+
+        // Save goal logic.
+        _template.m_goalLogic = _goalLogics.Select(wrapper => wrapper.Logic).ToList();
+    }
+
     private async void SaveTemplate() {
         try {
-            // Save basic quest properties.
-            _template.m_questName = new ByteString(_questNameBox.Text ?? string.Empty);
-            _template.m_questTitle = new ByteString(_questTitleBox.Text ?? string.Empty);
-            _template.m_questLevel = (int) (_questLevelBox.Value ?? 1);
-            
-            // Save dialog system - convert from editor back to ActorDialogList
-            _template.m_dialogList = _questDialogEditor.ToActorDialogList();
-            
-            _template.m_onStartQuestScript = new ByteString(_onStartScriptBox.Text ?? string.Empty);
-            _template.m_onEndQuestScript = new ByteString(_onEndScriptBox.Text ?? string.Empty);
-
-            // Save quest flags.
-            _template.m_isHidden = _isHiddenBox.IsChecked ?? false;
-            _template.m_noQuestHelper = _noQuestHelperBox.IsChecked ?? false;
-            _template.m_prepAlways = _prepAlwaysBox.IsChecked ?? false;
-            _template.m_questRepeat = (_questRepeatBox.IsChecked ?? false) ? 1 : 0;
-            _template.m_outdated = _outdatedBox.IsChecked ?? false;
-
-            // Save quest goals.
-            _template.m_goals = _goals.Select(wrapper => wrapper.Goal).ToList();
-
-            // Save starting goals.
-            _template.m_startGoals = _goals
-                .Where(wrapper => wrapper.IsStartGoal)
-                .Select(wrapper => wrapper.Goal.m_goalName?.ToString() ?? string.Empty)
-                .ToList();
-
-            // Save goal logic.
-            _template.m_goalLogic = _goalLogics.Select(wrapper => wrapper.Logic).ToList();
+            // Save changes to template first
+            SaveChangesToTemplate();
 
             // Get the parent window for the save dialog.
             var parentWindow = this.FindAncestorOfType<Avalonia.Controls.Window>();

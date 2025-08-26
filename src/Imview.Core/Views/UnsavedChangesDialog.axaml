@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Imview.Core.Views.UnsavedChangesDialog"
+        Title="Unsaved Changes"
+        Width="400"
+        Height="200"
+        MinWidth="400"
+        MinHeight="200"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Icon and Message -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="0,0,0,20">
+            <TextBlock Text="⚠️" FontSize="24" VerticalAlignment="Center"/>
+            <TextBlock Text="You have unsaved changes!" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
+        
+        <!-- Details -->
+        <TextBlock Grid.Row="1" 
+                   Text="You have made changes to the current quest that haven't been saved. What would you like to do?"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,20"/>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Name="SaveButton" Content="Save" 
+                   MinWidth="80" Padding="10,5"
+                   Classes="accent"
+                   Click="SaveButton_Click"/>
+            <Button Name="DiscardButton" Content="Discard Changes" 
+                   MinWidth="80" Padding="10,5"
+                   Click="DiscardButton_Click"/>
+            <Button Name="CancelButton" Content="Cancel" 
+                   MinWidth="80" Padding="10,5"
+                   Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

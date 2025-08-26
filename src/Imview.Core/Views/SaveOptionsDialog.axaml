@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Imview.Core.Views.SaveOptionsDialog"
+        Title="Save Quest"
+        Width="400"
+        Height="200"
+        MinWidth="400"
+        MinHeight="200"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="0,0,0,20">
+            <TextBlock Text="💾" FontSize="24" VerticalAlignment="Center"/>
+            <TextBlock Text="Choose Save Location" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
+        
+        <!-- Options -->
+        <StackPanel Grid.Row="1" Spacing="15">
+            <TextBlock Text="Where would you like to save this quest?"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,10"/>
+            <RadioButton Name="SaveToDatabaseRadio" Content="Save to Database" IsChecked="True" GroupName="SaveLocation"/>
+            <RadioButton Name="SaveToFileRadio" Content="Save to Local File" GroupName="SaveLocation"/>
+        </StackPanel>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Name="SaveButton" Content="Save" 
+                   MinWidth="80" Padding="10,5"
+                   Classes="accent"
+                   Click="SaveButton_Click"/>
+            <Button Name="CancelButton" Content="Cancel" 
+                   MinWidth="80" Padding="10,5"
+                   Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

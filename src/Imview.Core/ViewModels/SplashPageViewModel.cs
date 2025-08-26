@@ -29,14 +29,14 @@ public class SplashPageViewModel(MainWindowViewModel mainViewModel) : ViewModelB
     public ObservableCollection<SplashSectionViewModel> Sections { get; } = [
         new SplashSectionViewModel(
             "Quests",
-            "Create Quest",
-            "Load Quest", 
-            "Browse Quests",
+            "Quest Editor",
             "Get Quests From Packet Capture",
-            mainViewModel.CreateNewQuest,
-            mainViewModel.LoadQuest,
+            "",
+            "",
             mainViewModel.ShowQuestBrowser,
-            mainViewModel.GetQuestsFromPacketCapture),
+            mainViewModel.GetQuestsFromPacketCapture,
+            null,
+            null),
         new SplashSectionViewModel(
             "Files",
             "Unpack KIWADs",

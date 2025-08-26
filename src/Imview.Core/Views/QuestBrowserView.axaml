@@ -1,11 +1,17 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Imview.Core.ViewModels"
+             xmlns:views="using:Imview.Core.Views"
+             xmlns:templates="using:Imview.Core.Controls.Templates"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Imview.Core.Views.QuestBrowserView"
              x:DataType="vm:QuestBrowserViewModel">
+
+    <UserControl.KeyBindings>
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveQuestCommand}"/>
+    </UserControl.KeyBindings>
     
     <Grid>
         <Grid.RowDefinitions>
@@ -16,7 +22,7 @@
         <!-- Header and Controls -->
         <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
                 Padding="15">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
                 <!-- Search Box -->
                 <TextBox Grid.Column="0" 
                         Text="{Binding SearchText}" 
@@ -33,8 +39,13 @@
                        Command="{Binding NewQuestCommand}"
                        Margin="10,0,0,0" Classes="accent"/>
                 
+                <!-- Load Local Quest Button -->
+                <Button Grid.Column="3" Content="Load Local Quest" 
+                       Command="{Binding LoadLocalQuestCommand}"
+                       Margin="10,0,0,0"/>
+                
                 <!-- Delete Selected Button -->
-                <Button Grid.Column="3" Content="Delete Selected" 
+                <Button Grid.Column="4" Content="Delete Selected" 
                        Command="{Binding DeleteSelectedCommand}"
                        IsEnabled="{Binding HasSelectedQuest}"
                        Margin="10,0,0,0"/>
@@ -102,70 +113,63 @@
                          Background="Gray" 
                          HorizontalAlignment="Stretch"/>
             
-            <!-- Quest Detail Panel -->
-            <Border Grid.Column="2" Padding="15">
+            <!-- Quest Editor Panel -->
+            <Border Grid.Column="2" Padding="0">
                 <Grid>
+                    <!-- Quest Editor Content -->
                     <ScrollViewer IsVisible="{Binding HasSelectedQuest}">
-                        <StackPanel Spacing="15">
-                            <!-- Quest Info -->
+                        <StackPanel Spacing="10" Margin="15">
+                            <!-- Quest Header Info -->
                             <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="15">
-                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*">
-                                    <Grid.Styles>
-                                        <Style Selector="TextBlock.label">
-                                            <Setter Property="FontWeight" Value="Bold"/>
-                                            <Setter Property="Margin" Value="0,0,10,0"/>
-                                            <Setter Property="VerticalAlignment" Value="Top"/>
-                                        </Style>
-                                    </Grid.Styles>
-                                    
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:"/>
+                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,*,Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" 
+                                              Text="Quest Name:" 
+                                              FontWeight="Bold" 
+                                              Margin="0,0,10,0" 
+                                              VerticalAlignment="Center"/>
                                     <TextBox Grid.Row="0" Grid.Column="1" 
                                             Text="{Binding SelectedQuest.Name}" 
-                                            IsReadOnly="{Binding !IsEditing}"/>
+                                            Margin="0,0,10,0"/>
+                                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="10">
+                                        <Button Command="{Binding SaveQuestCommand}"
+                                               IsEnabled="{Binding HasSelectedQuest}"
+                                               Classes="accent">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <TextBlock Text="●" 
+                                                          IsVisible="{Binding HasUnsavedChanges}"
+                                                          Foreground="Orange"
+                                                          VerticalAlignment="Center"/>
+                                                <TextBlock Text="Save" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Content="Export" 
+                                               Command="{Binding ExportCommand}"
+                                               IsEnabled="{Binding HasSelectedQuest}"/>
+                                    </StackPanel>
                                     
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="ID:"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" 
-                                              Text="{Binding SelectedQuest.Id}" 
-                                              Foreground="Gray" Margin="0,5"/>
-                                    
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Description:"/>
-                                    <TextBox Grid.Row="2" Grid.Column="1" 
+                                    <TextBlock Grid.Row="1" Grid.Column="0" 
+                                              Text="Description:" 
+                                              FontWeight="Bold" 
+                                              Margin="0,10,10,0" 
+                                              VerticalAlignment="Top"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                             Text="{Binding SelectedQuest.Description}" 
-                                            AcceptsReturn="True" TextWrapping="Wrap" Height="80"
-                                            IsReadOnly="{Binding !IsEditing}"/>
-                                    
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Created:"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="1" 
-                                              Text="{Binding SelectedQuest.CreatedAt}" 
-                                              Foreground="Gray" Margin="0,5"/>
-                                    
-                                    <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="Modified:"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="1" 
-                                              Text="{Binding SelectedQuest.ModifiedAt}" 
-                                              Foreground="Gray" Margin="0,5"/>
+                                            AcceptsReturn="True" 
+                                            TextWrapping="Wrap" 
+                                            Height="60"
+                                            Margin="0,10,0,0"/>
                                 </Grid>
                             </Border>
                             
-                            <!-- Action Buttons -->
-                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                                <Button Content="{Binding EditButtonText}" 
-                                       Command="{Binding EditCommand}"/>
-                                <Button Content="Open in Editor" 
-                                       Command="{Binding OpenEditorCommand}" 
-                                       Classes="accent"/>
-                                <Button Content="Export to File" 
-                                       Command="{Binding ExportCommand}"/>
-                            </StackPanel>
-                            
-                            <!-- Quest Template Preview -->
-                            <Expander Header="Template Preview" IsExpanded="False">
-                                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10">
-                                    <TextBlock Text="{Binding SelectedQuestPreview}" 
-                                              FontFamily="Consolas,Courier New,monospace" 
-                                              FontSize="10"
-                                              TextWrapping="Wrap"/>
-                                </Border>
-                            </Expander>
+                            <!-- Embedded Quest Editor -->
+                            <ContentControl Content="{Binding QuestEditorViewModel}"
+                                          IsVisible="{Binding HasSelectedQuest}">
+                                <ContentControl.DataTemplates>
+                                    <DataTemplate DataType="{x:Type vm:QuestTemplateEditorViewModel}">
+                                        <views:QuestTemplateEditorView/>
+                                    </DataTemplate>
+                                </ContentControl.DataTemplates>
+                            </ContentControl>
                         </StackPanel>
                     </ScrollViewer>
                     
@@ -178,9 +182,12 @@
                                   FontSize="18" 
                                   Foreground="Gray" 
                                   HorizontalAlignment="Center"/>
-                        <TextBlock Text="Select a quest from the list to view details" 
+                        <TextBlock Text="Create a new quest, load from file, or select one from the database" 
                                   Foreground="Gray" 
-                                  HorizontalAlignment="Center"/>
+                                  HorizontalAlignment="Center"
+                                  TextWrapping="Wrap"
+                                  TextAlignment="Center"
+                                  MaxWidth="300"/>
                     </StackPanel>
                 </Grid>
             </Border>

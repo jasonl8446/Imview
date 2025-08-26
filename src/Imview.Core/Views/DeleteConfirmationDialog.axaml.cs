@@ -19,33 +19,27 @@ modification, are permitted provided that the following conditions are met:
 */
 
 using Avalonia.Controls;
-using Imview.Core.Controls.Templates;
-using Imview.Core.ViewModels;
+using Avalonia.Interactivity;
 
 namespace Imview.Core.Views;
 
-public partial class QuestTemplateEditorView : UserControl {
-   
-   public QuestTemplateEditorView() {
-      InitializeComponent();
+public partial class DeleteConfirmationDialog : Window {
+    
+    public DeleteConfirmationDialog(string questName) {
+        InitializeComponent();
+        
+        // Set the message with the quest name
+        var messageText = this.FindControl<TextBlock>("MessageText");
+        if (messageText != null) {
+            messageText.Text = $"Are you sure you want to delete the quest '{questName}'?\n\nThis action cannot be undone.";
+        }
+    }
 
-      // Wait for DataContext to be set
-      DataContextChanged += (s, e) => {
-         if (DataContext is QuestTemplateEditorViewModel vm) {
-            var editor = this.FindControl<QuestTemplateEditor>("QuestEditor");
-            if (editor != null) {
-               editor.Template = vm.Template;
-            }
-         }
-      };
-   }
+    private void DeleteButton_Click(object? sender, RoutedEventArgs e) {
+        Close(true);
+    }
 
-   /// <summary>
-   /// Saves the current editor changes back to the template
-   /// </summary>
-   public void SaveChangesToTemplate() {
-      var editor = this.FindControl<QuestTemplateEditor>("QuestEditor");
-      editor?.SaveChangesToTemplate();
-   }
-
+    private void CancelButton_Click(object? sender, RoutedEventArgs e) {
+        Close(false);
+    }
 }

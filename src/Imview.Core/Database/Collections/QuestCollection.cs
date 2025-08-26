@@ -196,6 +196,104 @@ public static class QuestCollection {
     }
 
     /// <summary>
+    /// Finds a quest by name
+    /// </summary>
+    /// <param name="questName">The name of the quest to find</param>
+    /// <returns>The quest document or null if not found</returns>
+    public static async Task<QuestDocument?> FindQuestByNameAsync(string questName) {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            var result = await session.Query<QuestDocument>()
+                .Where(q => q.Name == questName)
+                .FirstOrDefaultAsync();
+
+            return result;
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error finding quest by name: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Upserts a quest template - creates new if not exists, updates if exists
+    /// </summary>
+    /// <param name="questTemplate">The quest template</param>
+    /// <param name="name">The name for the quest</param>
+    /// <param name="description">Optional description</param>
+    /// <returns>The ID of the upserted quest document</returns>
+    public static async Task<string?> UpsertQuestAsync(QuestTemplate questTemplate, string name, string description = "") {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            // Try to find existing quest by name
+            // First, get all quests and check if name exists (for debugging)
+            var allQuests = await session.Query<QuestDocument>().ToListAsync();
+            var existingQuestByName = allQuests.FirstOrDefault(q => q.Name == name);
+            
+            // Also try the original query approach
+            var existingQuest = await session.Query<QuestDocument>()
+                .Where(q => q.Name == name)
+                .FirstOrDefaultAsync();
+
+            // Use the in-memory search result as it's more reliable
+            existingQuest = existingQuestByName;
+            
+            if (existingQuest != null) {
+                // Completely replace the existing quest while preserving the ID and creation info
+                string preservedId = existingQuest.Id;
+                DateTime preservedCreatedAt = existingQuest.CreatedAt;
+                string preservedCreatedBy = existingQuest.CreatedBy;
+                
+                // Replace all properties with new data
+                existingQuest.Name = name;
+                existingQuest.Description = description;
+                existingQuest.Template = questTemplate;
+                existingQuest.ModifiedAt = DateTime.UtcNow;
+                existingQuest.ModifiedBy = Environment.UserName;
+                
+                // Ensure we preserve the original creation metadata
+                existingQuest.Id = preservedId;
+                existingQuest.CreatedAt = preservedCreatedAt;
+                existingQuest.CreatedBy = preservedCreatedBy;
+                
+                await session.SaveChangesAsync();
+                return existingQuest.Id;
+            } else {
+                // Create new quest
+                var questDoc = new QuestDocument {
+                    Name = name,
+                    Description = description,
+                    Template = questTemplate,
+                    CreatedAt = DateTime.UtcNow,
+                    ModifiedAt = DateTime.UtcNow,
+                    CreatedBy = Environment.UserName,
+                    ModifiedBy = Environment.UserName
+                };
+
+                await session.StoreAsync(questDoc);
+                await session.SaveChangesAsync();
+                return questDoc.Id;
+            }
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error upserting quest: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Deletes a quest template from the database
     /// </summary>
     /// <param name="questId">The quest ID to delete</param>

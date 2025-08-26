@@ -19,33 +19,28 @@ modification, are permitted provided that the following conditions are met:
 */
 
 using Avalonia.Controls;
-using Imview.Core.Controls.Templates;
-using Imview.Core.ViewModels;
+using Avalonia.Interactivity;
 
 namespace Imview.Core.Views;
 
-public partial class QuestTemplateEditorView : UserControl {
-   
-   public QuestTemplateEditorView() {
-      InitializeComponent();
+public enum SaveLocation {
+    Database,
+    LocalFile,
+    Cancelled
+}
 
-      // Wait for DataContext to be set
-      DataContextChanged += (s, e) => {
-         if (DataContext is QuestTemplateEditorViewModel vm) {
-            var editor = this.FindControl<QuestTemplateEditor>("QuestEditor");
-            if (editor != null) {
-               editor.Template = vm.Template;
-            }
-         }
-      };
-   }
+public partial class SaveOptionsDialog : Window {
+    
+    public SaveOptionsDialog() {
+        InitializeComponent();
+    }
 
-   /// <summary>
-   /// Saves the current editor changes back to the template
-   /// </summary>
-   public void SaveChangesToTemplate() {
-      var editor = this.FindControl<QuestTemplateEditor>("QuestEditor");
-      editor?.SaveChangesToTemplate();
-   }
+    private void SaveButton_Click(object? sender, RoutedEventArgs e) {
+        var result = SaveToDatabaseRadio?.IsChecked == true ? SaveLocation.Database : SaveLocation.LocalFile;
+        Close(result);
+    }
 
+    private void CancelButton_Click(object? sender, RoutedEventArgs e) {
+        Close(SaveLocation.Cancelled);
+    }
 }

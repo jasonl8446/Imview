@@ -39,6 +39,7 @@ public class MainWindowViewModel : ViewModelBase {
     public ICommand LoadQuestCommand { get; }
 
     private Avalonia.Controls.Window? _mainWindow;
+    private QuestBrowserViewModel? _questBrowserViewModel;
 
     public MainWindowViewModel() {
         TabManager = new TabManagerViewModel();
@@ -213,7 +214,19 @@ public class MainWindowViewModel : ViewModelBase {
             return;
         }
 
-        var tab = TabManager.AddTab("Quest Browser", new QuestBrowserViewModel());
+        // Check if quest browser tab already exists
+        var existingTab = TabManager.FindTabByContent<QuestBrowserViewModel>();
+        if (existingTab != null) {
+            TabManager.SelectTab(existingTab);
+            return;
+        }
+
+        // Create singleton quest browser instance if it doesn't exist
+        if (_questBrowserViewModel == null) {
+            _questBrowserViewModel = new QuestBrowserViewModel();
+        }
+
+        var tab = TabManager.AddTab("Quest Editor", _questBrowserViewModel);
         TabManager.SelectTab(tab);
     }
 
