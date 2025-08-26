@@ -67,7 +67,6 @@ public partial class QuestTemplateEditor : UserControl {
     private readonly IGoalEditorFactory _goalEditorFactory;
 
     // UI Controls
-    private TextBox _questNameBox;
     private TextBox _questTitleBox;
     private NumericUpDown _questLevelBox;
     private ListBox _goalsList;
@@ -104,7 +103,6 @@ public partial class QuestTemplateEditor : UserControl {
         );
 
         // Initialize non-nullable fields
-        _questNameBox = new TextBox();
         _questTitleBox = new TextBox();
         _questLevelBox = new NumericUpDown();
         _goalsList = new ListBox();
@@ -144,7 +142,6 @@ public partial class QuestTemplateEditor : UserControl {
 
     private void InitializeControls() {
         // Basic info controls.
-        _questNameBox = new TextBox();
         _questTitleBox = new TextBox();
         _questLevelBox = new NumericUpDown {
             Minimum = 1,
@@ -264,7 +261,6 @@ public partial class QuestTemplateEditor : UserControl {
         var content = new StackPanel {
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
             Children = {
-                CreateLabeledControl("Quest Name:", _questNameBox),
                 CreateLabeledControl("Quest Title:", _questTitleBox),
                 CreateLabeledControl("Quest Level:", _questLevelBox)
             }
@@ -430,7 +426,6 @@ public partial class QuestTemplateEditor : UserControl {
         };
 
     private void InitializeValues() {
-        _questNameBox.Text = _template.m_questName?.ToString();
         _questTitleBox.Text = _template.m_questTitle?.ToString();
         _questLevelBox.Value = _template.m_questLevel;
         
@@ -518,8 +513,7 @@ public partial class QuestTemplateEditor : UserControl {
     /// Saves the current UI state back to the template object without showing file dialog
     /// </summary>
     public void SaveChangesToTemplate() {
-        // Save basic quest properties.
-        _template.m_questName = new ByteString(_questNameBox.Text ?? string.Empty);
+        // Save basic quest properties (quest name is handled by the parent quest browser).
         _template.m_questTitle = new ByteString(_questTitleBox.Text ?? string.Empty);
         _template.m_questLevel = (int) (_questLevelBox.Value ?? 1);
         
