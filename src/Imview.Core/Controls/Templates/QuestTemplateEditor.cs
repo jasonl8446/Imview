@@ -257,11 +257,73 @@ public partial class QuestTemplateEditor : UserControl {
         _goalLogicsList.DoubleTapped += GoalLogicsList_DoubleTapped;
     }
 
+    private Control CreateQuestTitlePanel() {
+        var titlePanel = new StackPanel { Spacing = 5 };
+
+        // Label for the quest title section
+        titlePanel.Children.Add(new TextBlock { Text = "Quest Title:" });
+
+        // Text box for editing the locale ID
+        titlePanel.Children.Add(_questTitleBox);
+
+        // Text block to display the resolved English text
+        var resolvedTextBlock = new TextBlock {
+            Foreground = Brushes.LightGray,
+            FontStyle = FontStyle.Italic,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+
+        // Update resolved text when the text box changes
+        _questTitleBox.TextChanged += (sender, e) => {
+            var localeId = _questTitleBox.Text;
+            if (string.IsNullOrEmpty(localeId)) {
+                resolvedTextBlock.Text = "";
+                return;
+            }
+
+            var resolvedText = ResolveLocaleString(localeId);
+            if (!string.IsNullOrEmpty(resolvedText) && resolvedText != localeId) {
+                resolvedTextBlock.Text = $"➤ {resolvedText}";
+            }
+            else {
+                resolvedTextBlock.Text = "➤ (No locale text found)";
+            }
+        };
+
+        titlePanel.Children.Add(resolvedTextBlock);
+
+        return titlePanel;
+    }
+
+    private string? ResolveLocaleString(string localeReference) {
+        if (string.IsNullOrEmpty(localeReference) || !LocaleService.Instance.IsLoaded) {
+            return null;
+        }
+
+        // Split the locale reference into category and key (e.g., "QuestTitles_0000001")
+        var underscoreIndex = localeReference.LastIndexOf('_');
+        if (underscoreIndex == -1) {
+            return null; // Invalid format
+        }
+
+        var category = localeReference.Substring(0, underscoreIndex);
+        var key = localeReference.Substring(underscoreIndex + 1);
+
+        // Pad the key to 8 digits if it's not already
+        if (key.Length < 8 && key.All(char.IsDigit)) {
+            key = key.PadLeft(8, '0');
+        }
+
+        return LocaleService.Instance.GetString(category, key);
+    }
+
     private Control CreateBasicInfoSection() {
+        var questTitlePanel = CreateQuestTitlePanel();
         var content = new StackPanel {
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
             Children = {
-                CreateLabeledControl("Quest Title:", _questTitleBox),
+                questTitlePanel,
                 CreateLabeledControl("Quest Level:", _questLevelBox)
             }
         };
@@ -428,10 +490,10 @@ public partial class QuestTemplateEditor : UserControl {
     private void InitializeValues() {
         _questTitleBox.Text = _template.m_questTitle?.ToString();
         _questLevelBox.Value = _template.m_questLevel;
-        
+
         // Initialize dialog editor with quest's dialog list
         _questDialogEditor.DialogList = _template.m_dialogList as ActorDialogList;
-        
+
         _onStartScriptBox.Text = _template.m_onStartQuestScript?.ToString();
         _onEndScriptBox.Text = _template.m_onEndQuestScript?.ToString();
 
@@ -516,10 +578,10 @@ public partial class QuestTemplateEditor : UserControl {
         // Save basic quest properties (quest name is handled by the parent quest browser).
         _template.m_questTitle = new ByteString(_questTitleBox.Text ?? string.Empty);
         _template.m_questLevel = (int) (_questLevelBox.Value ?? 1);
-        
+
         // Save dialog system - convert from editor back to ActorDialogList
         _template.m_dialogList = _questDialogEditor.ToActorDialogList();
-        
+
         _template.m_onStartQuestScript = new ByteString(_onStartScriptBox.Text ?? string.Empty);
         _template.m_onEndQuestScript = new ByteString(_onEndScriptBox.Text ?? string.Empty);
 

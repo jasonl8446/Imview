@@ -25,7 +25,9 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using ReactiveUI;
 using System;
+using System.Linq;
 using Imview.Core.Common.Constants;
+using Imview.Core.Services;
 
 namespace Imview.Core.Controls.Templates;
 
@@ -102,9 +104,7 @@ public class DialogEntryEditorWindow : Window {
                     "The name of the NPC persona that will speak this dialogue", 
                     _personaNameBox = new TextBox()),
                     
-                CreateLabeledControl("Dialog Locale Key:", 
-                    "The localization key that references the actual dialogue text (e.g., 'WizQst9559_00000129')", 
-                    _dialogKeyBox = new TextBox()),
+                CreateDialogKeySection(),
                     
                 CreateLabeledControl("Sound File Path:", 
                     "Path to the audio file for voice acting (e.g., '|Sound_Dialogue|WorldData|Sound/Dialogue/MerleAmbrose_QST_13.mp3')", 
@@ -121,6 +121,80 @@ public class DialogEntryEditorWindow : Window {
         };
 
         return CreateGroupBox("Basic Dialog Properties", content);
+    }
+
+    private Control CreateDialogKeySection() {
+        var panel = new StackPanel { Spacing = 3 };
+        
+        var headerText = new TextBlock { 
+            Text = "Dialog Locale Key:",
+            FontWeight = FontWeight.SemiBold
+        };
+        
+        var explanationTextBlock = new TextBlock {
+            Text = "The localization key that references the actual dialogue text (e.g., 'WizQst9559_00000129')",
+            Foreground = Brushes.LightGray,
+            FontStyle = FontStyle.Italic,
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, 0, 5)
+        };
+        
+        // Text box for editing the locale ID
+        _dialogKeyBox = new TextBox();
+        
+        // Text block to display the resolved English text
+        var resolvedTextBlock = new TextBlock {
+            Foreground = Brushes.LightGray,
+            FontStyle = FontStyle.Italic,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        
+        // Update resolved text when the text box changes
+        _dialogKeyBox.TextChanged += (sender, e) => {
+            var localeReference = _dialogKeyBox.Text;
+            if (string.IsNullOrEmpty(localeReference)) {
+                resolvedTextBlock.Text = "";
+                return;
+            }
+            
+            var resolvedText = ResolveLocaleString(localeReference);
+            if (!string.IsNullOrEmpty(resolvedText) && resolvedText != localeReference) {
+                resolvedTextBlock.Text = $"➤ {resolvedText}";
+            } else {
+                resolvedTextBlock.Text = "➤ (No locale text found)";
+            }
+        };
+        
+        panel.Children.Add(headerText);
+        panel.Children.Add(explanationTextBlock);
+        panel.Children.Add(_dialogKeyBox);
+        panel.Children.Add(resolvedTextBlock);
+        
+        return panel;
+    }
+
+    private string? ResolveLocaleString(string localeReference) {
+        if (string.IsNullOrEmpty(localeReference) || !LocaleService.Instance.IsLoaded) {
+            return null;
+        }
+
+        // Split the locale reference into category and key (e.g., "WizQst9559_00000129")
+        var underscoreIndex = localeReference.LastIndexOf('_');
+        if (underscoreIndex == -1) {
+            return null; // Invalid format
+        }
+
+        var category = localeReference.Substring(0, underscoreIndex);
+        var key = localeReference.Substring(underscoreIndex + 1);
+
+        // Pad the key to 8 digits if it's not already and is all numeric
+        if (key.Length < 8 && key.All(char.IsDigit)) {
+            key = key.PadLeft(8, '0');
+        }
+
+        return LocaleService.Instance.GetString(category, key);
     }
 
     private Control CreateAdvancedSection() {

@@ -31,15 +31,15 @@ namespace Imview.Core.Services;
 /// Singleton service for managing localized text from .lang files in Root.wad.
 /// </summary>
 public sealed class LocaleService {
-    
+
     private static readonly Lazy<LocaleService> _instance = new(() => new LocaleService());
     public static LocaleService Instance => _instance.Value;
-    
+
     private readonly Dictionary<string, Dictionary<string, string>> _localeData = new();
     private readonly object _lock = new();
-    
+
     private LocaleService() { }
-    
+
     /// <summary>
     /// Gets whether locale data has been loaded.
     /// </summary>
@@ -50,7 +50,7 @@ public sealed class LocaleService {
             }
         }
     }
-    
+
     /// <summary>
     /// Gets the number of loaded locale categories.
     /// </summary>
@@ -61,7 +61,7 @@ public sealed class LocaleService {
             }
         }
     }
-    
+
     /// <summary>
     /// Gets the total number of locale strings across all categories.
     /// </summary>
@@ -72,7 +72,9 @@ public sealed class LocaleService {
             }
         }
     }
-    
+
+    private static readonly char[] separator = new[] { '\r', '\n' };
+
     /// <summary>
     /// Loads all .lang files from Root.wad's Locale/English directory.
     /// </summary>
@@ -80,7 +82,7 @@ public sealed class LocaleService {
     public Task<bool> LoadFromRootWadAsync() {
         return Task.Run(() => LoadFromRootWad());
     }
-    
+
     /// <summary>
     /// Loads all .lang files from Root.wad's Locale/English directory synchronously.
     /// </summary>
@@ -89,25 +91,25 @@ public sealed class LocaleService {
         if (!RootWadService.Instance.IsLoaded) {
             return false;
         }
-        
+
         try {
             var loadedCategories = 0;
             var loadedStrings = 0;
-            
+
             // Get list of all files in the Root.wad
             var fileNames = RootWadService.Instance.GetFileNames();
-            var langFiles = fileNames.Where(f => f.StartsWith("Locale/English/", StringComparison.OrdinalIgnoreCase) 
+            var langFiles = fileNames.Where(f => f.StartsWith("Locale/English/", StringComparison.OrdinalIgnoreCase)
                                                 && f.EndsWith(".lang", StringComparison.OrdinalIgnoreCase))
                                      .ToList();
-            
+
             lock (_lock) {
                 _localeData.Clear();
             }
-            
+
             foreach (var langFile in langFiles) {
                 try {
                     var fileData = RootWadService.Instance.GetFile(langFile);
-                    
+
                     if (fileData.HasValue) {
                         var category = ParseLangFile(langFile, fileData.Value);
                         if (category != null) {
@@ -116,7 +118,7 @@ public sealed class LocaleService {
                             }
                             loadedCategories++;
                             loadedStrings += category.Entries.Count;
-                            
+
                             // Progress reporting for large loads
                             if (loadedCategories % 50 == 0) {
                                 Console.WriteLine($"Loaded {loadedCategories}/{langFiles.Count} locale categories...");
@@ -128,7 +130,7 @@ public sealed class LocaleService {
                     Console.WriteLine($"Failed to load {langFile}: {ex.Message}");
                 }
             }
-            
+
             Console.WriteLine($"Loaded {loadedCategories} locale categories with {loadedStrings} strings total");
             return loadedCategories > 0;
         }
@@ -137,7 +139,7 @@ public sealed class LocaleService {
             return false;
         }
     }
-    
+
     /// <summary>
     /// Gets a localized string from a specific category by key.
     /// </summary>
@@ -152,7 +154,7 @@ public sealed class LocaleService {
             return null;
         }
     }
-    
+
     /// <summary>
     /// Gets a localized string from a specific category by numeric key.
     /// </summary>
@@ -163,7 +165,7 @@ public sealed class LocaleService {
         var paddedKey = numericKey.ToString("00000000");
         return GetString(category, paddedKey);
     }
-    
+
     /// <summary>
     /// Searches for strings containing the specified text across all categories.
     /// </summary>
@@ -174,10 +176,10 @@ public sealed class LocaleService {
         if (string.IsNullOrWhiteSpace(searchText)) {
             return new List<LocaleEntry>();
         }
-        
+
         var results = new List<LocaleEntry>();
         var searchLower = searchText.ToLowerInvariant();
-        
+
         lock (_lock) {
             foreach (var category in _localeData) {
                 foreach (var entry in category.Value) {
@@ -187,7 +189,7 @@ public sealed class LocaleService {
                             Key = entry.Key,
                             Value = entry.Value
                         });
-                        
+
                         if (results.Count >= maxResults) {
                             return results;
                         }
@@ -195,10 +197,10 @@ public sealed class LocaleService {
                 }
             }
         }
-        
+
         return results;
     }
-    
+
     /// <summary>
     /// Gets all strings from a specific category.
     /// </summary>
@@ -206,12 +208,12 @@ public sealed class LocaleService {
     /// <returns>A dictionary of key-value pairs, or empty dictionary if category not found.</returns>
     public Dictionary<string, string> GetCategory(string category) {
         lock (_lock) {
-            return _localeData.TryGetValue(category, out var categoryData) 
-                ? new Dictionary<string, string>(categoryData) 
+            return _localeData.TryGetValue(category, out var categoryData)
+                ? new Dictionary<string, string>(categoryData)
                 : new Dictionary<string, string>();
         }
     }
-    
+
     /// <summary>
     /// Gets a list of all available category names.
     /// </summary>
@@ -221,7 +223,7 @@ public sealed class LocaleService {
             return _localeData.Keys.ToList();
         }
     }
-    
+
     /// <summary>
     /// Checks if a category exists.
     /// </summary>
@@ -232,7 +234,7 @@ public sealed class LocaleService {
             return _localeData.ContainsKey(category);
         }
     }
-    
+
     /// <summary>
     /// Gets information about the loaded locale data.
     /// </summary>
@@ -246,7 +248,7 @@ public sealed class LocaleService {
             };
         }
     }
-    
+
     /// <summary>
     /// Clears all loaded locale data.
     /// </summary>
@@ -255,42 +257,55 @@ public sealed class LocaleService {
             _localeData.Clear();
         }
     }
-    
+
     private LangCategory? ParseLangFile(string fileName, Memory<byte> data) {
         try {
             // Extract category name from file path (e.g., "Locale/English/Spells.lang" -> "Spells")
             var categoryName = Path.GetFileNameWithoutExtension(fileName);
-            
+
             // Convert bytes to UTF-16 string (lang files are UTF-16 encoded)
             var content = Encoding.Unicode.GetString(data.Span);
-            
+
             var entries = new Dictionary<string, string>();
-            var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            
-            for (int i = 0; i < lines.Length; i++) {
-                var line = lines[i].Trim();
+            var lines = content.Split(separator, StringSplitOptions.None); // Keep empty lines to maintain structure
+
+            // Skip the first line (filename echo)
+            int startIndex = 1;
+            if (lines.Length > 0 && lines[0].Trim().Contains(categoryName, StringComparison.OrdinalIgnoreCase)) {
+                startIndex = 1;
+            } else {
+                startIndex = 0; // Fallback if first line isn't filename
+            }
+
+            // Parse blocks: key, empty line, value, repeat
+            for (int i = startIndex; i < lines.Length; i++) {
+                var keyLine = lines[i].Trim();
                 
-                // Skip empty lines and header line
-                if (string.IsNullOrEmpty(line) || line.Contains(':')) {
+                // Skip empty lines
+                if (string.IsNullOrEmpty(keyLine)) {
                     continue;
                 }
+
+                // This should be a key line - could be digits, hex, alphanumeric, etc.
+                var key = keyLine.Replace(" ", ""); // Remove spaces from key
                 
-                // Check if this line looks like a key (all digits and spaces)
-                if (IsKeyLine(line)) {
-                    var key = line.Replace(" ", ""); // Remove spaces from key
-                    
-                    // Get the value from the next non-empty line
-                    if (i + 1 < lines.Length) {
-                        var valueLine = lines[i + 1].Trim();
-                        if (!string.IsNullOrEmpty(valueLine) && !IsKeyLine(valueLine)) {
-                            // Clean up the value (remove extra spaces between characters)
-                            var cleanValue = CleanValue(valueLine);
-                            entries[key] = cleanValue;
-                        }
+                // Skip the empty line after the key (if it exists)
+                i++;
+                while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i])) {
+                    i++;
+                }
+                
+                // Get the value line
+                if (i < lines.Length) {
+                    var valueLine = lines[i].Trim();
+                    if (!string.IsNullOrEmpty(valueLine)) {
+                        // Clean up the value (remove extra spaces between characters)
+                        var cleanValue = CleanValue(valueLine);
+                        entries[key] = cleanValue;
                     }
                 }
             }
-            
+
             return entries.Count > 0 ? new LangCategory { Name = categoryName, Entries = entries } : null;
         }
         catch (Exception ex) {
@@ -298,30 +313,26 @@ public sealed class LocaleService {
             return null;
         }
     }
-    
-    private static bool IsKeyLine(string line) {
-        // Key lines are all digits separated by spaces (e.g., "0 0 0 0 0 0 0 1")
-        var withoutSpaces = line.Replace(" ", "");
-        return withoutSpaces.Length == 8 && withoutSpaces.All(char.IsDigit);
-    }
-    
+
+
     private static string CleanValue(string value) {
         // The UTF-16 encoding might have spaces between characters, clean them up
         var cleaned = new StringBuilder();
         bool lastWasSpace = false;
-        
+
         foreach (char c in value) {
             if (c == ' ') {
                 if (!lastWasSpace) {
                     cleaned.Append(c);
                     lastWasSpace = true;
                 }
-            } else {
+            }
+            else {
                 cleaned.Append(c);
                 lastWasSpace = false;
             }
         }
-        
+
         return cleaned.ToString().Trim();
     }
 }
@@ -341,7 +352,7 @@ public class LocaleEntry {
     public string Category { get; set; } = string.Empty;
     public string Key { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
-    
+
     public int NumericKey => int.TryParse(Key, out int result) ? result : 0;
 }
 
