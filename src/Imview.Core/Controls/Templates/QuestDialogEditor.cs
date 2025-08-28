@@ -42,6 +42,9 @@ public partial class QuestDialogEditor : UserControl {
     public static readonly StyledProperty<ActorDialogList> DialogListProperty =
         AvaloniaProperty.Register<QuestDialogEditor, ActorDialogList>(nameof(DialogList));
 
+    public static readonly StyledProperty<string> QuestTitleProperty =
+        AvaloniaProperty.Register<QuestDialogEditor, string>(nameof(QuestTitle));
+
     public ActorDialogList DialogList {
         get => GetValue(DialogListProperty);
         set {
@@ -50,6 +53,11 @@ public partial class QuestDialogEditor : UserControl {
                 PopulateDialogSections(value);
             }
         }
+    }
+
+    public string QuestTitle {
+        get => GetValue(QuestTitleProperty);
+        set => SetValue(QuestTitleProperty, value);
     }
 
     // Dialog section collections - one for each dialog tag
@@ -278,7 +286,7 @@ public partial class QuestDialogEditor : UserControl {
 
     private async System.Threading.Tasks.Task<DialogEntryWrapper?> ShowDialogEntryEditor(DialogEntryWrapper entry) {
         // Create a simple dialog entry editor window
-        var editor = new DialogEntryEditorWindow(entry);
+        var editor = new DialogEntryEditorWindow(entry, QuestTitle);
         
         // Show as dialog
         var appLifetime = Application.Current?.ApplicationLifetime as 

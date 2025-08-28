@@ -28,6 +28,7 @@ using System;
 using System.Linq;
 using Imview.Core.Common.Constants;
 using Imview.Core.Services;
+using Imview.Core.Views;
 
 namespace Imview.Core.Controls.Templates;
 
@@ -38,10 +39,13 @@ public class DialogEntryEditorWindow : Window {
     
     private DialogEntryWrapper _result;
     private DialogEntryWrapper _originalEntry;
+    private readonly string? _questTitle;
     
     // UI Controls
     private TextBox _personaNameBox = null!;
-    private TextBox _dialogKeyBox = null!;
+    private Avalonia.Controls.Button _dialogKeyButton = null!;
+    private TextBlock _dialogKeyResolvedText = null!;
+    private string _dialogKeyValue = "";
     private TextBox _soundFileBox = null!;
     private NumericUpDown _actorTemplateIdBox = null!;
     private TextBox _cameraNameBox = null!;
@@ -50,8 +54,11 @@ public class DialogEntryEditorWindow : Window {
     private TextBox _nameOverrideBox = null!;
     private TextBox _guiDisplayBox = null!;
 
-    public DialogEntryEditorWindow(DialogEntryWrapper entry) {
+    public DialogEntryEditorWindow(DialogEntryWrapper entry, string? questTitle = null) {
         _originalEntry = entry;
+        _questTitle = questTitle;
+        _dialogKeyValue = entry.DialogKey;
+        
         _result = new DialogEntryWrapper {
             PersonaName = entry.PersonaName,
             DialogKey = entry.DialogKey,
@@ -140,39 +147,73 @@ public class DialogEntryEditorWindow : Window {
             Margin = new Thickness(0, 2, 0, 5)
         };
         
-        // Text box for editing the locale ID
-        _dialogKeyBox = new TextBox();
+        // Button to open locale selection popup
+        _dialogKeyButton = new Avalonia.Controls.Button {
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(10, 8),
+            MinHeight = 32
+        };
+        
+        _dialogKeyButton.Click += async (sender, e) => {
+            var preferredCategory = GetDialogCategory();
+            var popup = new LocaleSelectionPopup(preferredCategory, _dialogKeyValue);
+            var result = await popup.ShowDialog<string?>(this);
+            
+            if (!string.IsNullOrEmpty(result)) {
+                _dialogKeyValue = result;
+                UpdateDialogKeyDisplay();
+            }
+        };
         
         // Text block to display the resolved English text
-        var resolvedTextBlock = new TextBlock {
+        _dialogKeyResolvedText = new TextBlock {
             Foreground = Brushes.LightGray,
             FontStyle = FontStyle.Italic,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 2, 0, 0)
         };
         
-        // Update resolved text when the text box changes
-        _dialogKeyBox.TextChanged += (sender, e) => {
-            var localeReference = _dialogKeyBox.Text;
-            if (string.IsNullOrEmpty(localeReference)) {
-                resolvedTextBlock.Text = "";
-                return;
-            }
-            
-            var resolvedText = ResolveLocaleString(localeReference);
-            if (!string.IsNullOrEmpty(resolvedText) && resolvedText != localeReference) {
-                resolvedTextBlock.Text = $"➤ {resolvedText}";
-            } else {
-                resolvedTextBlock.Text = "➤ (No locale text found)";
-            }
-        };
-        
         panel.Children.Add(headerText);
         panel.Children.Add(explanationTextBlock);
-        panel.Children.Add(_dialogKeyBox);
-        panel.Children.Add(resolvedTextBlock);
+        panel.Children.Add(_dialogKeyButton);
+        panel.Children.Add(_dialogKeyResolvedText);
+        
+        UpdateDialogKeyDisplay();
         
         return panel;
+    }
+
+    private string? GetDialogCategory() {
+        if (string.IsNullOrEmpty(_questTitle)) {
+            return null;
+        }
+
+        // Extract ID from quest title like "QuestTitle_1625BF" -> "1625BF"
+        var underscoreIndex = _questTitle.LastIndexOf('_');
+        if (underscoreIndex == -1) {
+            return null;
+        }
+
+        var questId = _questTitle.Substring(underscoreIndex + 1);
+        return $"WizQst{questId}";
+    }
+
+    private void UpdateDialogKeyDisplay() {
+        // Update button content
+        _dialogKeyButton.Content = string.IsNullOrEmpty(_dialogKeyValue) ? 
+            "(Click to select dialog key)" : _dialogKeyValue;
+
+        // Update resolved text
+        if (string.IsNullOrEmpty(_dialogKeyValue)) {
+            _dialogKeyResolvedText.Text = "";
+        } else {
+            var resolvedText = ResolveLocaleString(_dialogKeyValue);
+            if (!string.IsNullOrEmpty(resolvedText) && resolvedText != _dialogKeyValue) {
+                _dialogKeyResolvedText.Text = $"➤ {resolvedText}";
+            } else {
+                _dialogKeyResolvedText.Text = "➤ (No locale text found)";
+            }
+        }
     }
 
     private string? ResolveLocaleString(string localeReference) {
@@ -296,7 +337,8 @@ public class DialogEntryEditorWindow : Window {
 
     private void PopulateControls() {
         _personaNameBox.Text = _result.PersonaName;
-        _dialogKeyBox.Text = _result.DialogKey;
+        _dialogKeyValue = _result.DialogKey;
+        UpdateDialogKeyDisplay();
         _soundFileBox.Text = _result.SoundFile;
         _actorTemplateIdBox.Value = _result.ActorTemplateID;
         _cameraNameBox.Text = _result.CameraName;
@@ -309,7 +351,7 @@ public class DialogEntryEditorWindow : Window {
     private void SaveAndClose() {
         // Update the result with current values
         _result.PersonaName = _personaNameBox.Text ?? "";
-        _result.DialogKey = _dialogKeyBox.Text ?? "";
+        _result.DialogKey = _dialogKeyValue ?? "";
         _result.SoundFile = _soundFileBox.Text ?? "";
         _result.ActorTemplateID = (int)(_actorTemplateIdBox.Value ?? 0);
         _result.CameraName = _cameraNameBox.Text ?? "";

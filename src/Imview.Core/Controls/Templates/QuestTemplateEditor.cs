@@ -37,6 +37,7 @@ using System.Threading.Tasks;
 using Imview.Core.Services;
 using Avalonia.VisualTree;
 using Avalonia.ReactiveUI;
+using Imview.Core.Views;
 
 namespace Imview.Core.Controls.Templates;
 
@@ -67,7 +68,9 @@ public partial class QuestTemplateEditor : UserControl {
     private readonly IGoalEditorFactory _goalEditorFactory;
 
     // UI Controls
-    private TextBox _questTitleBox;
+    private Avalonia.Controls.Button _questTitleButton;
+    private TextBlock _questTitleResolvedText;
+    private string _questTitleValue = "";
     private NumericUpDown _questLevelBox;
     private ListBox _goalsList;
     private ListBox _goalLogicsList;
@@ -103,7 +106,8 @@ public partial class QuestTemplateEditor : UserControl {
         );
 
         // Initialize non-nullable fields
-        _questTitleBox = new TextBox();
+        _questTitleButton = new Avalonia.Controls.Button();
+        _questTitleResolvedText = new TextBlock();
         _questLevelBox = new NumericUpDown();
         _goalsList = new ListBox();
         _goalLogicsList = new ListBox();
@@ -141,8 +145,7 @@ public partial class QuestTemplateEditor : UserControl {
     }
 
     private void InitializeControls() {
-        // Basic info controls.
-        _questTitleBox = new TextBox();
+        // Basic info controls - quest title button initialized in CreateQuestTitlePanel
         _questLevelBox = new NumericUpDown {
             Minimum = 1,
             Maximum = 200,
@@ -263,37 +266,65 @@ public partial class QuestTemplateEditor : UserControl {
         // Label for the quest title section
         titlePanel.Children.Add(new TextBlock { Text = "Quest Title:" });
 
-        // Text box for editing the locale ID
-        titlePanel.Children.Add(_questTitleBox);
+        // Button to open locale selection popup
+        _questTitleButton = new Avalonia.Controls.Button {
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(10, 8),
+            MinHeight = 32
+        };
+        
+        _questTitleButton.Click += async (sender, e) => {
+            var popup = new LocaleSelectionPopup("QuestTitle", _questTitleValue);
+            var result = await popup.ShowDialog<string?>(GetParentWindow());
+            
+            if (!string.IsNullOrEmpty(result)) {
+                _questTitleValue = result;
+                UpdateQuestTitleDisplay();
+            }
+        };
+
+        titlePanel.Children.Add(_questTitleButton);
 
         // Text block to display the resolved English text
-        var resolvedTextBlock = new TextBlock {
+        _questTitleResolvedText = new TextBlock {
             Foreground = Brushes.LightGray,
             FontStyle = FontStyle.Italic,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 2, 0, 0)
         };
 
-        // Update resolved text when the text box changes
-        _questTitleBox.TextChanged += (sender, e) => {
-            var localeId = _questTitleBox.Text;
-            if (string.IsNullOrEmpty(localeId)) {
-                resolvedTextBlock.Text = "";
-                return;
-            }
-
-            var resolvedText = ResolveLocaleString(localeId);
-            if (!string.IsNullOrEmpty(resolvedText) && resolvedText != localeId) {
-                resolvedTextBlock.Text = $"➤ {resolvedText}";
-            }
-            else {
-                resolvedTextBlock.Text = "➤ (No locale text found)";
-            }
-        };
-
-        titlePanel.Children.Add(resolvedTextBlock);
+        titlePanel.Children.Add(_questTitleResolvedText);
 
         return titlePanel;
+    }
+
+    private void UpdateQuestTitleDisplay() {
+        // Update button content
+        _questTitleButton.Content = string.IsNullOrEmpty(_questTitleValue) ? 
+            "(Click to select quest title)" : _questTitleValue;
+
+        // Update resolved text
+        if (string.IsNullOrEmpty(_questTitleValue)) {
+            _questTitleResolvedText.Text = "";
+        } else {
+            var resolvedText = ResolveLocaleString(_questTitleValue);
+            if (!string.IsNullOrEmpty(resolvedText) && resolvedText != _questTitleValue) {
+                _questTitleResolvedText.Text = $"➤ {resolvedText}";
+            } else {
+                _questTitleResolvedText.Text = "➤ (No locale text found)";
+            }
+        }
+
+        // Update the dialog editor's quest title reference
+        if (_questDialogEditor != null) {
+            _questDialogEditor.QuestTitle = _questTitleValue;
+        }
+    }
+
+    private Avalonia.Controls.Window GetParentWindow() {
+        return this.FindAncestorOfType<Avalonia.Controls.Window>() ?? 
+               (Application.Current?.ApplicationLifetime as 
+                Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow!;
     }
 
     private string? ResolveLocaleString(string localeReference) {
@@ -488,11 +519,13 @@ public partial class QuestTemplateEditor : UserControl {
         };
 
     private void InitializeValues() {
-        _questTitleBox.Text = _template.m_questTitle?.ToString();
+        _questTitleValue = _template.m_questTitle?.ToString() ?? "";
+        UpdateQuestTitleDisplay();
         _questLevelBox.Value = _template.m_questLevel;
 
         // Initialize dialog editor with quest's dialog list
         _questDialogEditor.DialogList = _template.m_dialogList as ActorDialogList;
+        _questDialogEditor.QuestTitle = _questTitleValue;
 
         _onStartScriptBox.Text = _template.m_onStartQuestScript?.ToString();
         _onEndScriptBox.Text = _template.m_onEndQuestScript?.ToString();
@@ -576,7 +609,7 @@ public partial class QuestTemplateEditor : UserControl {
     /// </summary>
     public void SaveChangesToTemplate() {
         // Save basic quest properties (quest name is handled by the parent quest browser).
-        _template.m_questTitle = new ByteString(_questTitleBox.Text ?? string.Empty);
+        _template.m_questTitle = new ByteString(_questTitleValue ?? string.Empty);
         _template.m_questLevel = (int) (_questLevelBox.Value ?? 1);
 
         // Save dialog system - convert from editor back to ActorDialogList
