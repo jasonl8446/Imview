@@ -18,7 +18,6 @@ modification, are permitted provided that the following conditions are met:
    this software without specific prior written permission.
 */
 
-using System;
 using Imcodec.ObjectProperty;
 using Imcodec.ObjectProperty.TypeCache;
 using Imview.PacketReader.Services;
@@ -42,6 +41,10 @@ public sealed class QuestBuilder {
             packetCapturePath,
             "MSG_SENDGOAL"
         );
+        var actorDialogPackets = await PacketReaderService.ExtractPacketsAsync<ActorDialogPacket>(
+            packetCapturePath,
+            "MSG_ACTORDIALOG"
+        );
 
         var templates = questOfferPackets
             .Select(ConvertOfferPacketToTemplate)
@@ -49,6 +52,7 @@ public sealed class QuestBuilder {
         foreach (var template in templates) {
             AddQuestIDToQuestTemplate(template, sendQuestPackets);
             AddGoalsToQuestTemplate(template, sendGoalPackets);
+            AddPrepDialogToQuestTemplate(template, actorDialogPackets);
         }
 
         return templates;
@@ -182,6 +186,63 @@ public sealed class QuestBuilder {
         }
 
         return goals;
+    }
+
+    private static void AddPrepDialogToQuestTemplate(QuestTemplate template, List<ActorDialogPacket> packets) {
+        // Find the ActorDialog packet that precedes the quest offer with CompletionType "QuestInfo"
+        // Since the dialog packet appears before the quest offer, we look for packets with CompletionType "QuestInfo"
+        foreach (var packet in packets) {
+            if (packet.CompletionType?.Equals("QuestInfo", StringComparison.OrdinalIgnoreCase) == true) {
+                try {
+                    // Deserialize the ActorDialog hex blob.
+                    var actorDialogBlob = packet.ActorDialog.Replace(" ", string.Empty);
+                    var actorDialogBytes = Convert.FromHexString(actorDialogBlob);
+                    var serializer = new ObjectSerializer(
+                        Versionable: false,
+                        Behaviors: SerializerFlags.None
+                    );
+
+                    if (serializer.Deserialize<ActorDialog>(actorDialogBytes, 16, out var actorDialog)) {
+                        // Initialize dialog list if it doesn't exist
+                        if (template.m_dialogList == null) {
+                            template.m_dialogList = new ActorDialogList { m_dialogs = [] };
+                        }
+
+                        // Cast to ActorDialogList to access m_dialogs property
+                        var dialogList = template.m_dialogList as ActorDialogList;
+                        if (dialogList == null) {
+                            // If it's not an ActorDialogList, create a new one
+                            dialogList = new ActorDialogList { m_dialogs = [] };
+                            template.m_dialogList = dialogList;
+                        }
+
+                        // Set the dialog tag to "Prep" for quest preparation dialogue
+                        actorDialog!.m_dialogTag = "Prep";
+
+                        // Add or update the prep dialog
+                        var existingPrepDialog = dialogList.m_dialogs?.FirstOrDefault(d =>
+                            d.m_dialogTag?.Equals("Prep", StringComparison.OrdinalIgnoreCase) == true);
+
+                        if (existingPrepDialog != null) {
+                            // Update existing prep dialog
+                            var index = dialogList.m_dialogs!.IndexOf(existingPrepDialog);
+                            dialogList.m_dialogs[index] = actorDialog;
+                        }
+                        else {
+                            // Add new prep dialog
+                            dialogList.m_dialogs?.Add(actorDialog);
+                        }
+
+                        // We found and processed the prep dialog for this quest, no need to continue
+                        break;
+                    }
+                }
+                catch {
+                    // If deserialization fails, we skip this dialog packet
+                    // This allows the system to continue processing other quests
+                }
+            }
+        }
     }
 
     private static GoalTemplate GetGoalFromType(GOAL_TYPE goalType)

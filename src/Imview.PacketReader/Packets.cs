@@ -102,3 +102,40 @@ public class SendGoalPacket {
     public byte PetOnlyQuest { get; set; }
 
 }
+
+public class ActorDialogPacket {
+
+    [PacketReaderService.PacketField("MobileID", PacketReaderService.ExtractMethod.Gid)]
+    public ulong MobileID { get; set; }
+
+    [PacketReaderService.PacketField("QuestID", PacketReaderService.ExtractMethod.Gid)]
+    public ulong QuestID { get; set; }
+
+    [PacketReaderService.PacketField("GoalID", PacketReaderService.ExtractMethod.Gid)]
+    public ulong GoalID { get; set; }
+
+    [PacketReaderService.PacketField("CompletionType", PacketReaderService.ExtractMethod.ASCII)]
+    public string CompletionType { get; set; } = string.Empty;
+
+    [PacketReaderService.PacketField("ActorDialog", PacketReaderService.ExtractMethod.Hex)]
+    public string ActorDialog { get; set; } = string.Empty;
+
+    [PacketReaderService.PacketField("Persona", PacketReaderService.ExtractMethod.ASCII)]
+    public string Persona { get; set; } = string.Empty;
+
+    [PacketReaderService.PacketField("PersonaName", PacketReaderService.ExtractMethod.ASCII)]
+    public string PersonaName { get; set; } = string.Empty;
+
+    [PacketReaderService.PacketField("PersonaIcon", PacketReaderService.ExtractMethod.ASCII)]
+    public string PersonaIcon { get; set; } = string.Empty;
+
+    [PacketReaderService.PacketField("RangeCheck", PacketReaderService.ExtractMethod.Ubyte)]
+    public byte RangeCheck { get; set; }
+
+    [PacketReaderService.PacketField("IsEncounter", PacketReaderService.ExtractMethod.Ubyte)]
+    public byte IsEncounter { get; set; }
+
+    [PacketReaderService.PacketField("DefaultDialogAnimation", PacketReaderService.ExtractMethod.Hex)]
+    public string DefaultDialogAnimation { get; set; } = string.Empty;
+
+}
