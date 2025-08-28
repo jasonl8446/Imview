@@ -27,6 +27,7 @@ namespace Imview.PacketReader;
 public sealed class QuestBuilder {
 
     private static readonly Dictionary<QuestTemplate, ulong> s_questTemplateIDMap = [];
+    private static readonly Dictionary<ulong, GoalTemplate> s_goalIDToTemplateMap = [];
 
     public static async Task<List<QuestTemplate>> BuildQuestsFromPacketCaptureAsync(string packetCapturePath) {
         var questOfferPackets = await PacketReaderService.ExtractPacketsAsync<QuestOfferPacket>(
@@ -55,6 +56,9 @@ public sealed class QuestBuilder {
             AddPrepDialogToQuestTemplate(template, actorDialogPackets);
             AddCompletionDialogToQuestTemplate(template, actorDialogPackets);
         }
+        
+        // Process goal-specific dialogs after all goals have been created and mapped
+        AddDialogToGoals(actorDialogPackets);
 
         return templates;
     }
@@ -142,6 +146,9 @@ public sealed class QuestBuilder {
                 }
 
                 template.m_goals.Add(goalTemplate);
+                
+                // Map GoalID to the goal template for dialog processing
+                s_goalIDToTemplateMap[packet.GoalID] = goalTemplate;
             }
         }
     }
@@ -307,6 +314,68 @@ public sealed class QuestBuilder {
                 catch {
                     // If deserialization fails, we skip this dialog packet
                     // This allows the system to continue processing other completion dialogs
+                }
+            }
+        }
+    }
+
+    private static void AddDialogToGoals(List<ActorDialogPacket> packets) {
+        // Process MSG_ACTORDIALOG packets that have GoalID != 0 for goal-specific dialogs
+        foreach (var packet in packets) {
+            if (packet.GoalID != 0 && s_goalIDToTemplateMap.TryGetValue(packet.GoalID, out var goalTemplate)) {
+                try {
+                    // Deserialize the ActorDialog hex blob using the same serializer configuration
+                    var actorDialogBlob = packet.ActorDialog.Replace(" ", string.Empty);
+                    var actorDialogBytes = Convert.FromHexString(actorDialogBlob);
+                    var serializer = new ObjectSerializer(
+                        Versionable: false,
+                        Behaviors: SerializerFlags.None
+                    );
+
+                    if (serializer.Deserialize<ActorDialog>(actorDialogBytes, 16, out var actorDialog)) {
+                        // Initialize dialog list if it doesn't exist
+                        if (goalTemplate.m_dialogList == null) {
+                            goalTemplate.m_dialogList = new ActorDialogList { m_dialogs = [] };
+                        }
+
+                        // Cast to ActorDialogList to access m_dialogs property
+                        var dialogList = goalTemplate.m_dialogList as ActorDialogList;
+                        if (dialogList == null) {
+                            // If it's not an ActorDialogList, create a new one
+                            dialogList = new ActorDialogList { m_dialogs = [] };
+                            goalTemplate.m_dialogList = dialogList;
+                        }
+
+                        // Map CompletionType to appropriate dialog tag
+                        var dialogTag = packet.CompletionType?.ToLower() switch {
+                            "questinfo" => "QuestInfo",
+                            "prep" => "Prep", 
+                            "underway" => "Underway",
+                            "completion" => "Completion",
+                            "hyperlink" => "Hyperlink",
+                            _ => packet.CompletionType ?? "QuestInfo" // Default fallback
+                        };
+
+                        actorDialog!.m_dialogTag = dialogTag;
+
+                        // Add or update the dialog for this tag
+                        var existingDialog = dialogList.m_dialogs?.FirstOrDefault(d =>
+                            d.m_dialogTag?.Equals(dialogTag, StringComparison.OrdinalIgnoreCase) == true);
+
+                        if (existingDialog != null) {
+                            // Update existing dialog
+                            var index = dialogList.m_dialogs!.IndexOf(existingDialog);
+                            dialogList.m_dialogs[index] = actorDialog;
+                        }
+                        else {
+                            // Add new dialog
+                            dialogList.m_dialogs?.Add(actorDialog);
+                        }
+                    }
+                }
+                catch {
+                    // If deserialization fails, we skip this dialog packet
+                    // This allows the system to continue processing other goal dialogs
                 }
             }
         }

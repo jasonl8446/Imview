@@ -68,6 +68,9 @@ public class SendGoalPacket {
     [PacketReaderService.PacketField("QuestID", PacketReaderService.ExtractMethod.Gid)]
     public ulong QuestID { get; set; }
 
+    [PacketReaderService.PacketField("GoalID", PacketReaderService.ExtractMethod.Gid)]
+    public ulong GoalID { get; set; }
+
     [PacketReaderService.PacketField("GoalNameID", PacketReaderService.ExtractMethod.Uint)]
     public uint GoalNameID { get; set; }
 
