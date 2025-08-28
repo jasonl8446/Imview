@@ -68,6 +68,8 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
     protected ObservableCollection<Result> ActivationResults;
 
     protected GoalEditorWindowBase(GoalTemplate template, string title) : base(title) {
+        Width = 800;
+        
         GoalNameBox = new TextBox();
         GoalNameIdBox = new NumericUpDown();
         GoalTitleBox = new TextBox();
@@ -275,13 +277,13 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         MainPanel.Children.Add(CreateGroupBox("Flags", flagsContent));
 
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-        AddResultsPanel("Completion Results", CompletionResultsBox,
-            () => AddNewResult(CompletionResults),
-            () => RemoveSelectedResult(CompletionResultsBox, CompletionResults));
-
         AddResultsPanel("Activation Results", ActivationResultsBox,
             () => AddNewResult(ActivationResults),
             () => RemoveSelectedResult(ActivationResultsBox, ActivationResults));
+
+        AddResultsPanel("Completion Results", CompletionResultsBox,
+            () => AddNewResult(CompletionResults),
+            () => RemoveSelectedResult(CompletionResultsBox, CompletionResults));
 #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
 
         return MainPanel;
