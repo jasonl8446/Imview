@@ -53,6 +53,7 @@ public sealed class QuestBuilder {
             AddQuestIDToQuestTemplate(template, sendQuestPackets);
             AddGoalsToQuestTemplate(template, sendGoalPackets);
             AddPrepDialogToQuestTemplate(template, actorDialogPackets);
+            AddCompletionDialogToQuestTemplate(template, actorDialogPackets);
         }
 
         return templates;
@@ -240,6 +241,72 @@ public sealed class QuestBuilder {
                 catch {
                     // If deserialization fails, we skip this dialog packet
                     // This allows the system to continue processing other quests
+                }
+            }
+        }
+    }
+
+    private static void AddCompletionDialogToQuestTemplate(QuestTemplate template, List<ActorDialogPacket> packets) {
+        // Find the quest ID by searching for a template with the same quest name
+        var questIDEntry = s_questTemplateIDMap.FirstOrDefault(kvp =>
+            kvp.Key.m_questName?.Equals(template.m_questName, StringComparison.OrdinalIgnoreCase) == true);
+
+        if (questIDEntry.Key == null) {
+            return; // No matching quest found in the map
+        }
+
+        var questID = questIDEntry.Value;
+
+        foreach (var packet in packets) {
+            if (packet.CompletionType?.Equals("Completion", StringComparison.OrdinalIgnoreCase) == true &&
+                packet.QuestID == questID) {
+                try {
+                    // Deserialize the ActorDialog hex blob using the same serializer configuration
+                    var actorDialogBlob = packet.ActorDialog.Replace(" ", string.Empty);
+                    var actorDialogBytes = Convert.FromHexString(actorDialogBlob);
+                    var serializer = new ObjectSerializer(
+                        Versionable: false,
+                        Behaviors: SerializerFlags.None
+                    );
+
+                    if (serializer.Deserialize<ActorDialog>(actorDialogBytes, 16, out var actorDialog)) {
+                        // Initialize dialog list if it doesn't exist
+                        if (template.m_dialogList == null) {
+                            template.m_dialogList = new ActorDialogList { m_dialogs = [] };
+                        }
+
+                        // Cast to ActorDialogList to access m_dialogs property
+                        var dialogList = template.m_dialogList as ActorDialogList;
+                        if (dialogList == null) {
+                            // If it's not an ActorDialogList, create a new one
+                            dialogList = new ActorDialogList { m_dialogs = [] };
+                            template.m_dialogList = dialogList;
+                        }
+
+                        // Set the dialog tag to "Completion" for quest completion dialogue
+                        actorDialog!.m_dialogTag = "Completion";
+
+                        // Add or update the completion dialog
+                        var existingCompletionDialog = dialogList.m_dialogs?.FirstOrDefault(d =>
+                            d.m_dialogTag?.Equals("Completion", StringComparison.OrdinalIgnoreCase) == true);
+
+                        if (existingCompletionDialog != null) {
+                            // Update existing completion dialog
+                            var index = dialogList.m_dialogs!.IndexOf(existingCompletionDialog);
+                            dialogList.m_dialogs[index] = actorDialog;
+                        }
+                        else {
+                            // Add new completion dialog
+                            dialogList.m_dialogs?.Add(actorDialog);
+                        }
+
+                        // Found and processed the completion dialog for this specific quest
+                        break;
+                    }
+                }
+                catch {
+                    // If deserialization fails, we skip this dialog packet
+                    // This allows the system to continue processing other completion dialogs
                 }
             }
         }
