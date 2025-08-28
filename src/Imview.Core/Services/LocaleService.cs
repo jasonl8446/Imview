@@ -77,7 +77,15 @@ public sealed class LocaleService {
     /// Loads all .lang files from Root.wad's Locale/English directory.
     /// </summary>
     /// <returns>True if successfully loaded, false if Root.wad not available or failed to load.</returns>
-    public async Task<bool> LoadFromRootWadAsync() {
+    public Task<bool> LoadFromRootWadAsync() {
+        return Task.Run(() => LoadFromRootWad());
+    }
+    
+    /// <summary>
+    /// Loads all .lang files from Root.wad's Locale/English directory synchronously.
+    /// </summary>
+    /// <returns>True if successfully loaded, false if Root.wad not available or failed to load.</returns>
+    public bool LoadFromRootWad() {
         if (!RootWadService.Instance.IsLoaded) {
             return false;
         }
@@ -98,7 +106,8 @@ public sealed class LocaleService {
             
             foreach (var langFile in langFiles) {
                 try {
-                    var fileData = await RootWadService.Instance.GetFileAsync(langFile);
+                    var fileData = RootWadService.Instance.GetFile(langFile);
+                    
                     if (fileData.HasValue) {
                         var category = ParseLangFile(langFile, fileData.Value);
                         if (category != null) {
@@ -107,6 +116,11 @@ public sealed class LocaleService {
                             }
                             loadedCategories++;
                             loadedStrings += category.Entries.Count;
+                            
+                            // Progress reporting for large loads
+                            if (loadedCategories % 50 == 0) {
+                                Console.WriteLine($"Loaded {loadedCategories}/{langFiles.Count} locale categories...");
+                            }
                         }
                     }
                 }

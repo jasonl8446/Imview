@@ -37,7 +37,9 @@ public sealed class RootWadService {
     public static RootWadService Instance => _instance.Value;
     
     private Archive? _rootArchive;
+    private MemoryStream? _archiveStream;
     private readonly object _lock = new();
+    private readonly object _fileLock = new();
     
     private RootWadService() { }
     
@@ -103,32 +105,36 @@ public sealed class RootWadService {
             }
             
             Archive? newArchive;
+            MemoryStream? newArchiveStream;
             
             // Open and parse the WAD file
             await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var memoryStream = new MemoryStream();
+            newArchiveStream = new MemoryStream();
             
             // Copy to memory stream for better performance and thread safety
-            await fileStream.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
+            await fileStream.CopyToAsync(newArchiveStream);
+            newArchiveStream.Position = 0;
             
-            newArchive = ArchiveParser.Parse(memoryStream);
+            newArchive = ArchiveParser.Parse(newArchiveStream);
             
             if (newArchive == null) {
+                newArchiveStream.Dispose();
                 return false;
             }
             
-            // Atomically replace the current archive
+            // Atomically replace the current archive and dispose the old stream
             lock (_lock) {
+                _archiveStream?.Dispose();
                 _rootArchive = newArchive;
+                _archiveStream = newArchiveStream;
             }
             
             Console.WriteLine($"Root.wad loaded successfully: {newArchive.FileCount} files, {newArchive.Size()} bytes");
             
             // Automatically load locale data after Root.wad is loaded
-            _ = Task.Run(async () => {
+            _ = Task.Run(() => {
                 try {
-                    await LocaleService.Instance.LoadFromRootWadAsync();
+                    LocaleService.Instance.LoadFromRootWad();
                 }
                 catch (Exception ex) {
                     Console.WriteLine($"Failed to load locale data: {ex.Message}");
@@ -149,8 +155,10 @@ public sealed class RootWadService {
     /// <param name="fileName">The name of the file to retrieve.</param>
     /// <returns>The file data as a memory block, or null if not found or archive not loaded.</returns>
     public Memory<byte>? GetFile(string fileName) {
-        lock (_lock) {
-            return _rootArchive?.OpenFile(fileName);
+        lock (_fileLock) {
+            lock (_lock) {
+                return _rootArchive?.OpenFile(fileName);
+            }
         }
     }
     
@@ -160,12 +168,20 @@ public sealed class RootWadService {
     /// <param name="fileName">The name of the file to retrieve.</param>
     /// <returns>The file data as a memory block, or null if not found or archive not loaded.</returns>
     public async Task<Memory<byte>?> GetFileAsync(string fileName) {
-        Archive? archive;
-        lock (_lock) {
-            archive = _rootArchive;
-        }
+        // For async, we need to use TaskCompletionSource to avoid holding locks across await
+        var tcs = new TaskCompletionSource<Memory<byte>?>();
         
-        return archive != null ? await archive.OpenFileAsync(fileName) : null;
+        _ = Task.Run(() => {
+            try {
+                var result = GetFile(fileName);
+                tcs.SetResult(result);
+            }
+            catch (Exception ex) {
+                tcs.SetException(ex);
+            }
+        });
+        
+        return await tcs.Task;
     }
     
     /// <summary>
@@ -194,7 +210,9 @@ public sealed class RootWadService {
     /// </summary>
     public void Unload() {
         lock (_lock) {
+            _archiveStream?.Dispose();
             _rootArchive = null;
+            _archiveStream = null;
         }
     }
     
