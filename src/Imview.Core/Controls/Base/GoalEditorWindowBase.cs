@@ -32,6 +32,7 @@ using ReactiveUI;
 using Avalonia.Layout;
 using System.Collections.Generic;
 using Imview.Core.Controls.Results;
+using Imview.Core.Controls.Templates;
 
 namespace Imview.Core.Controls.Base;
 
@@ -46,9 +47,6 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
     protected TextBox GoalNameBox;
     protected NumericUpDown GoalNameIdBox;
     protected TextBox GoalTitleBox;
-    protected TextBox GoalUnderwayBox;
-    protected TextBox HyperlinkBox;
-    protected TextBox CompleteTextBox;
     protected TextBox LocationNameBox;
     protected TextBox DisplayImage1Box;
     protected TextBox DisplayImage2Box;
@@ -61,6 +59,7 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
     protected CheckBox NoQuestHelperBox;
     protected CheckBox PetOnlyQuestBox;
     protected CheckBox HideGoalFloatyTextBox;
+    protected QuestDialogEditor DialogEditor;
 
     // Results lists
     protected ListBox CompletionResultsBox;
@@ -72,9 +71,6 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         GoalNameBox = new TextBox();
         GoalNameIdBox = new NumericUpDown();
         GoalTitleBox = new TextBox();
-        GoalUnderwayBox = new TextBox();
-        HyperlinkBox = new TextBox();
-        CompleteTextBox = new TextBox();
         LocationNameBox = new TextBox();
         DisplayImage1Box = new TextBox();
         DisplayImage2Box = new TextBox();
@@ -87,6 +83,7 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         NoQuestHelperBox = new CheckBox();
         PetOnlyQuestBox = new CheckBox();
         HideGoalFloatyTextBox = new CheckBox();
+        DialogEditor = new QuestDialogEditor();
         CompletionResultsBox = new ListBox();
         ActivationResultsBox = new ListBox();
         CompletionResults = [];
@@ -102,9 +99,6 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         GoalNameBox = new TextBox();
         GoalNameIdBox = new NumericUpDown();
         GoalTitleBox = new TextBox();
-        GoalUnderwayBox = new TextBox();
-        HyperlinkBox = new TextBox();
-        CompleteTextBox = new TextBox();
         LocationNameBox = new TextBox();
         DisplayImage1Box = new TextBox();
         DisplayImage2Box = new TextBox();
@@ -159,9 +153,6 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         GoalNameBox.Text = Template.m_goalName?.ToString();
         GoalNameIdBox.Value = Template.m_goalNameID;
         GoalTitleBox.Text = Template.m_goalTitle?.ToString();
-        GoalUnderwayBox.Text = Template.m_goalUnderway?.ToString();
-        HyperlinkBox.Text = Template.m_hyperlink?.ToString();
-        CompleteTextBox.Text = Template.m_completeText?.ToString();
         LocationNameBox.Text = Template.m_locationName?.ToString();
         DisplayImage1Box.Text = Template.m_displayImage1?.ToString();
         DisplayImage2Box.Text = Template.m_displayImage2?.ToString();
@@ -176,6 +167,9 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         HideGoalFloatyTextBox.IsChecked = Template.m_hideGoalFloatyText;
 
         GoalTypeBox.SelectedItem = Template.m_goalType;
+        
+        // Initialize dialog editor with goal's dialog list
+        DialogEditor.DialogList = Template.m_dialogList as ActorDialogList;
     }
 
     protected virtual void SaveValues() {
@@ -183,9 +177,6 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
             Template.m_goalName = new ByteString(GoalNameBox.Text ?? string.Empty);
             Template.m_goalNameID = (uint) (GoalNameIdBox.Value ?? 0);
             Template.m_goalTitle = new ByteString(GoalTitleBox.Text ?? string.Empty);
-            Template.m_goalUnderway = new ByteString(GoalUnderwayBox.Text ?? string.Empty);
-            Template.m_hyperlink = new ByteString(HyperlinkBox.Text ?? string.Empty);
-            Template.m_completeText = new ByteString(CompleteTextBox.Text ?? string.Empty);
             Template.m_locationName = new ByteString(LocationNameBox.Text ?? string.Empty);
             Template.m_displayImage1 = new ByteString(DisplayImage1Box.Text ?? string.Empty);
             Template.m_displayImage2 = new ByteString(DisplayImage2Box.Text ?? string.Empty);
@@ -201,6 +192,9 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
             Template.m_hideGoalFloatyText = HideGoalFloatyTextBox.IsChecked ?? false;
 
             Template.m_goalType = (GOAL_TYPE) (GoalTypeBox.SelectedItem ?? Template.m_goalType);
+
+            // Save dialog system - convert from editor back to ActorDialogList
+            Template.m_dialogList = DialogEditor.ToActorDialogList();
 
             Template.m_completeResults = new ResultList { m_results = CompletionResults.ToList() };
             Template.m_activateResults = new ResultList { m_results = ActivationResults.ToList() };
@@ -244,14 +238,6 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
             }
         };
 
-        var displayTextContent = new StackPanel {
-            Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
-            Children = {
-                CreateLabeledControl("Goal Underway Text:", GoalUnderwayBox),
-                CreateLabeledControl("Complete Text:", CompleteTextBox),
-                CreateLabeledControl("Hyperlink:", HyperlinkBox)
-            }
-        };
 
         var locationContent = new StackPanel {
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
@@ -283,7 +269,7 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         };
 
         MainPanel.Children.Add(CreateGroupBox("Basic Information", basicInfoContent));
-        MainPanel.Children.Add(CreateGroupBox("Display Text", displayTextContent));
+        MainPanel.Children.Add(CreateGroupBox("Goal Dialogue", DialogEditor));
         MainPanel.Children.Add(CreateGroupBox("Location and Display", locationContent));
         MainPanel.Children.Add(CreateGroupBox("Tags and Events", tagsContent));
         MainPanel.Children.Add(CreateGroupBox("Flags", flagsContent));
