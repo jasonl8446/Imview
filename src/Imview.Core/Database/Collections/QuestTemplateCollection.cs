@@ -81,14 +81,13 @@ public static class QuestTemplateCollection {
 
             using var session = store.OpenAsyncSession();
             
-            // Use provided ID or fall back to quest name
-            var id = questId ?? questTemplate.m_questName;
-            if (string.IsNullOrWhiteSpace(id)) {
-                throw new ArgumentException("Quest template must have a name or provided ID for updates");
+            // For updates, we must use the provided questId to maintain the same document
+            if (string.IsNullOrWhiteSpace(questId)) {
+                throw new ArgumentException("Quest ID is required for updates");
             }
             
             // Handle both full document IDs and just quest names
-            var documentId = id.StartsWith("questtemplates/") ? id : $"questtemplates/{id}";
+            var documentId = questId.StartsWith("questtemplates/") ? questId : $"questtemplates/{questId}";
             
             var existingTemplate = await session.LoadAsync<QuestTemplate>(documentId);
             if (existingTemplate == null) {

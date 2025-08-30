@@ -76,15 +76,18 @@ public static class QuestMetadataCollection {
                 return false;
             }
 
-            metadata.ModifiedAt = DateTime.UtcNow;
-            metadata.ModifiedBy = Environment.UserName;
-
-            await session.StoreAsync(metadata, metadata.Id);
+            // Update properties on the existing tracked object
+            existingMetadata.QuestTemplateId = metadata.QuestTemplateId;
+            existingMetadata.Name = metadata.Name;
+            existingMetadata.Description = metadata.Description;
+            existingMetadata.ModifiedAt = DateTime.UtcNow;
+            existingMetadata.ModifiedBy = Environment.UserName;
             await session.SaveChangesAsync();
             return true;
         }
         catch (Exception ex) {
-            Console.WriteLine($"Error updating quest metadata: {ex.Message}");
+            Console.WriteLine($"Error updating quest metadata (ID: {metadata.Id}, Name: {metadata.Name}): {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
             return false;
         }
     }

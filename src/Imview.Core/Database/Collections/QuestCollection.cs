@@ -93,7 +93,7 @@ public static class QuestCollection {
     /// <returns>True if successful</returns>
     public static async Task<bool> UpdateQuestAsync(string questId, QuestTemplate questTemplate, string name, string description = "") {
         try {
-            // Update template in QuestTemplateCollection
+            // Always update template at the original questId location (don't create new one)
             var templateUpdated = await QuestTemplateCollection.UpdateQuestTemplateAsync(questTemplate, questId);
             if (!templateUpdated) {
                 return false;
@@ -106,7 +106,22 @@ public static class QuestCollection {
                 metadata.Description = description;
                 metadata.ModifiedAt = DateTime.UtcNow;
                 metadata.ModifiedBy = Environment.UserName;
-                await QuestMetadataCollection.UpdateQuestMetadataAsync(metadata);
+                var metadataUpdated = await QuestMetadataCollection.UpdateQuestMetadataAsync(metadata);
+                if (!metadataUpdated) {
+                    Console.WriteLine($"Warning: Failed to update metadata for quest {questId}");
+                }
+            } else {
+                // Create metadata if it doesn't exist
+                var newMetadata = new QuestMetadata {
+                    QuestTemplateId = questId,
+                    Name = name,
+                    Description = description,
+                    CreatedAt = DateTime.UtcNow,
+                    ModifiedAt = DateTime.UtcNow,
+                    CreatedBy = Environment.UserName,
+                    ModifiedBy = Environment.UserName
+                };
+                await QuestMetadataCollection.SaveQuestMetadataAsync(newMetadata);
             }
 
             return true;
