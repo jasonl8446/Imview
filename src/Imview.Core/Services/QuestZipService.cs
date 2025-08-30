@@ -22,11 +22,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Imcodec.ObjectProperty;
 using Imcodec.ObjectProperty.TypeCache;
+using Imview.Core.Database.Collections;
 using Imview.Core.Services;
 
 namespace Imview.Core.Services;
@@ -140,6 +142,94 @@ public static class QuestZipService {
         }
     }
     
+    /// <summary>
+    /// Saves multiple quest templates to the database.
+    /// </summary>
+    /// <param name="templates">The collection of templates to save</param>
+    /// <param name="parentWindow">The parent window for dialogs</param>
+    /// <returns>A task that completes when the save operation is done, with a bool indicating success</returns>
+    public static async Task<bool> SaveQuestsToDatabaseAsync(
+        IEnumerable<QuestTemplate> templates,
+        Avalonia.Controls.Window parentWindow) {
+
+        ArgumentNullException.ThrowIfNull(templates);
+
+        var questList = templates.ToList();
+        if (questList.Count == 0) {
+            MessageService.Error("No quests to save.")
+                .WithDuration(TimeSpan.FromSeconds(3))
+                .Send();
+            return false;
+        }
+
+        try {
+            int successCount = 0;
+            int totalCount = questList.Count;
+            var failedQuests = new List<string>();
+
+            foreach (var template in questList) {
+                try {
+                    // Generate a descriptive name for the quest
+                    var questName = template.m_questName?.ToString() ?? 
+                                  template.m_questTitle?.ToString() ?? 
+                                  $"Quest_FromPacket_{DateTime.Now:HHmmss}";
+
+                    var description = $"Quest imported from packet capture on {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+
+                    // Use UpsertQuestAsync to handle duplicates gracefully
+                    var questId = await QuestCollection.UpsertQuestAsync(template, questName, description);
+
+                    if (!string.IsNullOrEmpty(questId)) {
+                        successCount++;
+                        
+                        // Show progress for every 5th quest or the last quest
+                        if (successCount % 5 == 0 || successCount == totalCount) {
+                            MessageService.Info($"Uploaded {successCount}/{totalCount} quests...")
+                                .WithDuration(TimeSpan.FromSeconds(2))
+                                .Send();
+                        }
+                    } else {
+                        failedQuests.Add(questName);
+                    }
+                }
+                catch (Exception ex) {
+                    var questName = template.m_questName?.ToString() ?? "Unknown Quest";
+                    failedQuests.Add($"{questName} ({ex.Message})");
+                    Console.WriteLine($"Error saving quest {questName}: {ex.Message}");
+                }
+            }
+
+            // Report results
+            if (successCount == totalCount) {
+                MessageService.Info($"Successfully uploaded all {totalCount} quests to database.")
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+                return true;
+            } else if (successCount > 0) {
+                var failedDetails = string.Join(", ", failedQuests.Take(3));
+                if (failedQuests.Count > 3) {
+                    failedDetails += $" and {failedQuests.Count - 3} more";
+                }
+                
+                MessageService.Warn($"Uploaded {successCount}/{totalCount} quests. Failed: {failedDetails}")
+                    .WithDuration(TimeSpan.FromSeconds(8))
+                    .Send();
+                return true; // Partial success
+            } else {
+                MessageService.Error("Failed to upload any quests to database.")
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+                return false;
+            }
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Failed to upload quests to database: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+            return false;
+        }
+    }
+
     /// <summary>
     /// Sanitizes a file name by removing invalid characters.
     /// </summary>

@@ -20,11 +20,13 @@ modification, are permitted provided that the following conditions are met:
 
 using System;
 using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using Imcodec.ObjectProperty.TypeCache;
 using ReactiveUI;
 using System.Linq;
 using Imview.Core.Services;
+using Imview.Core.Views;
 
 namespace Imview.Core.ViewModels;
 
@@ -86,7 +88,6 @@ public class PacketQuestViewModel : ViewModelBase {
                 MessageService.Error("No quests to save.")
                     .WithDuration(TimeSpan.FromSeconds(3))
                     .Send();
-
                 return;
             }
             
@@ -95,18 +96,29 @@ public class PacketQuestViewModel : ViewModelBase {
                 MessageService.Error("Cannot find main window.")
                     .WithDuration(TimeSpan.FromSeconds(3))
                     .Send();
-                    
                 return;
             }
+
+            // Show save options dialog
+            var optionsDialog = new QuestSaveOptionsDialog();
+            var selectedOption = await optionsDialog.ShowDialog<QuestSaveOption>(window);
             
-            MessageService.Info("Preparing to save quests...")
-                .WithDuration(TimeSpan.FromSeconds(3))
-                .Send();
-                
-            var success = await QuestZipService.SaveQuestsToZipFileAsync(QuestTemplates, window);
-            
-            if (success) {
-                MessageService.Info($"Successfully saved {QuestTemplates.Count} quests to zip file.")
+            var success = selectedOption switch {
+                QuestSaveOption.SaveLocal => await SaveAllQuestsLocal(window),
+                QuestSaveOption.Upload => await SaveAllQuestsToDatabase(window),
+                QuestSaveOption.SaveBoth => await SaveAllQuestsBoth(window),
+                _ => false // User cancelled
+            };
+
+            if (success && selectedOption != QuestSaveOption.None) {
+                var message = selectedOption switch {
+                    QuestSaveOption.SaveLocal => $"Successfully saved {QuestTemplates.Count} quests to zip file.",
+                    QuestSaveOption.Upload => $"Successfully uploaded {QuestTemplates.Count} quests to database.",
+                    QuestSaveOption.SaveBoth => $"Successfully saved {QuestTemplates.Count} quests locally and to database.",
+                    _ => ""
+                };
+
+                MessageService.Info(message)
                     .WithDuration(TimeSpan.FromSeconds(5))
                     .Send();
             }
@@ -116,6 +128,38 @@ public class PacketQuestViewModel : ViewModelBase {
                 .WithDuration(TimeSpan.FromSeconds(5))
                 .Send();
         }
+    }
+
+    private async Task<bool> SaveAllQuestsLocal(Avalonia.Controls.Window window) {
+        MessageService.Info("Preparing to save quests to zip file...")
+            .WithDuration(TimeSpan.FromSeconds(3))
+            .Send();
+            
+        return await QuestZipService.SaveQuestsToZipFileAsync(QuestTemplates, window);
+    }
+
+    private async Task<bool> SaveAllQuestsToDatabase(Avalonia.Controls.Window window) {
+        // Check if database is configured first
+        var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(window);
+        if (!isConfigured) {
+            MessageService.Error("Database configuration is required to upload quests.")
+                .WithDuration(TimeSpan.FromSeconds(3))
+                .Send();
+            return false;
+        }
+
+        MessageService.Info("Uploading quests to database...")
+            .WithDuration(TimeSpan.FromSeconds(3))
+            .Send();
+
+        return await QuestZipService.SaveQuestsToDatabaseAsync(QuestTemplates, window);
+    }
+
+    private async Task<bool> SaveAllQuestsBoth(Avalonia.Controls.Window window) {
+        var localSuccess = await SaveAllQuestsLocal(window);
+        var databaseSuccess = await SaveAllQuestsToDatabase(window);
+        
+        return localSuccess || databaseSuccess; // Success if either works
     }
 
     private void BackToSplash() 
