@@ -32,6 +32,7 @@ using Imview.Core.Common.Constants;
 using System.Linq;
 using Imcodec.IO;
 using Imview.Core.Controls.Goals;
+using Imview.Core.Controls.Requirements;
 using Avalonia.Controls.Templates;
 using System.Threading.Tasks;
 using Imview.Core.Services;
@@ -66,6 +67,7 @@ public partial class QuestTemplateEditor : UserControl {
     private readonly ObservableCollection<GoalTemplateWrapper> _goals;
     private readonly ObservableCollection<GoalCompleteLogicWrapper> _goalLogics;
     private readonly IGoalEditorFactory _goalEditorFactory;
+    private readonly IRequirementEditorFactory _requirementEditorFactory;
 
     // UI Controls
     private Avalonia.Controls.Button _questTitleButton;
@@ -85,12 +87,18 @@ public partial class QuestTemplateEditor : UserControl {
     private CheckBox _questRepeatBox;
     private CheckBox _outdatedBox;
 
+    // Requirements Controls
+    private Avalonia.Controls.Button _mainRequirementsButton;
+    private Avalonia.Controls.Button _prepRequirementsButton;
+    private Avalonia.Controls.Button _pruneRequirementsButton;
+
     // Parameter-less constructor for design-time support
     public QuestTemplateEditor() : this(null, null) { }
 
     public QuestTemplateEditor(QuestTemplate? template = null, IGoalEditorFactory? goalEditorFactory = null) {
         _template = template ?? new QuestTemplate();
         _goalEditorFactory = goalEditorFactory ?? new GoalEditorFactory();
+        _requirementEditorFactory = new RequirementEditorFactory();
 
         // Create goal wrappers with IsStartGoal property,
         _goals = new ObservableCollection<GoalTemplateWrapper>(
@@ -119,6 +127,9 @@ public partial class QuestTemplateEditor : UserControl {
         _prepAlwaysBox = new CheckBox();
         _questRepeatBox = new CheckBox();
         _outdatedBox = new CheckBox();
+        _mainRequirementsButton = new Avalonia.Controls.Button();
+        _prepRequirementsButton = new Avalonia.Controls.Button();
+        _pruneRequirementsButton = new Avalonia.Controls.Button();
 
         InitializeComponent();
         InitializeValues();
@@ -137,6 +148,7 @@ public partial class QuestTemplateEditor : UserControl {
         mainPanel.Children.Add(CreateDialogSection());
         mainPanel.Children.Add(CreateScriptSection());
         mainPanel.Children.Add(CreateFlagsSection());
+        mainPanel.Children.Add(CreateRequirementsSection());
         mainPanel.Children.Add(CreateGoalsSection());
         mainPanel.Children.Add(CreateGoalLogicSection());
         mainPanel.Children.Add(CreateActionButtons());
@@ -165,6 +177,20 @@ public partial class QuestTemplateEditor : UserControl {
         _prepAlwaysBox = new CheckBox { Content = "Prep Always" };
         _questRepeatBox = new CheckBox { Content = "Quest Repeatable" };
         _outdatedBox = new CheckBox { Content = "Outdated" };
+
+        // Requirements buttons.
+        _mainRequirementsButton = new Avalonia.Controls.Button {
+            Content = "Edit Main Requirements (0 requirements)",
+            Command = ReactiveCommand.Create(() => EditRequirementList(_template.m_requirements, "Main", r => _template.m_requirements = r))
+        };
+        _prepRequirementsButton = new Avalonia.Controls.Button {
+            Content = "Edit Prep Requirements (0 requirements)",
+            Command = ReactiveCommand.Create(() => EditRequirementList(_template.m_prepRequirements, "Prep", r => _template.m_prepRequirements = r))
+        };
+        _pruneRequirementsButton = new Avalonia.Controls.Button {
+            Content = "Edit Prune Requirements (0 requirements)",
+            Command = ReactiveCommand.Create(() => EditRequirementList(_template.m_pruneRequirements, "Prune", r => _template.m_pruneRequirements = r))
+        };
 
         // Goals list.
         _goalsList = new ListBox {
@@ -393,6 +419,42 @@ public partial class QuestTemplateEditor : UserControl {
         return CreateGroupBox("Quest Flags", content);
     }
 
+    private Control CreateRequirementsSection() {
+        var infoPanel = new StackPanel {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 5),
+            Children = {
+                new TextBlock {
+                    Text = "Define quest requirements that must be met for the quest to be available, prepared, or completed.",
+                    Foreground = Brushes.LightGray,
+                    FontStyle = FontStyle.Italic,
+                    TextWrapping = TextWrapping.Wrap
+                }
+            }
+        };
+
+        var content = new StackPanel {
+            Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
+            Children = {
+                infoPanel,
+                CreateRequirementControlWithTooltip(
+                    "Main Requirements:", 
+                    _mainRequirementsButton,
+                    "Determines if this quest can be offered to players. All requirements must be met for the quest to appear."),
+                CreateRequirementControlWithTooltip(
+                    "Prep Requirements:", 
+                    _prepRequirementsButton,
+                    "⚠️ Purpose unknown - adding requirements here is likely incorrect unless you know what you're doing."),
+                CreateRequirementControlWithTooltip(
+                    "Prune Requirements:", 
+                    _pruneRequirementsButton,
+                    "When these requirements become true, the quest is removed from the player's quest log. Used for event quests when the event ends.")
+            }
+        };
+
+        return CreateGroupBox("Quest Requirements", content);
+    }
+
     private Control CreateGoalsSection() {
         var infoPanel = new StackPanel {
             Orientation = Orientation.Horizontal,
@@ -492,6 +554,23 @@ public partial class QuestTemplateEditor : UserControl {
             }
         };
 
+    private static Control CreateRequirementControlWithTooltip(string labelText, Control control, string tooltipText)
+        => new StackPanel {
+            Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
+            Children = {
+                new TextBlock { Text = labelText },
+                control,
+                new TextBlock {
+                    Text = tooltipText,
+                    Foreground = Brushes.LightGray,
+                    FontStyle = FontStyle.Italic,
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 2, 0, 0)
+                }
+            }
+        };
+
     private static Border CreateGroupBox(string header, Control content)
         => new() {
             BorderBrush = Brushes.Gray,
@@ -535,6 +614,11 @@ public partial class QuestTemplateEditor : UserControl {
         _prepAlwaysBox.IsChecked = _template.m_prepAlways;
         _questRepeatBox.IsChecked = _template.m_questRepeat >= 1;
         _outdatedBox.IsChecked = _template.m_outdated;
+
+        // Initialize requirement button text
+        UpdateRequirementButtonText("Main", _template.m_requirements);
+        UpdateRequirementButtonText("Prep", _template.m_prepRequirements);
+        UpdateRequirementButtonText("Prune", _template.m_pruneRequirements);
     }
 
     private async void AddGoal<T>() where T : GoalTemplate, new() {
@@ -601,6 +685,50 @@ public partial class QuestTemplateEditor : UserControl {
     private void RemoveSelectedGoalLogic() {
         if (_goalLogicsList.SelectedItem is GoalCompleteLogicWrapper selectedLogicWrapper) {
             _goalLogics.Remove(selectedLogicWrapper);
+        }
+    }
+
+    private async void EditRequirementList(RequirementList? currentList, string typeName, System.Action<RequirementList> updateAction) {
+        try {
+            // Launch RequirementListEditor
+            var editor = new RequirementListEditor(currentList, _requirementEditorFactory);
+            
+            // Show as a dialog
+            var appLifetime = Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
+            if (appLifetime?.MainWindow != null) {
+                await editor.ShowDialog(appLifetime.MainWindow);
+                var result = await editor.GetResultAsync();
+                
+                if (result != null) {
+                    // Update the template property
+                    updateAction(result);
+                    
+                    // Update the button text to show requirement count
+                    UpdateRequirementButtonText(typeName, result);
+                }
+            }
+        }
+        catch (Exception ex) {
+            MessageService
+                .Error($"Error editing {typeName.ToLower()} requirements: {ex.Message}")
+                .Send();
+        }
+    }
+
+    private void UpdateRequirementButtonText(string typeName, RequirementList requirementList) {
+        var count = requirementList?.m_requirements?.Count ?? 0;
+        var text = $"Edit {typeName} Requirements ({count} requirements)";
+        
+        switch (typeName) {
+            case "Main":
+                _mainRequirementsButton.Content = text;
+                break;
+            case "Prep":
+                _prepRequirementsButton.Content = text;
+                break;
+            case "Prune":
+                _pruneRequirementsButton.Content = text;
+                break;
         }
     }
 
