@@ -28,8 +28,14 @@ public sealed class QuestBuilder {
 
     private static readonly Dictionary<QuestTemplate, ulong> s_questTemplateIDMap = [];
     private static readonly Dictionary<ulong, GoalTemplate> s_goalIDToTemplateMap = [];
+    private static readonly Dictionary<string, ulong> s_questNameToMobileIDMap = [];
 
     public static async Task<List<QuestTemplate>> BuildQuestsFromPacketCaptureAsync(string packetCapturePath) {
+        // Clear static dictionaries for clean state
+        s_questTemplateIDMap.Clear();
+        s_goalIDToTemplateMap.Clear();
+        s_questNameToMobileIDMap.Clear();
+
         var questOfferPackets = await PacketReaderService.ExtractPacketsAsync<QuestOfferPacket>(
             packetCapturePath,
             "MSG_QUESTOFFER"
@@ -73,6 +79,9 @@ public sealed class QuestBuilder {
             m_goals = [],
             m_startGoals = [],
         };
+
+        // Store the MobileID for later dialog matching
+        s_questNameToMobileIDMap[template.m_questName] = packet.MobileID;
 
         // Extract the goal compilation from the packet.
         var goalCompilation = ExtractGoalCompilationFromPacket(packet);
@@ -197,10 +206,15 @@ public sealed class QuestBuilder {
     }
 
     private static void AddPrepDialogToQuestTemplate(QuestTemplate template, List<ActorDialogPacket> packets) {
-        // Find the ActorDialog packet that precedes the quest offer with CompletionType "QuestInfo"
-        // Since the dialog packet appears before the quest offer, we look for packets with CompletionType "QuestInfo"
+        // Get the MobileID for this quest template
+        if (!s_questNameToMobileIDMap.TryGetValue(template.m_questName, out var questMobileID)) {
+            return; // No MobileID found for this quest template
+        }
+
+        // Find the ActorDialog packet with matching MobileID and CompletionType "QuestInfo"
         foreach (var packet in packets) {
-            if (packet.CompletionType?.Equals("QuestInfo", StringComparison.OrdinalIgnoreCase) == true) {
+            if (packet.MobileID == questMobileID && 
+                packet.CompletionType?.Equals("QuestInfo", StringComparison.OrdinalIgnoreCase) == true) {
                 try {
                     // Deserialize the ActorDialog hex blob.
                     var actorDialogBlob = packet.ActorDialog.Replace(" ", string.Empty);
