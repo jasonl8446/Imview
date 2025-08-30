@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Imcodec.ObjectProperty.TypeCache;
+using Imview.Core.Database.Models;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Queries;
 
@@ -48,35 +49,33 @@ public class QuestDocument {
 public static class QuestCollection {
 
     /// <summary>
-    /// Saves a quest template to the database
+    /// Saves a quest template to the database using the new decoupled architecture
     /// </summary>
     /// <param name="questTemplate">The quest template to save</param>
     /// <param name="name">The name for the quest</param>
     /// <param name="description">Optional description</param>
-    /// <returns>The ID of the saved quest document</returns>
+    /// <returns>The ID of the saved quest template</returns>
     public static async Task<string?> SaveQuestAsync(QuestTemplate questTemplate, string name, string description = "") {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
+            // Save template to QuestTemplateCollection
+            var questTemplateId = await QuestTemplateCollection.SaveQuestTemplateAsync(questTemplate, name);
+            if (questTemplateId == null) {
+                return null;
             }
 
-            using var session = store.OpenAsyncSession();
-            
-            var questDoc = new QuestDocument {
+            // Save metadata to QuestMetadataCollection
+            var metadata = new QuestMetadata {
+                QuestTemplateId = questTemplateId,
                 Name = name,
                 Description = description,
-                Template = questTemplate,
                 CreatedAt = DateTime.UtcNow,
                 ModifiedAt = DateTime.UtcNow,
                 CreatedBy = Environment.UserName,
                 ModifiedBy = Environment.UserName
             };
 
-            await session.StoreAsync(questDoc);
-            await session.SaveChangesAsync();
-
-            return questDoc.Id;
+            await QuestMetadataCollection.SaveQuestMetadataAsync(metadata);
+            return questTemplateId;
         }
         catch (Exception ex) {
             Console.WriteLine($"Error saving quest: {ex.Message}");
@@ -85,7 +84,7 @@ public static class QuestCollection {
     }
 
     /// <summary>
-    /// Updates an existing quest template in the database
+    /// Updates an existing quest template in the database using the new decoupled architecture
     /// </summary>
     /// <param name="questId">The ID of the quest to update</param>
     /// <param name="questTemplate">The updated quest template</param>
@@ -94,25 +93,22 @@ public static class QuestCollection {
     /// <returns>True if successful</returns>
     public static async Task<bool> UpdateQuestAsync(string questId, QuestTemplate questTemplate, string name, string description = "") {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
-            }
-
-            using var session = store.OpenAsyncSession();
-            
-            var questDoc = await session.LoadAsync<QuestDocument>(questId);
-            if (questDoc == null) {
+            // Update template in QuestTemplateCollection
+            var templateUpdated = await QuestTemplateCollection.UpdateQuestTemplateAsync(questTemplate, questId);
+            if (!templateUpdated) {
                 return false;
             }
 
-            questDoc.Name = name;
-            questDoc.Description = description;
-            questDoc.Template = questTemplate;
-            questDoc.ModifiedAt = DateTime.UtcNow;
-            questDoc.ModifiedBy = Environment.UserName;
+            // Update metadata in QuestMetadataCollection
+            var metadata = await QuestMetadataCollection.GetQuestMetadataByTemplateIdAsync(questId);
+            if (metadata != null) {
+                metadata.Name = name;
+                metadata.Description = description;
+                metadata.ModifiedAt = DateTime.UtcNow;
+                metadata.ModifiedBy = Environment.UserName;
+                await QuestMetadataCollection.UpdateQuestMetadataAsync(metadata);
+            }
 
-            await session.SaveChangesAsync();
             return true;
         }
         catch (Exception ex) {
@@ -122,19 +118,32 @@ public static class QuestCollection {
     }
 
     /// <summary>
-    /// Retrieves a quest template by ID
+    /// Retrieves a quest template by ID (backward compatibility wrapper)
     /// </summary>
     /// <param name="questId">The quest ID</param>
     /// <returns>The quest document or null if not found</returns>
     public static async Task<QuestDocument?> GetQuestAsync(string questId) {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
+            // Get template from QuestTemplateCollection
+            var template = await QuestTemplateCollection.GetQuestTemplateAsync(questId);
+            if (template == null) {
+                return null;
             }
 
-            using var session = store.OpenAsyncSession();
-            return await session.LoadAsync<QuestDocument>(questId);
+            // Get metadata from QuestMetadataCollection
+            var metadata = await QuestMetadataCollection.GetQuestMetadataByTemplateIdAsync(questId);
+            
+            // Reconstruct QuestDocument for backward compatibility
+            return new QuestDocument {
+                Id = questId,
+                Name = metadata?.Name ?? template.m_questName,
+                Description = metadata?.Description ?? "",
+                Template = template,
+                CreatedAt = metadata?.CreatedAt ?? DateTime.UtcNow,
+                ModifiedAt = metadata?.ModifiedAt ?? DateTime.UtcNow,
+                CreatedBy = metadata?.CreatedBy ?? Environment.UserName,
+                ModifiedBy = metadata?.ModifiedBy ?? Environment.UserName
+            };
         }
         catch (Exception ex) {
             Console.WriteLine($"Error retrieving quest: {ex.Message}");
@@ -143,21 +152,34 @@ public static class QuestCollection {
     }
 
     /// <summary>
-    /// Retrieves all quest templates from the database
+    /// Retrieves all quest templates from the database (backward compatibility wrapper)
     /// </summary>
     /// <returns>List of quest documents</returns>
     public static async Task<List<QuestDocument>> GetAllQuestsAsync() {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
-            }
-
-            using var session = store.OpenAsyncSession();
+            // Get all templates and metadata
+            var templates = await QuestTemplateCollection.GetAllQuestTemplatesAsync();
+            var allMetadata = await QuestMetadataCollection.GetAllQuestMetadataAsync();
             
-            var results = await session.Query<QuestDocument>()
-                .OrderByDescending(q => q.ModifiedAt)
-                .ToListAsync();
+            // Create a lookup for metadata by template ID
+            var metadataLookup = allMetadata.ToDictionary(m => m.QuestTemplateId, m => m);
+            
+            // Reconstruct QuestDocuments for backward compatibility
+            var results = templates.Select(template => {
+                var templateId = $"questtemplates/{template.m_questName}";
+                metadataLookup.TryGetValue(templateId, out var metadata);
+                
+                return new QuestDocument {
+                    Id = templateId,
+                    Name = metadata?.Name ?? template.m_questName,
+                    Description = metadata?.Description ?? "",
+                    Template = template,
+                    CreatedAt = metadata?.CreatedAt ?? DateTime.UtcNow,
+                    ModifiedAt = metadata?.ModifiedAt ?? DateTime.UtcNow,
+                    CreatedBy = metadata?.CreatedBy ?? Environment.UserName,
+                    ModifiedBy = metadata?.ModifiedBy ?? Environment.UserName
+                };
+            }).OrderByDescending(q => q.ModifiedAt).ToList();
 
             return results;
         }
@@ -168,26 +190,61 @@ public static class QuestCollection {
     }
 
     /// <summary>
-    /// Searches for quest templates by name
+    /// Searches for quest templates by name (backward compatibility wrapper)
     /// </summary>
     /// <param name="searchTerm">The search term</param>
     /// <returns>List of matching quest documents</returns>
     public static async Task<List<QuestDocument>> SearchQuestsAsync(string searchTerm) {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
+            // Search metadata first (contains user-friendly names)
+            var matchingMetadata = await QuestMetadataCollection.SearchQuestMetadataAsync(searchTerm);
+            var results = new List<QuestDocument>();
+            var foundTemplateIds = new HashSet<string>();
+
+            // Add quests that have matching metadata
+            foreach (var metadata in matchingMetadata) {
+                var template = await QuestTemplateCollection.GetQuestTemplateAsync(metadata.QuestTemplateId);
+                if (template != null) {
+                    foundTemplateIds.Add(metadata.QuestTemplateId);
+                    results.Add(new QuestDocument {
+                        Id = metadata.QuestTemplateId,
+                        Name = metadata.Name,
+                        Description = metadata.Description,
+                        Template = template,
+                        CreatedAt = metadata.CreatedAt,
+                        ModifiedAt = metadata.ModifiedAt,
+                        CreatedBy = metadata.CreatedBy,
+                        ModifiedBy = metadata.ModifiedBy
+                    });
+                }
             }
 
-            using var session = store.OpenAsyncSession();
-            
-            var results = await session.Query<QuestDocument>()
-                .Where(q => q.Name.StartsWith(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                           q.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(q => q.ModifiedAt)
-                .ToListAsync();
+            // Also search quest templates directly for those without metadata
+            var allTemplates = await QuestTemplateCollection.GetAllQuestTemplatesAsync();
+            foreach (var template in allTemplates) {
+                var templateId = $"questtemplates/{template.m_questName}";
+                
+                // Skip if already found through metadata search
+                if (foundTemplateIds.Contains(templateId)) {
+                    continue;
+                }
+                
+                // Check if template name matches search term
+                if (template.m_questName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) {
+                    results.Add(new QuestDocument {
+                        Id = templateId,
+                        Name = template.m_questName,
+                        Description = "",
+                        Template = template,
+                        CreatedAt = DateTime.UtcNow,
+                        ModifiedAt = DateTime.UtcNow,
+                        CreatedBy = Environment.UserName,
+                        ModifiedBy = Environment.UserName
+                    });
+                }
+            }
 
-            return results;
+            return results.OrderByDescending(q => q.ModifiedAt).ToList();
         }
         catch (Exception ex) {
             Console.WriteLine($"Error searching quests: {ex.Message}");
@@ -196,24 +253,35 @@ public static class QuestCollection {
     }
 
     /// <summary>
-    /// Finds a quest by name
+    /// Finds a quest by name (backward compatibility wrapper)
     /// </summary>
     /// <param name="questName">The name of the quest to find</param>
     /// <returns>The quest document or null if not found</returns>
     public static async Task<QuestDocument?> FindQuestByNameAsync(string questName) {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
+            // Search metadata by name
+            var metadata = await QuestMetadataCollection.FindQuestMetadataByNameAsync(questName);
+            if (metadata == null) {
+                return null;
             }
 
-            using var session = store.OpenAsyncSession();
-            
-            var result = await session.Query<QuestDocument>()
-                .Where(q => q.Name == questName)
-                .FirstOrDefaultAsync();
+            // Get corresponding template
+            var template = await QuestTemplateCollection.GetQuestTemplateAsync(metadata.QuestTemplateId);
+            if (template == null) {
+                return null;
+            }
 
-            return result;
+            // Reconstruct QuestDocument
+            return new QuestDocument {
+                Id = metadata.QuestTemplateId,
+                Name = metadata.Name,
+                Description = metadata.Description,
+                Template = template,
+                CreatedAt = metadata.CreatedAt,
+                ModifiedAt = metadata.ModifiedAt,
+                CreatedBy = metadata.CreatedBy,
+                ModifiedBy = metadata.ModifiedBy
+            };
         }
         catch (Exception ex) {
             Console.WriteLine($"Error finding quest by name: {ex.Message}");
@@ -230,61 +298,43 @@ public static class QuestCollection {
     /// <returns>The ID of the upserted quest document</returns>
     public static async Task<string?> UpsertQuestAsync(QuestTemplate questTemplate, string name, string description = "") {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
-            }
+            // Check if metadata exists by name
+            var existingMetadata = await QuestMetadataCollection.FindQuestMetadataByNameAsync(name);
+            
+            if (existingMetadata != null) {
+                // Update existing quest
+                var templateUpdated = await QuestTemplateCollection.UpdateQuestTemplateAsync(questTemplate, existingMetadata.QuestTemplateId);
+                if (!templateUpdated) {
+                    return null;
+                }
 
-            using var session = store.OpenAsyncSession();
-            
-            // Try to find existing quest by name
-            // First, get all quests and check if name exists (for debugging)
-            var allQuests = await session.Query<QuestDocument>().ToListAsync();
-            var existingQuestByName = allQuests.FirstOrDefault(q => q.Name == name);
-            
-            // Also try the original query approach
-            var existingQuest = await session.Query<QuestDocument>()
-                .Where(q => q.Name == name)
-                .FirstOrDefaultAsync();
-
-            // Use the in-memory search result as it's more reliable
-            existingQuest = existingQuestByName;
-            
-            if (existingQuest != null) {
-                // Completely replace the existing quest while preserving the ID and creation info
-                string preservedId = existingQuest.Id;
-                DateTime preservedCreatedAt = existingQuest.CreatedAt;
-                string preservedCreatedBy = existingQuest.CreatedBy;
+                // Update metadata
+                existingMetadata.Name = name;
+                existingMetadata.Description = description;
+                existingMetadata.ModifiedAt = DateTime.UtcNow;
+                existingMetadata.ModifiedBy = Environment.UserName;
+                await QuestMetadataCollection.UpdateQuestMetadataAsync(existingMetadata);
                 
-                // Replace all properties with new data
-                existingQuest.Name = name;
-                existingQuest.Description = description;
-                existingQuest.Template = questTemplate;
-                existingQuest.ModifiedAt = DateTime.UtcNow;
-                existingQuest.ModifiedBy = Environment.UserName;
-                
-                // Ensure we preserve the original creation metadata
-                existingQuest.Id = preservedId;
-                existingQuest.CreatedAt = preservedCreatedAt;
-                existingQuest.CreatedBy = preservedCreatedBy;
-                
-                await session.SaveChangesAsync();
-                return existingQuest.Id;
+                return existingMetadata.QuestTemplateId;
             } else {
                 // Create new quest
-                var questDoc = new QuestDocument {
+                var questTemplateId = await QuestTemplateCollection.SaveQuestTemplateAsync(questTemplate, name);
+                if (questTemplateId == null) {
+                    return null;
+                }
+
+                var metadata = new QuestMetadata {
+                    QuestTemplateId = questTemplateId,
                     Name = name,
                     Description = description,
-                    Template = questTemplate,
                     CreatedAt = DateTime.UtcNow,
                     ModifiedAt = DateTime.UtcNow,
                     CreatedBy = Environment.UserName,
                     ModifiedBy = Environment.UserName
                 };
 
-                await session.StoreAsync(questDoc);
-                await session.SaveChangesAsync();
-                return questDoc.Id;
+                await QuestMetadataCollection.SaveQuestMetadataAsync(metadata);
+                return questTemplateId;
             }
         }
         catch (Exception ex) {
@@ -294,27 +344,22 @@ public static class QuestCollection {
     }
 
     /// <summary>
-    /// Deletes a quest template from the database
+    /// Deletes a quest template and its metadata from the database
     /// </summary>
     /// <param name="questId">The quest ID to delete</param>
     /// <returns>True if successful</returns>
     public static async Task<bool> DeleteQuestAsync(string questId) {
         try {
-            var store = WorldDatabase.Instance.Store;
-            if (store == null) {
-                throw new InvalidOperationException("Database connection not available");
-            }
-
-            using var session = store.OpenAsyncSession();
+            // Delete from both collections
+            var templateDeleted = await QuestTemplateCollection.DeleteQuestTemplateAsync(questId);
             
-            var questDoc = await session.LoadAsync<QuestDocument>(questId);
-            if (questDoc == null) {
-                return false;
+            // Find and delete corresponding metadata
+            var metadata = await QuestMetadataCollection.GetQuestMetadataByTemplateIdAsync(questId);
+            if (metadata != null) {
+                await QuestMetadataCollection.DeleteQuestMetadataAsync(metadata.Id);
             }
 
-            session.Delete(questDoc);
-            await session.SaveChangesAsync();
-            return true;
+            return templateDeleted;
         }
         catch (Exception ex) {
             Console.WriteLine($"Error deleting quest: {ex.Message}");

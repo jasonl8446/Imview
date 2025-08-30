@@ -1,0 +1,212 @@
+/*
+BSD 3-Clause License
+
+Copyright (c) 2024, Jooty
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+*/
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Imcodec.ObjectProperty.TypeCache;
+using Raven.Client.Documents;
+
+namespace Imview.Core.Database.Collections;
+
+/// <summary>
+/// Collection for managing raw QuestTemplate objects without metadata wrapper
+/// </summary>
+public static class QuestTemplateCollection {
+
+    /// <summary>
+    /// Saves a quest template directly to the database
+    /// </summary>
+    /// <param name="questTemplate">The quest template to save</param>
+    /// <param name="questId">Optional specific ID, uses m_questName if not provided</param>
+    /// <returns>The ID of the saved quest template</returns>
+    public static async Task<string?> SaveQuestTemplateAsync(QuestTemplate questTemplate, string? questId = null) {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            // Use provided ID or fall back to quest name
+            var id = questId ?? questTemplate.m_questName;
+            if (string.IsNullOrWhiteSpace(id)) {
+                throw new ArgumentException("Quest template must have a name or provided ID");
+            }
+
+            // Create document ID for RavenDB
+            var documentId = $"questtemplates/{id}";
+            
+            await session.StoreAsync(questTemplate, documentId);
+            await session.SaveChangesAsync();
+
+            return documentId;
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error saving quest template: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing quest template in the database
+    /// </summary>
+    /// <param name="questTemplate">The updated quest template</param>
+    /// <returns>True if successful</returns>
+    public static async Task<bool> UpdateQuestTemplateAsync(QuestTemplate questTemplate, string? questId = null) {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            // Use provided ID or fall back to quest name
+            var id = questId ?? questTemplate.m_questName;
+            if (string.IsNullOrWhiteSpace(id)) {
+                throw new ArgumentException("Quest template must have a name or provided ID for updates");
+            }
+
+            // Use m_questName to construct document ID
+            var documentId = $"questtemplates/{id}";
+            
+            var existingTemplate = await session.LoadAsync<QuestTemplate>(documentId);
+            if (existingTemplate == null) {
+                return false;
+            }
+
+            await session.StoreAsync(questTemplate, documentId);
+            await session.SaveChangesAsync();
+            return true;
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error updating quest template: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Retrieves a quest template by ID
+    /// </summary>
+    /// <param name="questId">The quest template ID</param>
+    /// <returns>The quest template or null if not found</returns>
+    public static async Task<QuestTemplate?> GetQuestTemplateAsync(string questId) {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            // Ensure proper document ID format
+            var documentId = questId.StartsWith("questtemplates/") ? questId : $"questtemplates/{questId}";
+            return await session.LoadAsync<QuestTemplate>(documentId);
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error retrieving quest template: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Retrieves all quest templates from the database
+    /// </summary>
+    /// <returns>List of quest templates</returns>
+    public static async Task<List<QuestTemplate>> GetAllQuestTemplatesAsync() {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            var results = await session.Query<QuestTemplate>()
+                .ToListAsync();
+
+            return results;
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error retrieving all quest templates: {ex.Message}");
+            return new List<QuestTemplate>();
+        }
+    }
+
+    /// <summary>
+    /// Finds a quest template by quest name
+    /// </summary>
+    /// <param name="questName">The m_questName property value</param>
+    /// <returns>The quest template or null if not found</returns>
+    public static async Task<QuestTemplate?> FindQuestTemplateByNameAsync(string questName) {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            var result = await session.Query<QuestTemplate>()
+                .Where(q => q.m_questName == questName)
+                .FirstOrDefaultAsync();
+
+            return result;
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error finding quest template by name: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Deletes a quest template from the database
+    /// </summary>
+    /// <param name="questId">The quest template ID to delete</param>
+    /// <returns>True if successful</returns>
+    public static async Task<bool> DeleteQuestTemplateAsync(string questId) {
+        try {
+            var store = WorldDatabase.Instance.Store;
+            if (store == null) {
+                throw new InvalidOperationException("Database connection not available");
+            }
+
+            using var session = store.OpenAsyncSession();
+            
+            // Ensure proper document ID format
+            var documentId = questId.StartsWith("questtemplates/") ? questId : $"questtemplates/{questId}";
+            var questTemplate = await session.LoadAsync<QuestTemplate>(documentId);
+            if (questTemplate == null) {
+                return false;
+            }
+
+            session.Delete(questTemplate);
+            await session.SaveChangesAsync();
+            return true;
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error deleting quest template: {ex.Message}");
+            return false;
+        }
+    }
+}
