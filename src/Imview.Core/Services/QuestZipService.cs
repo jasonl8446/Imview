@@ -30,6 +30,7 @@ using Imcodec.ObjectProperty;
 using Imcodec.ObjectProperty.TypeCache;
 using Imview.Core.Database.Collections;
 using Imview.Core.Services;
+using Imview.Core.Views;
 
 namespace Imview.Core.Services;
 
@@ -228,6 +229,137 @@ public static class QuestZipService {
                 .Send();
             return false;
         }
+    }
+
+    /// <summary>
+    /// Saves a single quest template with save option dialog.
+    /// </summary>
+    /// <param name="template">The template to save</param>
+    /// <param name="parentWindow">The parent window for dialogs</param>
+    /// <returns>A task that completes when the save operation is done, with a bool indicating success</returns>
+    public static async Task<bool> SaveSingleQuestAsync(
+        QuestTemplate template, 
+        Avalonia.Controls.Window parentWindow) {
+
+        ArgumentNullException.ThrowIfNull(template);
+
+        try {
+            // Show save options dialog
+            var optionsDialog = new QuestSaveOptionsDialog();
+            var selectedOption = await optionsDialog.ShowDialog<QuestSaveOption>(parentWindow);
+            
+            var success = selectedOption switch {
+                QuestSaveOption.SaveLocal => await SaveSingleQuestLocal(template, parentWindow),
+                QuestSaveOption.Upload => await SaveSingleQuestToDatabase(template, parentWindow),
+                QuestSaveOption.SaveBoth => await SaveSingleQuestBoth(template, parentWindow),
+                _ => false // User cancelled
+            };
+
+            if (success && selectedOption != QuestSaveOption.None) {
+                var questName = template.m_questName?.ToString() ?? template.m_questTitle?.ToString() ?? "Quest";
+                var message = selectedOption switch {
+                    QuestSaveOption.SaveLocal => $"Successfully saved quest '{questName}' to file.",
+                    QuestSaveOption.Upload => $"Successfully uploaded quest '{questName}' to database.",
+                    QuestSaveOption.SaveBoth => $"Successfully saved quest '{questName}' locally and to database.",
+                    _ => ""
+                };
+
+                MessageService.Info(message)
+                    .WithDuration(TimeSpan.FromSeconds(5))
+                    .Send();
+            }
+            
+            return success;
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Failed to save quest: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+            return false;
+        }
+    }
+
+    private static async Task<bool> SaveSingleQuestLocal(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
+        try {
+            var questName = SanitizeFileName(template.m_questName?.ToString() ?? 
+                                           template.m_questTitle?.ToString() ?? 
+                                           $"Quest_{DateTime.Now:HHmmss}");
+            
+            // Create save file dialog for .view file.
+            var options = new FilePickerSaveOptions {
+                Title = "Save Quest Template",
+                SuggestedFileName = $"{questName}.view",
+                FileTypeChoices = [
+                    new("View Files") {
+                        Patterns = ["*.view"]
+                    }
+                ]
+            };
+
+            var result = await parentWindow.StorageProvider.SaveFilePickerAsync(options);
+            if (result == null) {
+                return false; // User cancelled
+            }
+
+            var filePath = result.Path.LocalPath;
+            
+            // Serialize the template
+            var serializer = new ObjectSerializer(false);
+            if (!serializer.Serialize(template, 1, out var data)) {
+                MessageService.Error($"Failed to serialize quest template.")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+                return false;
+            }
+            
+            // Write the serialized data to the file
+            await File.WriteAllBytesAsync(filePath, data);
+            return true;
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Failed to save quest locally: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+            return false;
+        }
+    }
+
+    private static async Task<bool> SaveSingleQuestToDatabase(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
+        try {
+            // Check if database is configured first
+            var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(parentWindow);
+            if (!isConfigured) {
+                MessageService.Error("Database configuration is required to upload quest.")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+                return false;
+            }
+
+            // Generate a descriptive name for the quest
+            var questName = template.m_questName?.ToString() ?? 
+                          template.m_questTitle?.ToString() ?? 
+                          $"Quest_FromPacket_{DateTime.Now:HHmmss}";
+
+            var description = $"Quest imported from packet capture on {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+
+            // Use UpsertQuestAsync to handle duplicates gracefully
+            var questId = await QuestCollection.UpsertQuestAsync(template, questName, description);
+
+            return !string.IsNullOrEmpty(questId);
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Failed to upload quest to database: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+            return false;
+        }
+    }
+
+    private static async Task<bool> SaveSingleQuestBoth(QuestTemplate template, Avalonia.Controls.Window parentWindow) {
+        var localSuccess = await SaveSingleQuestLocal(template, parentWindow);
+        var databaseSuccess = await SaveSingleQuestToDatabase(template, parentWindow);
+        
+        return localSuccess || databaseSuccess; // Success if either works
     }
 
     /// <summary>

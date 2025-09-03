@@ -19,12 +19,21 @@ modification, are permitted provided that the following conditions are met:
 */
 
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Imcodec.ObjectProperty.TypeCache;
+using Imview.Core.ViewModels;
 
 namespace Imview.Core.Views;
 
 public partial class PacketQuestView : UserControl {
 
    public PacketQuestView() => AvaloniaXamlLoader.Load(this);
+
+   private void OnSaveIndividualQuestClick(object? sender, RoutedEventArgs e) {
+        if (sender is Avalonia.Controls.Button button && button.Tag is QuestTemplate quest && DataContext is PacketQuestViewModel viewModel) {
+            viewModel.SaveIndividualQuestCommand.Execute(quest);
+        }
+   }
 
 }

@@ -40,6 +40,7 @@ public class PacketQuestViewModel : ViewModelBase {
     public ICommand BackToSplashCommand { get; }
     public ICommand EditSelectedQuestCommand { get; }
     public ICommand SaveAllQuestsCommand { get; }
+    public ICommand SaveIndividualQuestCommand { get; }
 
     public bool HasQuests => QuestTemplates != null && QuestTemplates.Count > 0;
     public bool HasSelectedQuest => SelectedQuest != null;
@@ -65,6 +66,7 @@ public class PacketQuestViewModel : ViewModelBase {
         BackToSplashCommand = ReactiveCommand.Create(BackToSplash);
         EditSelectedQuestCommand = ReactiveCommand.Create(EditSelectedQuest);
         SaveAllQuestsCommand = ReactiveCommand.Create(SaveAllQuests);
+        SaveIndividualQuestCommand = ReactiveCommand.Create<QuestTemplate>(SaveIndividualQuest);
 
         // Update the HasQuests property
         this.RaisePropertyChanged(nameof(HasQuests));
@@ -160,6 +162,25 @@ public class PacketQuestViewModel : ViewModelBase {
         var databaseSuccess = await SaveAllQuestsToDatabase(window);
         
         return localSuccess || databaseSuccess; // Success if either works
+    }
+
+    private async void SaveIndividualQuest(QuestTemplate template) {
+        try {
+            var window = _mainViewModel.GetMainWindow();
+            if (window == null) {
+                MessageService.Error("Cannot find main window.")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+                return;
+            }
+
+            await QuestZipService.SaveSingleQuestAsync(template, window);
+        }
+        catch (Exception ex) {
+            MessageService.Error($"Failed to save quest: {ex.Message}")
+                .WithDuration(TimeSpan.FromSeconds(5))
+                .Send();
+        }
     }
 
     private void BackToSplash() 
