@@ -44,6 +44,17 @@ public static class QuestPacketReaderService {
                 throw new ArgumentNullException(nameof(filePath), "File path cannot be null or empty.");
             }
 
+            // Set up template manifest loader delegate for actor template ID resolution
+            QuestBuilder.TemplateManifestLoader = () => {
+                try {
+                    return RootWadService.Instance.GetFile("TemplateManifest.xml");
+                }
+                catch (Exception ex) {
+                    Console.WriteLine($"Warning: Could not load template manifest from Root.wad: {ex.Message}");
+                    return null;
+                }
+            };
+
             // Build quests from packet capture using QuestBuilder.
             var quests = await QuestBuilder.BuildQuestsFromPacketCaptureAsync(filePath);
             var questCollection = new ObservableCollection<QuestTemplate>(quests);

@@ -36,6 +36,10 @@ public sealed class QuestBuilder {
         s_goalIDToTemplateMap.Clear();
         s_questNameToMobileIDMap.Clear();
 
+        // Try to load template manifest for actor template ID resolution
+        // This is optional - if it fails, we'll continue without actor template IDs
+        TryLoadTemplateManifest();
+
         var questOfferPackets = await PacketReaderService.ExtractPacketsAsync<QuestOfferPacket>(
             packetCapturePath,
             "MSG_QUESTOFFER"
@@ -146,7 +150,7 @@ public sealed class QuestBuilder {
                     var serializer = new ObjectSerializer(false, SerializerFlags.None);
                     try {
                         if (serializer.Deserialize<ClientTagList>(clientTagsBytes, 1, out var clientTagsObject)) {
-                            goalTemplate.m_clientTags = clientTagsObject.m_clientTags;
+                            goalTemplate.m_clientTags = clientTagsObject?.m_clientTags;
                         }
                     }
                     catch {
@@ -241,6 +245,9 @@ public sealed class QuestBuilder {
                         // Set the dialog tag to "Prep" for quest preparation dialogue
                         actorDialog!.m_dialogTag = "Prep";
 
+                        // Populate actor template IDs using persona name from the packet
+                        PopulateActorTemplateIds(actorDialog, packet.Persona);
+
                         // Add or update the prep dialog
                         var existingPrepDialog = dialogList.m_dialogs?.FirstOrDefault(d =>
                             d.m_dialogTag?.Equals("Prep", StringComparison.OrdinalIgnoreCase) == true);
@@ -307,6 +314,9 @@ public sealed class QuestBuilder {
                         // Set the dialog tag to "Completion" for quest completion dialogue
                         actorDialog!.m_dialogTag = "Completion";
 
+                        // Populate actor template IDs using persona name from the packet
+                        PopulateActorTemplateIds(actorDialog, packet.Persona);
+
                         // Add or update the completion dialog
                         var existingCompletionDialog = dialogList.m_dialogs?.FirstOrDefault(d =>
                             d.m_dialogTag?.Equals("Completion", StringComparison.OrdinalIgnoreCase) == true);
@@ -372,6 +382,9 @@ public sealed class QuestBuilder {
 
                         actorDialog!.m_dialogTag = dialogTag;
 
+                        // Populate actor template IDs using persona name from the packet
+                        PopulateActorTemplateIds(actorDialog, packet.Persona);
+
                         // Add or update the dialog for this tag
                         var existingDialog = dialogList.m_dialogs?.FirstOrDefault(d =>
                             d.m_dialogTag?.Equals(dialogTag, StringComparison.OrdinalIgnoreCase) == true);
@@ -391,6 +404,57 @@ public sealed class QuestBuilder {
                     // If deserialization fails, we skip this dialog packet
                     // This allows the system to continue processing other goal dialogs
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to load the template manifest for actor template ID resolution.
+    /// This method attempts to load via delegate if provided, otherwise skips gracefully.
+    /// </summary>
+    private static void TryLoadTemplateManifest() {
+        try {
+            // Try to use the external template manifest loader if available
+            if (TemplateManifestLoader != null) {
+                var manifestData = TemplateManifestLoader();
+                if (manifestData.HasValue) {
+                    TemplateManifestService.Instance.LoadFromFileData(manifestData.Value);
+                }
+            }
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Warning: Could not load template manifest: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Optional delegate to provide template manifest data from external sources (like RootWadService).
+    /// Set this delegate to enable actor template ID resolution.
+    /// </summary>
+    public static Func<Memory<byte>?>? TemplateManifestLoader { get; set; }
+
+    /// <summary>
+    /// Populates actor template IDs for all dialog entries in an ActorDialog using the persona name from the packet.
+    /// </summary>
+    /// <param name="actorDialog">The ActorDialog containing dialog entries to populate.</param>
+    /// <param name="personaName">The persona name from the packet (e.g., "WC-ST01-NPC04_Persona").</param>
+    private static void PopulateActorTemplateIds(ActorDialog actorDialog, string personaName) {
+        if (actorDialog?.m_dialogEntries == null || string.IsNullOrEmpty(personaName)) {
+            return;
+        }
+
+        // Get the template ID from the persona name
+        var templateId = TemplateManifestService.Instance.GetTemplateIdByPersonaName(personaName);
+        if (templateId == 0) {
+            // If we can't find the template ID, log it but continue processing
+            Console.WriteLine($"Warning: Could not find template ID for persona: {personaName}");
+            return;
+        }
+
+        // Set the actor template ID for all dialog entries
+        foreach (var entry in actorDialog.m_dialogEntries) {
+            if (entry != null) {
+                entry.m_actorTemplateID = templateId;
             }
         }
     }
