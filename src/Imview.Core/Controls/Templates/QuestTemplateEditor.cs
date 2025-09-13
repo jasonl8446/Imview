@@ -622,7 +622,7 @@ public partial class QuestTemplateEditor : UserControl {
     }
 
     private async void AddGoal<T>() where T : GoalTemplate, new() {
-        var result = await _goalEditorFactory.CreateEditor(new T());
+        var result = await _goalEditorFactory.CreateEditor(new T(), _questTitleValue);
         if (result != null) {
             _goals.Add(new GoalTemplateWrapper(result, false));
         }
@@ -630,7 +630,7 @@ public partial class QuestTemplateEditor : UserControl {
 
     private async void GoalsList_DoubleTapped(object? sender, Avalonia.Interactivity.RoutedEventArgs e) {
         if (_goalsList.SelectedItem is GoalTemplateWrapper selectedGoalWrapper) {
-            var result = await _goalEditorFactory.CreateEditor(selectedGoalWrapper.Goal);
+            var result = await _goalEditorFactory.CreateEditor(selectedGoalWrapper.Goal, _questTitleValue);
             if (result != null) {
                 var index = _goals.IndexOf(selectedGoalWrapper);
                 _goals[index] = new GoalTemplateWrapper(result, selectedGoalWrapper.IsStartGoal);

@@ -104,6 +104,12 @@ public class SendGoalPacket {
     [PacketReaderService.PacketField("PetOnlyQuest", PacketReaderService.ExtractMethod.Ubyte)]
     public byte PetOnlyQuest { get; set; }
 
+    [PacketReaderService.PacketField("UseTally", PacketReaderService.ExtractMethod.Ubyte)]
+    public byte UseTally { get; set; }
+
+    [PacketReaderService.PacketField("GoalMadlibs", PacketReaderService.ExtractMethod.Hex)]
+    public string? GoalMadlibs { get; set; }
+
 }
 
 public class ActorDialogPacket {

@@ -34,13 +34,13 @@ namespace Imview.Core.Controls.Goals;
 /// </summary>
 public interface IGoalEditorFactory {
 
-    Task<GoalTemplate> CreateEditor(GoalTemplate template);
+    Task<GoalTemplate> CreateEditor(GoalTemplate template, string? questTitle = null);
 
 }
 
 public class GoalEditorFactory : IGoalEditorFactory {
 
-    public async Task<GoalTemplate> CreateEditor(GoalTemplate template) {
+    public async Task<GoalTemplate> CreateEditor(GoalTemplate template, string? questTitle = null) {
         Avalonia.Controls.Window editor = template switch {
             AchieveRankGoalTemplate rankTemplate => new AchieveRankGoalEditor(rankTemplate),
             BountyGoalTemplate bountyTemplate => new BountyGoalEditor(bountyTemplate),
@@ -49,6 +49,12 @@ public class GoalEditorFactory : IGoalEditorFactory {
             WaypointGoalTemplate waypointTemplate => new WaypointGoalEditor(waypointTemplate),
             _ => throw new ArgumentException($"Unsupported goal type: {template?.GetType().Name ?? "null"}")
         };
+
+        // Set quest title on the tally counter editor if available
+        if (editor is GoalEditorWindowBase goalEditor)
+        {
+            goalEditor.TallyCounterEditor.QuestTitle = questTitle;
+        }
 
         var editorWindow = (EditorWindowBase<GoalTemplate>)editor;
         var appLifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime

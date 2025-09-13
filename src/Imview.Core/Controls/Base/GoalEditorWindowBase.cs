@@ -60,6 +60,7 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
     protected CheckBox PetOnlyQuestBox;
     protected CheckBox HideGoalFloatyTextBox;
     protected QuestDialogEditor DialogEditor;
+    public TallyCounterEditor TallyCounterEditor;
 
     // Results lists
     protected ListBox CompletionResultsBox;
@@ -86,6 +87,7 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         PetOnlyQuestBox = new CheckBox();
         HideGoalFloatyTextBox = new CheckBox();
         DialogEditor = new QuestDialogEditor();
+        TallyCounterEditor = new TallyCounterEditor();
         CompletionResultsBox = new ListBox();
         ActivationResultsBox = new ListBox();
         CompletionResults = [];
@@ -172,6 +174,27 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
         
         // Initialize dialog editor with goal's dialog list
         DialogEditor.DialogList = Template.m_dialogList as ActorDialogList;
+        
+        // Initialize tally counter editor - handle enabled/disabled state
+        if (Template.m_tallyCounter == null)
+        {
+            // For manually created goals, create a default disabled tally counter
+            var defaultTallyCounter = new TallyCounterTemplate
+            {
+                m_percentChance = 1.0f, // 100% chance for new goals
+                m_count = 1,            // Single occurrence
+                m_descriptor = "",      
+                m_descriptor2 = "",     
+                m_tallyResults = new ResultList { m_results = new List<Result>() }
+            };
+            // Set it to null to indicate disabled state in the editor
+            TallyCounterEditor.TallyCounter = null;
+        }
+        else
+        {
+            // Tally counter exists, so it should be enabled
+            TallyCounterEditor.TallyCounter = Template.m_tallyCounter;
+        }
     }
 
     protected virtual void SaveValues() {
@@ -197,6 +220,10 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
 
             // Save dialog system - convert from editor back to ActorDialogList
             Template.m_dialogList = DialogEditor.ToActorDialogList();
+
+            // Save tally counter - only save if enabled
+            TallyCounterEditor.SaveToTallyCounter();
+            Template.m_tallyCounter = TallyCounterEditor.TallyCounter;
 
             Template.m_completeResults = new ResultList { m_results = CompletionResults.ToList() };
             Template.m_activateResults = new ResultList { m_results = ActivationResults.ToList() };
@@ -285,6 +312,9 @@ public abstract class GoalEditorWindowBase : EditorWindowBase<GoalTemplate> {
             () => AddNewResult(CompletionResults),
             () => RemoveSelectedResult(CompletionResultsBox, CompletionResults));
 #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+
+        // Add tally counter at the bottom
+        MainPanel.Children.Add(TallyCounterEditor);
 
         return MainPanel;
     }

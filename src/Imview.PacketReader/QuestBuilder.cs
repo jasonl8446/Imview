@@ -143,6 +143,18 @@ public sealed class QuestBuilder {
                     bountyGoalTemplate.m_bountyTotal = (int) packet.GoalTotal;
                 }
 
+                // Parse tally counter information from GoalMadlibs if UseTally indicates it's used
+                if (packet.UseTally == 1 && packet.GoalMadlibs is not null && packet.GoalMadlibs.Length > 0) {
+                    var tallyCounter = ParseTallyCounterFromMadlibs(packet.GoalMadlibs, packet.GoalTotal);
+                    if (tallyCounter != null) {
+                        goalTemplate.m_tallyCounter = tallyCounter;
+                    }
+                }
+                // If UseTally is 0, explicitly set tally counter to null to disable it in the editor
+                else if (packet.UseTally == 0) {
+                    goalTemplate.m_tallyCounter = null;
+                }
+
                 // Attempt to deserialize the ClientTags field of the packet.
                 if (packet.ClientTags is not null && packet.ClientTags.Length > 0) {
                     var clientTags = packet.ClientTags?.Replace(" ", string.Empty);
@@ -202,6 +214,16 @@ public sealed class QuestBuilder {
             if (goalInstance is BountyGoalTemplate bountyGoalTemplate) {
                 bountyGoalTemplate.m_bountyTotal = goal.m_goalTotal;
             }
+
+            // Create a basic tally counter for goals from quest compilation
+            // These won't have UseTally or madlibs data, so we create enabled defaults
+            goalInstance.m_tallyCounter = new TallyCounterTemplate {
+                m_percentChance = 1.0f,                                     // Default to 100% chance
+                m_count = goal.m_goalTotal,                                 // Use goal total as tally count  
+                m_descriptor = "",                                          // Empty - will need manual setup
+                m_descriptor2 = "",                                         // Empty - will need manual setup
+                m_tallyResults = new ResultList { m_results = new List<Result>() } // Empty results list
+            };
 
             goals.Add(goalInstance);
         }
@@ -470,5 +492,54 @@ public sealed class QuestBuilder {
             GOAL_TYPE.GOAL_TYPE_ACHIEVERANK => new AchieveRankGoalTemplate(),
             _ => throw new NotSupportedException($"Unsupported goal type: {goalType}"),
         };
+
+    /// <summary>
+    /// Parses tally counter information from the GoalMadlibs hex string.
+    /// Extracts TALLYTEXT and TALLYTEXT2 locale references from the MadlibBlock.
+    /// </summary>
+    /// <param name="goalMadlibs">Hex string containing serialized MadlibBlock data</param>
+    /// <param name="goalTotal">The goal total to use as tally count</param>
+    /// <returns>Configured TallyCounterTemplate or null if parsing fails</returns>
+    private static TallyCounterTemplate? ParseTallyCounterFromMadlibs(string goalMadlibs, uint goalTotal) {
+        try {
+            var madlibsBlob = goalMadlibs.Replace(" ", string.Empty);
+            var madlibsBytes = Convert.FromHexString(madlibsBlob);
+            var serializer = new ObjectSerializer(false, SerializerFlags.None);
+            
+            if (!serializer.Deserialize<MadlibBlock>(madlibsBytes, 1, out var madlibBlock)) {
+                return null;
+            }
+
+            // Look for TALLYTEXT and TALLYTEXT2 tokens in the madlibs
+            string? descriptor = null;
+            string? descriptor2 = null;
+
+            foreach (var madlib in madlibBlock?.m_madlibs ?? []) {
+                if (madlib is MadlibArgT_ByteString stringMadlib) {
+                    switch (stringMadlib.m_madlibToken?.ToUpperInvariant()) {
+                        case "TALLYTEXT":
+                            descriptor = stringMadlib.m_madlibArgument;
+                            break;
+                        case "TALLYTEXT2":
+                            descriptor2 = stringMadlib.m_madlibArgument;
+                            break;
+                    }
+                }
+            }
+
+            // Create tally counter template with extracted data
+            return new TallyCounterTemplate {
+                m_percentChance = 1.0f,                                     // Default to 100% chance
+                m_count = (int)goalTotal,                                   // Use GoalTotal as tally count
+                m_descriptor = descriptor ?? "",                            // TALLYTEXT locale reference
+                m_descriptor2 = descriptor2 ?? "",                          // TALLYTEXT2 locale reference
+                m_tallyResults = new ResultList { m_results = new List<Result>() } // Empty results list
+            };
+        }
+        catch {
+            // If deserialization fails, return null to indicate no tally counter available
+            return null;
+        }
+    }
 
 }
