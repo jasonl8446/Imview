@@ -1,0 +1,359 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Imview.Core.ViewModels"
+             xmlns:converters="clr-namespace:Imview.Core.Converters"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="Imview.Core.Views.ZoneEditorView"
+             x:DataType="vm:ZoneEditorViewModel">
+
+    <UserControl.Resources>
+        <converters:CoordinateConverter x:Key="CoordinateConverter"/>
+        <converters:ObjectTypeColorConverter x:Key="ObjectTypeColorConverter"/>
+        <converters:ObjectTypeIconConverter x:Key="ObjectTypeIconConverter"/>
+    </UserControl.Resources>
+
+    <Grid Background="#2B2B30">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="350" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Main Zone View Area (Left Side) -->
+        <Border Grid.Column="0" 
+                Background="#1E1E1E" 
+                BorderBrush="#3F3F46" 
+                BorderThickness="1"
+                Margin="5">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Zone Toolbar -->
+                <Border Grid.Row="0" 
+                        Background="#383838" 
+                        BorderBrush="#3F3F46"
+                        BorderThickness="0,0,0,1"
+                        Padding="10">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="Zone:" 
+                                 Foreground="White" 
+                                 VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding Zones}"
+                                SelectedItem="{Binding SelectedZone}"
+                                Width="200"
+                                Height="30"/>
+                        <Button Content="Load Zone"
+                                Command="{Binding LoadZoneCommand}"
+                                Height="30"
+                                Classes="accent"/>
+                        <Button Content="Save Zone"
+                                Command="{Binding SaveZoneCommand}"
+                                Height="30"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Zone Visualization Area -->
+                <Border Grid.Row="1" 
+                        Background="#2D2D30"
+                        Padding="5">
+                    <Grid>
+                        <!-- 2D Visualization Canvas -->
+                        <ScrollViewer Name="ZoneScrollViewer"
+                                    HorizontalScrollBarVisibility="Auto"
+                                    VerticalScrollBarVisibility="Auto"
+                                    Background="#1E1E1E">
+                            <Canvas Name="ZoneCanvas" 
+                                  Background="#1A1A1A"
+                                  Width="20000" 
+                                  Height="20000">
+                                
+                                <!-- Coordinate system center marker -->
+                                <Ellipse Width="16" Height="16" 
+                                       Fill="Red" 
+                                       Canvas.Left="9992" 
+                                       Canvas.Top="9992"/>
+                                <TextBlock Text="(0,0)" 
+                                         Foreground="Red" 
+                                         FontSize="14"
+                                         Canvas.Left="10012" 
+                                         Canvas.Top="9995"/>
+                                
+                                <!-- Grid lines for reference -->
+                                <Line StartPoint="0,10000" EndPoint="20000,10000" 
+                                    Stroke="#333333" StrokeThickness="1"/>
+                                <Line StartPoint="10000,0" EndPoint="10000,20000" 
+                                    Stroke="#333333" StrokeThickness="1"/>
+                                
+                                <!-- Test objects to verify rendering works -->
+                                <Border Background="Lime" Width="20" Height="20" 
+                                      Canvas.Left="9840" Canvas.Top="9820"
+                                      ToolTip.Tip="Test Object Near Expected Position">
+                                    <TextBlock Text="T" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                
+                                <Border Background="Yellow" Width="30" Height="30" 
+                                      Canvas.Left="5000" Canvas.Top="5000"
+                                      ToolTip.Tip="Test Object at 5000,5000">
+                                    <TextBlock Text="5K" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                
+                                <!-- Zone objects canvas - will be populated programmatically -->
+                                <Canvas Name="ZoneObjectCanvas"/>
+                            </Canvas>
+                        </ScrollViewer>
+                        
+                        <!-- Loading overlay -->
+                        <Border Background="#AA000000" 
+                              IsVisible="{Binding IsLoading}">
+                            <StackPanel HorizontalAlignment="Center" 
+                                      VerticalAlignment="Center">
+                                <TextBlock Text="Loading Zone Data..."
+                                         FontSize="18"
+                                         FontWeight="Bold"
+                                         Foreground="White"
+                                         HorizontalAlignment="Center"/>
+                                <TextBlock Text="Please wait while zone objects are processed"
+                                         FontSize="12"
+                                         Foreground="#CCCCCC"
+                                         HorizontalAlignment="Center"
+                                         Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- Visualization info overlay -->
+                        <StackPanel HorizontalAlignment="Right" 
+                                  VerticalAlignment="Bottom" 
+                                  Margin="10"
+                                  Background="#AA000000"
+                                  IsVisible="{Binding !IsLoading}">
+                            <TextBlock Text="2D Zone View (X/Y Coordinates)"
+                                     FontSize="10"
+                                     Foreground="#AAAAAA"
+                                     Margin="5"/>
+                            <TextBlock Text="{Binding ZoneVisualizationObjects.Count, StringFormat='Objects: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#AAAAAA"
+                                     Margin="5,0,5,5"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Right Panel - Object Inspector -->
+        <Border Grid.Column="1" 
+                Background="#2B2B30" 
+                BorderBrush="#3F3F46" 
+                BorderThickness="1,1,1,1"
+                Margin="0,5,5,5">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="15" Margin="15">
+
+                    <!-- Selected Object Details -->
+                    <Expander Header="Selected Object" 
+                            IsExpanded="True"
+                            Background="#383838"
+                            IsVisible="{Binding HasSelectedObject}">
+                        <StackPanel Spacing="12" Margin="10">
+                            <!-- Basic Info -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Object Information" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="White"/>
+                                
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Name:" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBox Text="{Binding SelectedCoreObject.m_zoneTag}" Height="25"/>
+                                </StackPanel>
+                                
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Template ID:" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBox Text="{Binding SelectedCoreObject.m_templateID}" Height="25" IsReadOnly="True"/>
+                                </StackPanel>
+                                
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Object ID:" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBox Text="{Binding SelectedCoreObject.m_nObjectID}" Height="25"/>
+                                </StackPanel>
+                                
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Type:" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBox Text="{Binding SelectedObject.Type}" Height="25" IsReadOnly="True"/>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Location -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Location" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="White"/>
+                                
+                                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,5,0,0">
+                                    <TextBlock Text="X:" Grid.Row="0" Grid.Column="0" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBlock Text="Y:" Grid.Row="0" Grid.Column="1" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBlock Text="Z:" Grid.Row="0" Grid.Column="2" Foreground="#CCCCCC" FontSize="11"/>
+                                    
+                                    <TextBox Text="{Binding LocationX}" 
+                                           Grid.Row="1" Grid.Column="0" 
+                                           Height="25" Margin="0,2,5,0"/>
+                                    <TextBox Text="{Binding LocationY}" 
+                                           Grid.Row="1" Grid.Column="1" 
+                                           Height="25" Margin="2,2,2,0"/>
+                                    <TextBox Text="{Binding LocationZ}" 
+                                           Grid.Row="1" Grid.Column="2" 
+                                           Height="25" Margin="5,2,0,0"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- Orientation -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Orientation" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="White"/>
+                                
+                                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,5,0,0">
+                                    <TextBlock Text="Pitch:" Grid.Row="0" Grid.Column="0" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBlock Text="Yaw:" Grid.Row="0" Grid.Column="1" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBlock Text="Roll:" Grid.Row="0" Grid.Column="2" Foreground="#CCCCCC" FontSize="11"/>
+                                    
+                                    <TextBox Text="{Binding OrientationX}" 
+                                           Grid.Row="1" Grid.Column="0" 
+                                           Height="25" Margin="0,2,5,0"/>
+                                    <TextBox Text="{Binding OrientationY}" 
+                                           Grid.Row="1" Grid.Column="1" 
+                                           Height="25" Margin="2,2,2,0"/>
+                                    <TextBox Text="{Binding OrientationZ}" 
+                                           Grid.Row="1" Grid.Column="2" 
+                                           Height="25" Margin="5,2,0,0"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- Scale -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Scale:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBox Text="{Binding SelectedCoreObject.m_fScale}" Height="25"/>
+                            </StackPanel>
+                            
+                            <!-- Advanced Properties -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Advanced Properties" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="White"/>
+                                
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Start State:" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBox Text="{Binding SelectedCoreObject.m_startState}" Height="25"/>
+                                </StackPanel>
+                                
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Override Name:" Foreground="#CCCCCC" FontSize="11"/>
+                                    <TextBox Text="{Binding SelectedCoreObject.m_overrideName}" Height="25"/>
+                                </StackPanel>
+                                
+                                <CheckBox Content="Global Dynamic" 
+                                        IsChecked="{Binding SelectedCoreObject.m_globalDynamic}"
+                                        Foreground="White"/>
+                                
+                                <CheckBox Content="Undetectable" 
+                                        IsChecked="{Binding SelectedCoreObject.m_bUndetectable}"
+                                        Foreground="White"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- No Selection Message -->
+                    <Border Background="#383838"
+                          CornerRadius="5"
+                          Padding="20"
+                          IsVisible="{Binding !HasSelectedObject}">
+                        <StackPanel Spacing="10" HorizontalAlignment="Center">
+                            <TextBlock Text="No Object Selected" 
+                                     FontSize="16"
+                                     FontWeight="Bold"
+                                     Foreground="#AAAAAA"
+                                     HorizontalAlignment="Center"/>
+                            <TextBlock Text="Click on an object in the zone view to inspect its properties" 
+                                     FontSize="12"
+                                     Foreground="#888888"
+                                     TextWrapping="Wrap"
+                                     HorizontalAlignment="Center"
+                                     TextAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Scene Hierarchy -->
+                    <Expander Header="Scene Hierarchy" 
+                            IsExpanded="True"
+                            Background="#383838">
+                        <StackPanel Spacing="10" Margin="10">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Zone Objects:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding ZoneVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
+                            </StackPanel>
+                            
+                            <ScrollViewer Height="300" VerticalScrollBarVisibility="Auto">
+                                <ListBox ItemsSource="{Binding ZoneVisualizationObjects}"
+                                       Background="Transparent"
+                                       BorderThickness="0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#2A2A2A" 
+                                                  Margin="2" 
+                                                  Padding="8,4"
+                                                  CornerRadius="3">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" 
+                                                             Foreground="White" 
+                                                             FontWeight="Medium"
+                                                             FontSize="11"/>
+                                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                                        <TextBlock Text="{Binding Type}" 
+                                                                 Foreground="#AAAAAA" 
+                                                                 FontSize="10"/>
+                                                        <TextBlock Text="{Binding CoordinateText}" 
+                                                                 Foreground="#888888" 
+                                                                 FontSize="10"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Zone Summary -->
+                    <Expander Header="Zone Summary" 
+                            Background="#383838">
+                        <StackPanel Spacing="10" Margin="10">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Zone Name:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding SelectedZone}" Foreground="White" FontWeight="Medium"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Total Objects:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding ZoneVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Shopkeepers:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding Shopkeepers.Count}" Foreground="White" FontWeight="Medium"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

@@ -93,45 +93,69 @@ public class SplashPageViewModel : ViewModelBase {
     private void InitializeSections() {
         Sections = [
             new SplashSectionViewModel(
-                "Quests",
-                "Quest Editor",
-                "Get Quests From Packet Capture",
+                "",
+                "Game Masters",
+                "",
+                "#333333",
+                "#888888",
                 "",
                 "",
-                _mainViewModel.ShowQuestBrowser,
-                _mainViewModel.GetQuestsFromPacketCapture,
+                "",
+                "",
+                "",
+                null,
+                null,
+                null,
                 null,
                 null),
-        new SplashSectionViewModel(
-            "Files",
-            "Unpack KIWADs",
-            "Unpack KIWADs & Deserialize",
-            "Download Client Files",
-            "",
-            () => _mainViewModel.UnpackKiwad(false),
-            () => _mainViewModel.UnpackKiwad(true),
-            _mainViewModel.ShowClientFileDownload,
-            null),
-        new SplashSectionViewModel(
-            "Object Property",
-            "Analyze Blob",
-            "",
-            "",
-            "",
-            _mainViewModel.AnalyzeObjectPropertyBlob,
-            null,
-            null,
-            null),
-        new SplashSectionViewModel(
-            "Settings",
-            "Configure Database",
-            "Configure Client Files",
-            "",
-            "",
-            _mainViewModel.ShowDatabaseConfig,
-            _mainViewModel.ShowClientFileConfig,
-            null,
-            null)
+            new SplashSectionViewModel(
+                "",
+                "Hall Monitors", 
+                "",
+                "#333333",
+                "#888888",
+                "",
+                "",
+                "",
+                "",
+                "",
+                null,
+                null,
+                null,
+                null,
+                null),
+            new SplashSectionViewModel(
+                "",
+                "Data Recollection",
+                "",
+                "#333333",
+                "#888888",
+                "Quest Editor",
+                "Get Quests From Packet Capture",
+                "Edit Zone",
+                "Download WAD Files",
+                "Configure Database & Client Files",
+                _mainViewModel.ShowQuestBrowser,
+                _mainViewModel.GetQuestsFromPacketCapture,
+                _mainViewModel.ShowZoneEditor,
+                _mainViewModel.ShowClientFileDownload,
+                _mainViewModel.ShowDatabaseAndClientConfig),
+            new SplashSectionViewModel(
+                "",
+                "General",
+                "",
+                "#333333",
+                "#888888",
+                "Analyze Object Property Blob",
+                "Unpack KIWADs",
+                "",
+                "",
+                "",
+                _mainViewModel.AnalyzeObjectPropertyBlob,
+                () => _mainViewModel.UnpackKiwad(false),
+                null,
+                null,
+                null)
         ];
     }
     
@@ -242,28 +266,40 @@ public class SplashPageViewModel : ViewModelBase {
 }
 
 public class SplashSectionViewModel(
+    string icon,
     string title,
+    string description,
+    string backgroundColor,
+    string borderColor,
     string firstButtonText,
     string secondButtonText,
     string thirdButtonText,
     string fourthButtonText,
+    string fifthButtonText,
     System.Action? firstButtonAction,
-    System.Action? secontButtonAction,
+    System.Action? secondButtonAction,
     System.Action? thirdButtonAction,
-    System.Action? fourthButtonAction) {
+    System.Action? fourthButtonAction,
+    System.Action? fifthButtonAction) {
 
+    public string Icon { get; } = icon;
     public string Title { get; } = title;
+    public string Description { get; } = description;
+    public string BackgroundColor { get; } = backgroundColor;
+    public string BorderColor { get; } = borderColor;
     public string FirstButtonText { get; } = firstButtonText;
     public string SecondButtonText { get; } = secondButtonText;
     public string ThirdButtonText { get; } = thirdButtonText;
     public string FourthButtonText { get; } = fourthButtonText;
+    public string FifthButtonText { get; } = fifthButtonText;
+    
     public ICommand? FirstButtonCommand { get; }
         = firstButtonAction != null
             ? ReactiveCommand.Create(firstButtonAction)
             : null;
     public ICommand? SecondButtonCommand { get; }
-        = secontButtonAction != null
-            ? ReactiveCommand.Create(secontButtonAction)
+        = secondButtonAction != null
+            ? ReactiveCommand.Create(secondButtonAction)
             : null;
     public ICommand? ThirdButtonCommand { get; }
         = thirdButtonAction != null
@@ -273,6 +309,14 @@ public class SplashSectionViewModel(
         = fourthButtonAction != null
             ? ReactiveCommand.Create(fourthButtonAction)
             : null;
+    public ICommand? FifthButtonCommand { get; }
+        = fifthButtonAction != null
+            ? ReactiveCommand.Create(fifthButtonAction)
+            : null;
+            
+    public bool HasFirstButton
+        => !string.IsNullOrEmpty(FirstButtonText)
+        && FirstButtonCommand != null;
     public bool HasSecondButton
         => !string.IsNullOrEmpty(SecondButtonText)
         && SecondButtonCommand != null;
@@ -282,7 +326,8 @@ public class SplashSectionViewModel(
     public bool HasFourthButton
         => !string.IsNullOrEmpty(FourthButtonText)
         && FourthButtonCommand != null;
-
-    public bool IsQuestSection => Title == "Quests";
+    public bool HasFifthButton
+        => !string.IsNullOrEmpty(FifthButtonText)
+        && FifthButtonCommand != null;
 
 }

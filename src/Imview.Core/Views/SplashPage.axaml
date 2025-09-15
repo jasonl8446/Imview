@@ -28,7 +28,7 @@
                              Foreground="White"
                              HorizontalAlignment="Center"/>
                              
-                    <TextBlock Text="Imlight's data recollection tool"
+                    <TextBlock Text="Imlight Server Management Tool"
                              FontSize="16"
                              Foreground="#CCCCCC"
                              HorizontalAlignment="Center"/>
@@ -80,64 +80,158 @@
                 </StackPanel>
             </Border>
 
-            <!-- Sections -->
-            <ItemsControl ItemsSource="{Binding Sections}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <UniformGrid Columns="2" Rows="2" HorizontalAlignment="Center" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="#333333"
-                                CornerRadius="8"
-                                Margin="10"
-                                Padding="20"
-                                Width="350"
-                                MinHeight="250">
-                            <StackPanel Spacing="16">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="{Binding Title}"
-                                             FontSize="24"
-                                             FontWeight="SemiBold"
-                                             Foreground="White"/>
-                                    <TextBlock Text="Some options require authentication"
-                                             FontSize="12"
-                                             FontStyle="Italic"
-                                             Foreground="#AAAAAA"
-                                             IsVisible="{Binding IsQuestSection}"/>
-                                </StackPanel>
-                                
-                                <StackPanel Spacing="8">
-                                    <Button Content="{Binding FirstButtonText}"
-                                            Command="{Binding FirstButtonCommand}"
-                                            HorizontalAlignment="Stretch"
-                                            Height="40"
-                                            Classes="accent"/>
-                                            
-                                    <Button Content="{Binding SecondButtonText}"
-                                            Command="{Binding SecondButtonCommand}"
-                                            HorizontalAlignment="Stretch"
-                                            Height="40"
-                                            IsVisible="{Binding HasSecondButton}"/>
+            <!-- cPanel Style Full-Width Horizontal Sections -->
+            <StackPanel Spacing="20" Margin="40,0">
+                
+                <!-- Game Masters Section -->
+                <Border Background="#333333"
+                        CornerRadius="6"
+                        Padding="25"
+                        BorderBrush="#888888"
+                        BorderThickness="1">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="Game Masters"
+                                 FontSize="22"
+                                 FontWeight="Bold"
+                                 Foreground="White"
+                                 HorizontalAlignment="Left"/>
+                        <Rectangle Height="1" 
+                                 Fill="#555555" 
+                                 HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Coming soon..."
+                                 FontStyle="Italic"
+                                 Foreground="#AAAAAA"
+                                 HorizontalAlignment="Left"
+                                 Margin="0,20,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Hall Monitors Section -->
+                <Border Background="#333333"
+                        CornerRadius="6"
+                        Padding="25"
+                        BorderBrush="#888888"
+                        BorderThickness="1">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="Hall Monitors"
+                                 FontSize="22"
+                                 FontWeight="Bold"
+                                 Foreground="White"
+                                 HorizontalAlignment="Left"/>
+                        <Rectangle Height="1" 
+                                 Fill="#555555" 
+                                 HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Coming soon..."
+                                 FontStyle="Italic"
+                                 Foreground="#AAAAAA"
+                                 HorizontalAlignment="Left"
+                                 Margin="0,20,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Data Recollection Section -->
+                <Border Background="#333333"
+                        CornerRadius="6"
+                        Padding="25"
+                        BorderBrush="#888888"
+                        BorderThickness="1">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="Data Recollection"
+                                 FontSize="22"
+                                 FontWeight="Bold"
+                                 Foreground="White"
+                                 HorizontalAlignment="Left"/>
+                        <Rectangle Height="1" 
+                                 Fill="#555555" 
+                                 HorizontalAlignment="Stretch"/>
+                        
+                        <!-- Horizontal Button Layout -->
+                        <WrapPanel Orientation="Horizontal" 
+                                 HorizontalAlignment="Left">
+                            <Button Content="Quest Editor"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[2].FirstButtonCommand}"
+                                    Width="150"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"
+                                    Classes="accent"/>
+                                    
+                            <Button Content="Get Quests From Packet Capture"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[2].SecondButtonCommand}"
+                                    Width="220"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
 
-                                    <Button Content="{Binding ThirdButtonText}"
-                                            Command="{Binding ThirdButtonCommand}"
-                                            HorizontalAlignment="Stretch"
-                                            Height="40"
-                                            IsVisible="{Binding HasThirdButton}"/>
+                            <Button Content="Edit Zone"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[2].ThirdButtonCommand}"
+                                    Width="120"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
 
-                                    <Button Content="{Binding FourthButtonText}"
-                                            Command="{Binding FourthButtonCommand}"
-                                            HorizontalAlignment="Stretch"
-                                            Height="40"
-                                            IsVisible="{Binding HasFourthButton}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                            <Button Content="Download WAD Files"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[2].FourthButtonCommand}"
+                                    Width="160"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
+
+                            <Button Content="Configure Database &amp; Client Files"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[2].FifthButtonCommand}"
+                                    Width="250"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+                
+                <!-- General Section -->
+                <Border Background="#333333"
+                        CornerRadius="6"
+                        Padding="25"
+                        BorderBrush="#888888"
+                        BorderThickness="1">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="General"
+                                 FontSize="22"
+                                 FontWeight="Bold"
+                                 Foreground="White"
+                                 HorizontalAlignment="Left"/>
+                        <Rectangle Height="1" 
+                                 Fill="#555555" 
+                                 HorizontalAlignment="Stretch"/>
+                        
+                        <!-- Horizontal Button Layout -->
+                        <WrapPanel Orientation="Horizontal" 
+                                 HorizontalAlignment="Left">
+                            <Button Content="Analyze Object Property Blob"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[3].FirstButtonCommand}"
+                                    Width="240"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"
+                                    Classes="accent"/>
+                                    
+                            <Button Content="Unpack KIWADs"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[3].SecondButtonCommand}"
+                                    Width="150"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+                
+            </StackPanel>
         </StackPanel>
     </Grid>
 </UserControl>

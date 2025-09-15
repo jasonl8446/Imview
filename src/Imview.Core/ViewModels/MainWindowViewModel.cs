@@ -316,6 +316,23 @@ public class MainWindowViewModel : ViewModelBase {
     }
 
     /// <summary>
+    /// Shows both database and client file configuration dialogs.
+    /// </summary>
+    public async void ShowDatabaseAndClientConfig() {
+        ShowDatabaseConfig();
+        await Task.Delay(500); // Small delay between dialogs
+        ShowClientFileConfig();
+    }
+
+    /// <summary>
+    /// Opens the Zone Editor in a new tab.
+    /// </summary>
+    public void ShowZoneEditor() {
+        var tab = TabManager.AddTab("Zone Editor", new ZoneEditorViewModel(this));
+        TabManager.SelectTab(tab);
+    }
+
+    /// <summary>
     /// Shows the client file download dialog.
     /// </summary>
     public void ShowClientFileDownload() {
