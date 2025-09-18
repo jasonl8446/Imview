@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.MessageLayer\Imcodec.MessageLayer.csproj" />
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.IO\Imcodec.IO.csproj" />
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.Cryptography\Imcodec.Cryptography.csproj" />
+    <ProjectReference Include="..\..\submodule\WizardTea\WizardTea\WizardTea.csproj" />
     <ProjectReference Include="..\Imview.PacketReader\Imview.PacketReader.csproj" />
   </ItemGroup>
 

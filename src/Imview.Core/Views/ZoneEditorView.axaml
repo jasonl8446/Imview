@@ -185,6 +185,10 @@
                                      FontSize="10"
                                      Foreground="#00FFFF"
                                      Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding NifMeshVisualizationObjects.Count, StringFormat='NIF Meshes: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#FFFF00"
+                                     Margin="5,0,5,5"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -216,6 +220,19 @@
                                 <CheckBox Content="Show Zone Objects"
                                         IsChecked="{Binding ShowZoneObjects}"
                                         Foreground="White"
+                                        Margin="10,0,0,0"/>
+                            </StackPanel>
+                            
+                            <!-- NIF Geometry Filter -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Zone Geometry" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="#FFFF00"/>
+                                
+                                <CheckBox Content="Show NIF Geometry"
+                                        IsChecked="{Binding ShowNifGeometry}"
+                                        Foreground="#FFFF00"
                                         Margin="10,0,0,0"/>
                             </StackPanel>
                             
@@ -577,6 +594,11 @@
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Collision Objects:" Foreground="#CCCCCC" FontSize="11"/>
                                 <TextBlock Text="{Binding CollisionVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="NIF Geometry Meshes:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding NifMeshVisualizationObjects.Count}" Foreground="#FFFF00" FontWeight="Medium"/>
                             </StackPanel>
                         </StackPanel>
                     </Expander>

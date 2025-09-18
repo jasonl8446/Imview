@@ -31,6 +31,7 @@ using Imcodec.ObjectProperty.TypeCache;
 using Imcodec.ObjectProperty;
 using Imcodec.BCD;
 using Imview.Core.Models;
+using WizardTea.Core;
 
 namespace Imview.Core.Services;
 
@@ -50,7 +51,7 @@ public class ZoneDataService
         _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
     
-    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData)> LoadZoneDataAsync(string zoneName)
+    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile)> LoadZoneDataAsync(string zoneName)
     {
         try
         {
@@ -113,7 +114,40 @@ public class ZoneDataService
                 Console.WriteLine($"No '{CollisionDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have collision data");
             }
             
-            return (zoneData, collisionData);
+            // Extract .nif scene file from the zone WAD (optional - use gamebryoSceneFileName from zone data)
+            NifFile? sceneFile = null;
+            if (zoneData != null && !string.IsNullOrEmpty(zoneData.m_gamebryoSceneFileName))
+            {
+                try
+                {
+                    var nifFileName = zoneData.m_gamebryoSceneFileName;
+                    Console.WriteLine($"Looking for NIF scene file: '{nifFileName}'");
+                    
+                    var nifFile = zoneArchive.OpenFile(nifFileName);
+                    if (nifFile != null)
+                    {
+                        using var nifStream = new MemoryStream(nifFile.Value.ToArray());
+                        var wizardTeaStream = new NifStream(nifStream);
+                        sceneFile = new NifFile(wizardTeaStream);
+                        Console.WriteLine($"Successfully loaded NIF scene file '{nifFileName}' with {sceneFile.Blocks.Length} blocks");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NIF scene file '{nifFileName}' not found in zone WAD '{zoneWadName}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Failed to parse NIF scene file '{zoneData.m_gamebryoSceneFileName}': {ex.Message}");
+                    // Continue without scene file - it's not critical for basic zone functionality
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No gamebryoSceneFileName specified in zone data or zone data is null");
+            }
+            
+            return (zoneData, collisionData, sceneFile);
         }
         catch (Exception ex)
         {

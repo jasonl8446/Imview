@@ -35,6 +35,7 @@ using Imcodec.ObjectProperty.TypeCache;
 using Imcodec.Math;
 using Imcodec.BCD;
 using BcdGeomParams = Imcodec.BCD.GeomParams;
+using WizardTea.Core;
 
 namespace Imview.Core.ViewModels;
 
@@ -47,9 +48,12 @@ public class ZoneEditorViewModel : ViewModelBase
     private CoreObjectInfo? _selectedCoreObject = null;
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
+    private NifFile? _currentSceneFile = null;
+    private NifGeometryProcessor? _nifProcessor = null;
     private bool _isLoading = false;
     private bool _showCollisions = true;
     private bool _showZoneObjects = true;
+    private bool _showNifGeometry = true;
     
     // Collision flag filters - default to false so all objects show initially
     private bool _showWalkableCollisions = false;
@@ -74,6 +78,8 @@ public class ZoneEditorViewModel : ViewModelBase
     private const double MaxZoom = 5.0;
     private const double ZoomStep = 0.1;
     private const double PanStep = 50.0;
+    private const double CanvasCenterX = 10000.0;
+    private const double CanvasCenterY = 10000.0;
 
     public ZoneEditorViewModel(MainWindowViewModel mainViewModel)
     {
@@ -100,6 +106,9 @@ public class ZoneEditorViewModel : ViewModelBase
         ZoneTransfers = new ObservableCollection<ZoneTransferItem>();
         ZoneVisualizationObjects = new ObservableCollection<ZoneVisualizationObject>();
         CollisionVisualizationObjects = new ObservableCollection<CollisionVisualizationObject>();
+        NifMeshVisualizationObjects = new ObservableCollection<NifMeshVisualizationObject>();
+        
+        _nifProcessor = new NifGeometryProcessor();
         
         LoadAvailableZones();
     }
@@ -110,6 +119,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ObservableCollection<ZoneTransferItem> ZoneTransfers { get; }
     public ObservableCollection<ZoneVisualizationObject> ZoneVisualizationObjects { get; }
     public ObservableCollection<CollisionVisualizationObject> CollisionVisualizationObjects { get; }
+    public ObservableCollection<NifMeshVisualizationObject> NifMeshVisualizationObjects { get; }
 
     public string SelectedZone
     {
@@ -151,6 +161,16 @@ public class ZoneEditorViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _showZoneObjects, value);
+            UpdateVisibility();
+        }
+    }
+
+    public bool ShowNifGeometry
+    {
+        get => _showNifGeometry;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showNifGeometry, value);
             UpdateVisibility();
         }
     }
@@ -361,9 +381,10 @@ public class ZoneEditorViewModel : ViewModelBase
                 .WithDuration(TimeSpan.FromSeconds(2))
                 .Send();
 
-            var (zoneData, collisionData) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
+            var (zoneData, collisionData, sceneFile) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
             _currentZoneData = zoneData;
             _currentCollisionData = collisionData;
+            _currentSceneFile = sceneFile;
             
             if (_currentZoneData != null)
             {
@@ -372,6 +393,11 @@ public class ZoneEditorViewModel : ViewModelBase
                 if (_currentCollisionData != null)
                 {
                     await PopulateCollisionData(_currentCollisionData);
+                }
+                
+                if (_currentSceneFile != null)
+                {
+                    await PopulateNifGeometry(_currentSceneFile);
                 }
                 
                 MessageService.Info($"Zone '{SelectedZone}' loaded successfully")
@@ -529,6 +555,7 @@ public class ZoneEditorViewModel : ViewModelBase
         ZoneTransfers.Clear();
         ZoneVisualizationObjects.Clear();
         CollisionVisualizationObjects.Clear();
+        NifMeshVisualizationObjects.Clear();
         
         // Add all items to UI collections
         foreach (var item in tempZoneObjects)
@@ -612,6 +639,58 @@ public class ZoneEditorViewModel : ViewModelBase
         
         // Create collision visuals now that we have collision data
         CreateCollisionVisuals();
+    }
+
+    private async Task PopulateNifGeometry(NifFile sceneFile)
+    {
+        var tempNifMeshObjects = new List<NifMeshVisualizationObject>();
+        
+        await Task.Run(() =>
+        {
+            Console.WriteLine($"PopulateNifGeometry called with NIF file containing {sceneFile.Blocks.Length} blocks");
+            
+            if (_nifProcessor != null)
+            {
+                var processedGeometry = _nifProcessor.ProcessNifFile(sceneFile);
+                
+                Console.WriteLine($"Processed NIF geometry: {processedGeometry.Meshes.Count} meshes, has geometry: {processedGeometry.HasGeometry}");
+                
+                foreach (var mesh in processedGeometry.Meshes)
+                {
+                    if (mesh.HasValidGeometry)
+                    {
+                        var nifMeshObj = new NifMeshVisualizationObject
+                        {
+                            Name = mesh.Name,
+                            Vertices2D = mesh.Vertices2D,
+                            Triangles = mesh.Triangles,
+                            BoundingBox = mesh.BoundingBox,
+                            VertexCount = mesh.Vertices2D.Count,
+                            TriangleCount = mesh.Triangles.Count
+                        };
+                        
+                        tempNifMeshObjects.Add(nifMeshObj);
+                        
+                        // Debug: Log first few mesh objects
+                        if (tempNifMeshObjects.Count <= 5)
+                        {
+                            Console.WriteLine($"NIF Mesh: {nifMeshObj.Name} with {nifMeshObj.VertexCount} vertices and {nifMeshObj.TriangleCount} triangles");
+                        }
+                    }
+                }
+            }
+            
+            Console.WriteLine($"NIF geometry processing complete. Created {tempNifMeshObjects.Count} mesh visualization objects");
+        });
+        
+        // Update UI collection on UI thread
+        foreach (var item in tempNifMeshObjects)
+            NifMeshVisualizationObjects.Add(item);
+            
+        Console.WriteLine($"NifMeshVisualizationObjects updated. Final count: {NifMeshVisualizationObjects.Count}");
+        
+        // Create NIF geometry visuals now that we have mesh data
+        CreateNifGeometryVisuals();
     }
 
     private string GetGeometryTypeName(uint typeId)
@@ -868,6 +947,17 @@ public class ZoneEditorViewModel : ViewModelBase
             }
         }
         
+        // Update NIF geometry visibility
+        var nifGeometryVisuals = _zoneObjectCanvas.Children
+            .OfType<Control>()
+            .Where(c => c.Tag is NifMeshVisualizationObject)
+            .ToList();
+            
+        foreach (var visual in nifGeometryVisuals)
+        {
+            visual.IsVisible = ShowNifGeometry;
+        }
+        
         // Notify property changes for count updates
         this.RaisePropertyChanged(nameof(VisibleCollisionCount));
     }
@@ -880,27 +970,17 @@ public class ZoneEditorViewModel : ViewModelBase
             return;
         }
         
-        Console.WriteLine($"Creating collision visuals for {CollisionVisualizationObjects.Count} collision objects");
-        Console.WriteLine($"ShowCollisions: {ShowCollisions}");
-        
         foreach (var collision in CollisionVisualizationObjects)
         {
             try
             {
                 var shouldShow = ShouldShowCollision(collision);
-                Console.WriteLine($"Collision '{collision.Name}' flags: {collision.CollisionFlags}, should show: {shouldShow}");
-                
                 var visual = CreateCollisionShapeVisual(collision);
                 if (visual != null)
                 {
                     // Set initial visibility based on filters
                     visual.IsVisible = shouldShow;
                     _zoneObjectCanvas.Children.Add(visual);
-                    Console.WriteLine($"Added collision visual for '{collision.Name}' to canvas (visible: {visual.IsVisible})");
-                }
-                else
-                {
-                    Console.WriteLine($"Failed to create visual for collision '{collision.Name}'");
                 }
             }
             catch (Exception ex)
@@ -909,7 +989,141 @@ public class ZoneEditorViewModel : ViewModelBase
             }
         }
         
-        Console.WriteLine($"Created collision visuals on canvas");
+    }
+
+    private void CreateNifGeometryVisuals()
+    {
+        if (_zoneObjectCanvas == null)
+        {
+            Console.WriteLine("Canvas not set, cannot create NIF geometry visuals");
+            return;
+        }
+        
+        Console.WriteLine($"Creating NIF geometry visuals for {NifMeshVisualizationObjects.Count} mesh objects");
+        
+        foreach (var mesh in NifMeshVisualizationObjects)
+        {
+            try
+            {
+                var visual = CreateNifMeshVisual(mesh);
+                if (visual != null)
+                {
+                    // Set initial visibility based on ShowNifGeometry setting
+                    visual.IsVisible = ShowNifGeometry;
+                    _zoneObjectCanvas.Children.Add(visual);
+                    Console.WriteLine($"Added NIF mesh visual for '{mesh.Name}' to canvas (visible: {visual.IsVisible})");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to create visual for NIF mesh '{mesh.Name}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating NIF mesh visual for '{mesh.Name}': {ex.Message}");
+            }
+        }
+        
+        Console.WriteLine($"Created NIF geometry visuals on canvas");
+    }
+
+    private Control? CreateNifMeshVisual(NifMeshVisualizationObject mesh)
+    {
+        if (mesh.Vertices2D.Count == 0)
+            return null;
+
+        try
+        {
+            // For large meshes, use simplified representation
+            var vertices = mesh.Vertices2D.Count > 100 
+                ? NifGeometryProcessor.SimplifyMesh(mesh.Vertices2D, 100)
+                : mesh.Vertices2D;
+
+            // If we still have too many vertices, create a bounding box representation
+            if (vertices.Count > 50)
+            {
+                return CreateNifBoundingBoxVisual(mesh);
+            }
+
+            // Create a polygon for the mesh
+            var polygon = new Polygon
+            {
+                Points = vertices,
+                Fill = new SolidColorBrush(Avalonia.Media.Color.FromArgb(100, 255, 255, 0)), // Semi-transparent yellow
+                Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)), // Yellow outline
+                StrokeThickness = 1,
+                Opacity = 0.7
+            };
+
+            // Add tooltip
+            ToolTip.SetTip(polygon, $"NIF Mesh: {mesh.Name}\nVertices: {mesh.VertexCount}\nTriangles: {mesh.TriangleCount}");
+            
+            // Tag for identification
+            polygon.Tag = mesh;
+
+            return polygon;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating polygon for mesh '{mesh.Name}': {ex.Message}");
+            return CreateNifBoundingBoxVisual(mesh);
+        }
+    }
+
+    private Control CreateNifBoundingBoxVisual(NifMeshVisualizationObject mesh)
+    {
+        // Create a simple rectangle representing the mesh bounds
+        if (mesh.BoundingBox.Count >= 4)
+        {
+            var minX = mesh.BoundingBox.Min(p => p.X);
+            var maxX = mesh.BoundingBox.Max(p => p.X);
+            var minY = mesh.BoundingBox.Min(p => p.Y);
+            var maxY = mesh.BoundingBox.Max(p => p.Y);
+
+            var rectangle = new Avalonia.Controls.Shapes.Rectangle
+            {
+                Width = Math.Max(2, maxX - minX),
+                Height = Math.Max(2, maxY - minY),
+                Fill = new SolidColorBrush(Avalonia.Media.Color.FromArgb(80, 255, 255, 0)), // Semi-transparent yellow
+                Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)), // Yellow outline
+                StrokeThickness = 1,
+                Opacity = 0.6
+            };
+
+            // Position the rectangle
+            Canvas.SetLeft(rectangle, minX);
+            Canvas.SetTop(rectangle, minY);
+
+            // Add tooltip
+            ToolTip.SetTip(rectangle, $"NIF Mesh (Simplified): {mesh.Name}\nVertices: {mesh.VertexCount}\nTriangles: {mesh.TriangleCount}");
+            
+            // Tag for identification
+            rectangle.Tag = mesh;
+
+            return rectangle;
+        }
+
+        // Fallback: create a small marker
+        var marker = new Ellipse
+        {
+            Width = 8,
+            Height = 8,
+            Fill = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)),
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 200, 0)),
+            StrokeThickness = 1
+        };
+
+        // Center at canvas origin
+        Canvas.SetLeft(marker, CanvasCenterX - 4);
+        Canvas.SetTop(marker, CanvasCenterY - 4);
+
+        // Add tooltip
+        ToolTip.SetTip(marker, $"NIF Mesh (Marker): {mesh.Name}\nVertices: {mesh.VertexCount}");
+        
+        // Tag for identification
+        marker.Tag = mesh;
+
+        return marker;
     }
 
 
@@ -1238,4 +1452,18 @@ public class CollisionVisualizationObject
     public string DisplayText => $"{Name} ({GeometryType})";
     public string CoordinateText => $"({X:F1}, {Y:F1}, {Z:F1})";
     public string FlagsText => $"Cat: {CategoryFlags}, Col: {CollisionFlags}";
+}
+
+public class NifMeshVisualizationObject
+{
+    public string Name { get; set; } = string.Empty;
+    public List<Avalonia.Point> Vertices2D { get; set; } = new();
+    public List<int[]> Triangles { get; set; } = new();
+    public List<Avalonia.Point> BoundingBox { get; set; } = new();
+    public int VertexCount { get; set; }
+    public int TriangleCount { get; set; }
+    
+    public string DisplayText => $"{Name} (NIF Mesh)";
+    public string GeometryInfo => $"Vertices: {VertexCount}, Triangles: {TriangleCount}";
+    public bool HasValidGeometry => Vertices2D.Count > 0;
 }
