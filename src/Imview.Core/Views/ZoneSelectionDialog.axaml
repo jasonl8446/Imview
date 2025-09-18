@@ -1,0 +1,139 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Imview.Core.ViewModels"
+        x:Class="Imview.Core.Views.ZoneSelectionDialog"
+        x:DataType="vm:ZoneSelectionDialogViewModel"
+        Title="{Binding DialogTitle}"
+        Width="500"
+        Height="600"
+        MinWidth="400"
+        MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        CanResize="true">
+
+    <Design.DataContext>
+        <vm:ZoneSelectionDialogViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+        
+        <!-- Search Section -->
+        <Border Grid.Row="0" 
+                Background="#2B2B30" 
+                CornerRadius="5" 
+                Padding="12"
+                Margin="0,0,0,15">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Search for a zone to load:"
+                         FontSize="14"
+                         FontWeight="Medium"
+                         Foreground="White"/>
+                
+                <TextBox Name="SearchTextBox"
+                         Text="{Binding SearchText}"
+                         Watermark="{Binding SearchPlaceholder}"
+                         FontSize="14"
+                         Height="35"
+                         Background="#383838"
+                         BorderBrush="#555555"
+                         Foreground="White"/>
+                
+                <TextBlock Text="{Binding ZoneCountText}"
+                         FontSize="11"
+                         Foreground="#AAAAAA"
+                         HorizontalAlignment="Right"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Zone List Section -->
+        <Border Grid.Row="1" 
+                Background="#2B2B30" 
+                CornerRadius="5" 
+                Padding="8">
+            <Grid RowDefinitions="Auto,*">
+                
+                <TextBlock Grid.Row="0"
+                         Text="Available Zones:"
+                         FontSize="12"
+                         FontWeight="Medium"
+                         Foreground="#CCCCCC"
+                         Margin="8,8,8,12"/>
+                
+                <ScrollViewer Grid.Row="1"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                    
+                    <ListBox ItemsSource="{Binding FilteredZones}"
+                           SelectedItem="{Binding SelectedZone}"
+                           Background="Transparent"
+                           BorderThickness="0"
+                           SelectionMode="Single">
+                        
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="Transparent"
+                                      Padding="12,8"
+                                      Margin="2">
+                                    <Border.Styles>
+                                        <Style Selector="Border:pointerover">
+                                            <Setter Property="Background" Value="#3A3A3A"/>
+                                        </Style>
+                                    </Border.Styles>
+                                    
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding}"
+                                                 FontSize="13"
+                                                 FontWeight="Medium"
+                                                 Foreground="White"/>
+                                        <TextBlock Text="{Binding, StringFormat='Zone: {0}'}"
+                                                 FontSize="10"
+                                                 Foreground="#888888"
+                                                 Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:selected">
+                                <Setter Property="Background" Value="#0078D4"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:selected:pointerover">
+                                <Setter Property="Background" Value="#106EBE"/>
+                            </Style>
+                        </ListBox.Styles>
+                    </ListBox>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- Button Section -->
+        <Border Grid.Row="2" 
+                Margin="0,15,0,0">
+            <StackPanel Orientation="Horizontal" 
+                      HorizontalAlignment="Right" 
+                      Spacing="10">
+                
+                <Button Content="Cancel"
+                        Command="{Binding CancelCommand}"
+                        Width="80"
+                        Height="32"
+                        Background="#666666"
+                        BorderBrush="#777777"/>
+                
+                <Button Content="Load Zone"
+                        Command="{Binding ConfirmSelectionCommand}"
+                        IsEnabled="{Binding HasSelectedZone}"
+                        Width="100"
+                        Height="32"
+                        Classes="accent"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

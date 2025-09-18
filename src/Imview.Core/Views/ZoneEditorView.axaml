@@ -42,12 +42,12 @@
                         <TextBlock Text="Zone:" 
                                  Foreground="White" 
                                  VerticalAlignment="Center"/>
-                        <ComboBox ItemsSource="{Binding Zones}"
-                                SelectedItem="{Binding SelectedZone}"
-                                Width="200"
-                                Height="30"/>
-                        <Button Content="Load Zone"
-                                Command="{Binding LoadZoneCommand}"
+                        <TextBlock Text="{Binding SelectedZone, TargetNullValue='No zone selected'}"
+                                 Foreground="#CCCCCC"
+                                 VerticalAlignment="Center"
+                                 MinWidth="200"/>
+                        <Button Content="Select Zone..."
+                                Command="{Binding SelectZoneCommand}"
                                 Height="30"
                                 Classes="accent"/>
                         <Button Content="Save Zone"
@@ -124,6 +124,49 @@
                             </StackPanel>
                         </Border>
                         
+                        <!-- Viewport Controls Overlay -->
+                        <Border Background="#2B2B30" 
+                                CornerRadius="3" 
+                                Padding="8" 
+                                HorizontalAlignment="Left" 
+                                VerticalAlignment="Bottom" 
+                                Margin="10" 
+                                Opacity="0.9"
+                                IsVisible="{Binding !IsLoading}">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{Binding ZoomDisplayText}"
+                                         FontSize="10"
+                                         Foreground="White"
+                                         HorizontalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <Button Content="+" 
+                                            Command="{Binding ZoomInCommand}"
+                                            Width="25" Height="25"
+                                            FontSize="12"/>
+                                    <Button Content="-" 
+                                            Command="{Binding ZoomOutCommand}"
+                                            Width="25" Height="25"
+                                            FontSize="12"/>
+                                    <Button Content="Reset" 
+                                            Command="{Binding ResetViewCommand}"
+                                            Width="45" Height="25"
+                                            FontSize="10"/>
+                                </StackPanel>
+                                <TextBlock Text="WASD to pan"
+                                         FontSize="9"
+                                         Foreground="#888888"
+                                         HorizontalAlignment="Center"/>
+                                <TextBlock Text="Ctrl+Mouse wheel to zoom"
+                                         FontSize="9"
+                                         Foreground="#888888"
+                                         HorizontalAlignment="Center"/>
+                                <TextBlock Text="Drag to pan"
+                                         FontSize="9"
+                                         Foreground="#888888"
+                                         HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        
                         <!-- Visualization info overlay -->
                         <StackPanel HorizontalAlignment="Right" 
                                   VerticalAlignment="Bottom" 
@@ -137,6 +180,10 @@
                             <TextBlock Text="{Binding ZoneVisualizationObjects.Count, StringFormat='Objects: {0}'}"
                                      FontSize="10"
                                      Foreground="#AAAAAA"
+                                     Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding CollisionVisualizationObjects.Count, StringFormat='Collisions: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#00FFFF"
                                      Margin="5,0,5,5"/>
                         </StackPanel>
                     </Grid>
@@ -152,6 +199,141 @@
                 Margin="0,5,5,5">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="15" Margin="15">
+
+                    <!-- Visualization Filters -->
+                    <Expander Header="Visualization Filters" 
+                            IsExpanded="True"
+                            Background="#383838">
+                        <StackPanel Spacing="12" Margin="10">
+                            
+                            <!-- Zone Objects Filter -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Zone Objects" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="White"/>
+                                
+                                <CheckBox Content="Show Zone Objects"
+                                        IsChecked="{Binding ShowZoneObjects}"
+                                        Foreground="White"
+                                        Margin="10,0,0,0"/>
+                            </StackPanel>
+                            
+                            <!-- Collision Objects Filter -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Collision Objects" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="#00FFFF"/>
+                                
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox Content="Show All Collisions"
+                                            IsChecked="{Binding ShowCollisions}"
+                                            Foreground="#00FFFF"
+                                            Margin="10,0,0,0"/>
+                                    <TextBlock Text="{Binding VisibleCollisionCount, StringFormat='({0} visible)'}"
+                                             Foreground="#888888"
+                                             FontSize="10"
+                                             VerticalAlignment="Center"
+                                             Margin="5,0,0,0"/>
+                                </StackPanel>
+                                
+                                <!-- Collision Flag Filters -->
+                                <StackPanel Spacing="4" Margin="20,5,0,0">
+                                    <TextBlock Text="Filter by Collision Flags:" 
+                                             Foreground="#CCCCCC" 
+                                             FontSize="11"/>
+                                    
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Walkable"
+                                                IsChecked="{Binding ShowWalkableCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding WalkableCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
+                                    
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Water"
+                                                IsChecked="{Binding ShowWaterCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding WaterCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
+                                    
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Trigger"
+                                                IsChecked="{Binding ShowTriggerCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding TriggerCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
+                                    
+                                    <CheckBox Content="Object"
+                                            IsChecked="{Binding ShowObjectCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Hitscan"
+                                            IsChecked="{Binding ShowHitscanCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Local Player"
+                                            IsChecked="{Binding ShowLocalPlayerCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Client Object"
+                                            IsChecked="{Binding ShowClientObjectCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Fog"
+                                            IsChecked="{Binding ShowFogCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Goo"
+                                            IsChecked="{Binding ShowGooCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Fish"
+                                            IsChecked="{Binding ShowFishCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                    
+                                    <CheckBox Content="Muck"
+                                            IsChecked="{Binding ShowMuckCollisions}"
+                                            Foreground="#AAAAAA"
+                                            FontSize="11"
+                                            Margin="5,2,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
 
                     <!-- Selected Object Details -->
                     <Expander Header="Selected Object" 
@@ -299,34 +481,76 @@
                                 <TextBlock Text="{Binding ZoneVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
                             </StackPanel>
                             
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Collision Objects:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding CollisionVisualizationObjects.Count}" Foreground="#00FFFF" FontWeight="Medium"/>
+                            </StackPanel>
+                            
                             <ScrollViewer Height="300" VerticalScrollBarVisibility="Auto">
-                                <ListBox ItemsSource="{Binding ZoneVisualizationObjects}"
-                                       Background="Transparent"
-                                       BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="#2A2A2A" 
-                                                  Margin="2" 
-                                                  Padding="8,4"
-                                                  CornerRadius="3">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" 
-                                                             Foreground="White" 
-                                                             FontWeight="Medium"
-                                                             FontSize="11"/>
-                                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                                        <TextBlock Text="{Binding Type}" 
-                                                                 Foreground="#AAAAAA" 
-                                                                 FontSize="10"/>
-                                                        <TextBlock Text="{Binding CoordinateText}" 
-                                                                 Foreground="#888888" 
-                                                                 FontSize="10"/>
+                                <StackPanel Spacing="5">
+                                    <!-- Zone Objects -->
+                                    <TextBlock Text="Zone Objects" Foreground="#CCCCCC" FontSize="10" FontWeight="Bold"/>
+                                    <ListBox ItemsSource="{Binding ZoneVisualizationObjects}"
+                                           Background="Transparent"
+                                           BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#2A2A2A" 
+                                                      Margin="2" 
+                                                      Padding="8,4"
+                                                      CornerRadius="3">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" 
+                                                                 Foreground="White" 
+                                                                 FontWeight="Medium"
+                                                                 FontSize="11"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                                            <TextBlock Text="{Binding Type}" 
+                                                                     Foreground="#AAAAAA" 
+                                                                     FontSize="10"/>
+                                                            <TextBlock Text="{Binding CoordinateText}" 
+                                                                     Foreground="#888888" 
+                                                                     FontSize="10"/>
+                                                        </StackPanel>
                                                     </StackPanel>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    
+                                    <!-- Collision Objects -->
+                                    <TextBlock Text="Collision Objects" Foreground="#00FFFF" FontSize="10" FontWeight="Bold"/>
+                                    <ListBox ItemsSource="{Binding CollisionVisualizationObjects}"
+                                           Background="Transparent"
+                                           BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#1A3A3A" 
+                                                      Margin="2" 
+                                                      Padding="8,4"
+                                                      CornerRadius="3">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" 
+                                                                 Foreground="#00FFFF" 
+                                                                 FontWeight="Medium"
+                                                                 FontSize="11"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                                            <TextBlock Text="{Binding GeometryType}" 
+                                                                     Foreground="#AAAAAA" 
+                                                                     FontSize="10"/>
+                                                            <TextBlock Text="{Binding CoordinateText}" 
+                                                                     Foreground="#888888" 
+                                                                     FontSize="10"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding FlagsText}" 
+                                                                 Foreground="#888888" 
+                                                                 FontSize="9"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
                             </ScrollViewer>
                         </StackPanel>
                     </Expander>
@@ -348,6 +572,11 @@
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Shopkeepers:" Foreground="#CCCCCC" FontSize="11"/>
                                 <TextBlock Text="{Binding Shopkeepers.Count}" Foreground="White" FontWeight="Medium"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Collision Objects:" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="{Binding CollisionVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
                             </StackPanel>
                         </StackPanel>
                     </Expander>

@@ -29,6 +29,7 @@ using Imcodec.IO;
 using Imcodec.Wad;
 using Imcodec.ObjectProperty.TypeCache;
 using Imcodec.ObjectProperty;
+using Imcodec.BCD;
 using Imview.Core.Models;
 
 namespace Imview.Core.Services;
@@ -36,6 +37,7 @@ namespace Imview.Core.Services;
 public class ZoneDataService
 {
     private const string ZoneDataFileName = "gamedata.bin";
+    private const string CollisionDataFileName = "collision.bcd";
     private const string AccessPassFileName = "AccessPass.xml";
     private readonly ClientFileService _clientFileService;
     private readonly RootWadService _rootWadService;
@@ -48,7 +50,7 @@ public class ZoneDataService
         _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
     
-    public async Task<WizZoneData?> LoadZoneDataAsync(string zoneName)
+    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData)> LoadZoneDataAsync(string zoneName)
     {
         try
         {
@@ -83,12 +85,35 @@ public class ZoneDataService
             var bindSerializer = new BindSerializer();
             var gameDataBytes = gameDataFile.Value.ToArray();
             
-            if (bindSerializer.Deserialize<WizZoneData>(gameDataBytes, out var zoneData))
+            WizZoneData? zoneData = null;
+            if (!bindSerializer.Deserialize<WizZoneData>(gameDataBytes, out zoneData))
             {
-                return zoneData;
+                throw new InvalidOperationException($"Failed to deserialize zone data from '{ZoneDataFileName}' in '{zoneWadName}'");
             }
             
-            throw new InvalidOperationException($"Failed to deserialize zone data from '{ZoneDataFileName}' in '{zoneWadName}'");
+            // Extract collision.bcd from the zone WAD (optional - not all zones may have collision data)
+            Bcd? collisionData = null;
+            var collisionFile = zoneArchive.OpenFile(CollisionDataFileName);
+            if (collisionFile != null)
+            {
+                try
+                {
+                    using var collisionStream = new MemoryStream(collisionFile.Value.ToArray());
+                    collisionData = Bcd.Parse(collisionStream);
+                    Console.WriteLine($"Loaded {collisionData.Collisions.Count} collision objects from '{CollisionDataFileName}'");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Failed to parse collision data from '{CollisionDataFileName}': {ex.Message}");
+                    // Continue without collision data - it's not critical
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No '{CollisionDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have collision data");
+            }
+            
+            return (zoneData, collisionData);
         }
         catch (Exception ex)
         {
