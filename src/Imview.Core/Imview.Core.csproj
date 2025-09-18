@@ -29,6 +29,9 @@
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.CoreObject\Imcodec.CoreObject.csproj" />
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.ObjectProperty\Imcodec.ObjectProperty.csproj" />
     <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.Wad\Imcodec.Wad.csproj" />
+    <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.MessageLayer\Imcodec.MessageLayer.csproj" />
+    <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.IO\Imcodec.IO.csproj" />
+    <ProjectReference Include="..\..\submodule\Imcodec\src\Imcodec.Cryptography\Imcodec.Cryptography.csproj" />
     <ProjectReference Include="..\Imview.PacketReader\Imview.PacketReader.csproj" />
   </ItemGroup>
 

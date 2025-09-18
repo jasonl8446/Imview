@@ -1,0 +1,154 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Imview.Core.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="450"
+        x:Class="Imview.Core.Views.LoginWindow"
+        x:DataType="vm:LoginViewModel"
+        Title="Imview - Login"
+        Width="450" Height="450"
+        MinWidth="450" MinHeight="450"
+        MaxWidth="450" MaxHeight="450"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        Icon="/Assets/logo.png">
+
+  <Design.DataContext>
+    <vm:LoginViewModel/>
+  </Design.DataContext>
+
+  <Grid Margin="20">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="25"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="25"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="20"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="20"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="25"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="25"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <StackPanel Grid.Row="0" HorizontalAlignment="Center">
+      <TextBlock Text="Imview Login" 
+                 FontSize="24" 
+                 FontWeight="Bold" 
+                 HorizontalAlignment="Center"/>
+      <TextBlock Text="Connect to Imlight Server" 
+                 FontSize="12" 
+                 Foreground="Gray" 
+                 HorizontalAlignment="Center"/>
+    </StackPanel>
+
+    <!-- Server Section -->
+    <Grid Grid.Row="2">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="5"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="5"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="10"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Server:" FontWeight="SemiBold"/>
+      
+      <TextBox Grid.Row="2" Grid.Column="0" 
+               x:Name="ServerTextBox"
+               Text="{Binding ServerAddress}"
+               Watermark="qa.r10.one"
+               IsEnabled="{Binding !IsConnecting}"/>
+      
+      <Button Grid.Row="2" Grid.Column="2" 
+              Content="Test" 
+              Width="60"
+              Command="{Binding TestConnectionCommand}"
+              Click="TestButton_Click"/>
+
+      <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal">
+        <Ellipse Width="8" Height="8" 
+                 Fill="{Binding ConnectionStatusColor}" 
+                 VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding ConnectionStatusText}" 
+                   Margin="8,0,0,0" 
+                   FontSize="12"
+                   VerticalAlignment="Center"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Credentials Section -->
+    <StackPanel Grid.Row="4">
+      <TextBlock Text="Username:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+      <TextBox x:Name="UsernameTextBox"
+               Text="{Binding Username}" 
+               Watermark="Enter your username"
+               IsEnabled="{Binding !IsConnecting}"/>
+      
+      <TextBlock Text="Password:" FontWeight="SemiBold" Margin="0,15,0,5"/>
+      <TextBox x:Name="PasswordTextBox"
+               Text="{Binding Password}" 
+               PasswordChar="●"
+               Watermark="Enter your password"
+               IsEnabled="{Binding !IsConnecting}"/>
+    </StackPanel>
+
+    <!-- Options -->
+    <CheckBox Grid.Row="6" 
+              Content="Remember server" 
+              IsChecked="{Binding RememberServer}"
+              IsEnabled="{Binding !IsConnecting}"/>
+
+    <!-- Buttons -->
+    <Grid Grid.Row="8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="10"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Button Grid.Column="0" 
+              Content="Login" 
+              HorizontalAlignment="Stretch"
+              Command="{Binding LoginCommand}"
+              IsDefault="True"/>
+
+      <Button Grid.Column="2" 
+              Content="Cancel" 
+              HorizontalAlignment="Stretch"
+              Command="{Binding CancelCommand}"
+              IsCancel="True"/>
+    </Grid>
+
+    <!-- Status -->
+    <Border Grid.Row="12" 
+            Background="LightGray" 
+            CornerRadius="3" 
+            Padding="10,5">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="Status:" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding StatusMessage}" Margin="5,0,0,0"/>
+        
+        <!-- Loading indicator -->
+        <Border IsVisible="{Binding IsConnecting}" Margin="10,0,0,0">
+          <StackPanel Orientation="Horizontal">
+            <ProgressBar IsIndeterminate="True" 
+                        Width="100" 
+                        Height="4"
+                        VerticalAlignment="Center"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>
