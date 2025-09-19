@@ -191,10 +191,9 @@ public partial class ZoneEditorView : UserControl
         var collisionObjectsToggle = this.FindControl<Button>("CollisionObjectsToggle");
         var collisionObjectsList = this.FindControl<ListBox>("CollisionObjectsList");
         var collisionObjectsArrow = this.FindControl<TextBlock>("CollisionObjectsArrow");
-        var collisionFilters = this.FindControl<Border>("CollisionFilters");
-        if (collisionObjectsToggle != null && collisionObjectsList != null && collisionObjectsArrow != null && collisionFilters != null)
+        if (collisionObjectsToggle != null && collisionObjectsList != null && collisionObjectsArrow != null)
         {
-            collisionObjectsToggle.Click += (s, e) => ToggleSectionWithFilters(collisionObjectsList, collisionObjectsArrow, collisionFilters);
+            collisionObjectsToggle.Click += (s, e) => ToggleSection(collisionObjectsList, collisionObjectsArrow);
         }
         
         // Paths & Spawns Toggle
@@ -214,18 +213,29 @@ public partial class ZoneEditorView : UserControl
         {
             nifGeometryToggle.Click += (s, e) => ToggleSection(nifGeometryList, nifGeometryArrow);
         }
+        
+        // Volumes Toggle
+        var volumesToggle = this.FindControl<Button>("VolumesToggle");
+        var volumesList = this.FindControl<ListBox>("VolumesList");
+        var volumesArrow = this.FindControl<TextBlock>("VolumesArrow");
+        if (volumesToggle != null && volumesList != null && volumesArrow != null)
+        {
+            volumesToggle.Click += (s, e) => ToggleSection(volumesList, volumesArrow);
+        }
+        
+        // Triggers Toggle
+        var triggersToggle = this.FindControl<Button>("TriggersToggle");
+        var triggersList = this.FindControl<ListBox>("TriggersList");
+        var triggersArrow = this.FindControl<TextBlock>("TriggersArrow");
+        if (triggersToggle != null && triggersList != null && triggersArrow != null)
+        {
+            triggersToggle.Click += (s, e) => ToggleSection(triggersList, triggersArrow);
+        }
     }
     
     private void ToggleSection(ListBox listBox, TextBlock arrow)
     {
         listBox.IsVisible = !listBox.IsVisible;
-        arrow.Text = listBox.IsVisible ? "▼" : "►";
-    }
-    
-    private void ToggleSectionWithFilters(ListBox listBox, TextBlock arrow, Border filters)
-    {
-        listBox.IsVisible = !listBox.IsVisible;
-        filters.IsVisible = listBox.IsVisible;
         arrow.Text = listBox.IsVisible ? "▼" : "►";
     }
     

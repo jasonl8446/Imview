@@ -84,7 +84,7 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool _showCylinderCollisions = true;
     private bool _showTubeCollisions = true;
     private bool _showPlaneCollisions = true;
-    private bool _showMeshCollisions = true;
+    private bool _showMeshCollisions = false;
     private bool _showRayCollisions = true;
     
     private Canvas? _zoneObjectCanvas = null;

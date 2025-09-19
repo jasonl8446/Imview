@@ -238,8 +238,20 @@
                                                 IsChecked="{Binding ShowCylinderCollisions}" 
                                                 FontSize="8" 
                                                 Foreground="#CCCCCC"/>
+                                        <CheckBox Content="Tube" 
+                                                IsChecked="{Binding ShowTubeCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
+                                        <CheckBox Content="Plane" 
+                                                IsChecked="{Binding ShowPlaneCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
                                         <CheckBox Content="Mesh" 
                                                 IsChecked="{Binding ShowMeshCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
+                                        <CheckBox Content="Ray" 
+                                                IsChecked="{Binding ShowRayCollisions}" 
                                                 FontSize="8" 
                                                 Foreground="#CCCCCC"/>
                                     </StackPanel>
