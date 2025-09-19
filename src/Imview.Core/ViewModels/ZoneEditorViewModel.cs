@@ -21,7 +21,9 @@ modification, are permitted provided that the following conditions are met:
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
+using System.Reactive;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -56,6 +58,7 @@ public class ZoneEditorViewModel : ViewModelBase
     private PathVisualizationObject? _selectedPath = null;
     private NifMeshVisualizationObject? _selectedMesh = null;
     private VolumeVisualizationObject? _selectedVolume = null;
+    private TriggerVisualizationObject? _selectedTrigger = null;
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
     private NifFile? _currentSceneFile = null;
@@ -63,6 +66,7 @@ public class ZoneEditorViewModel : ViewModelBase
     private PathTemplateList? _currentPathData = null;
     private NodeTemplateList? _currentNodeData = null;
     private WizZoneVolumes? _currentVolumeData = null;
+    private WizZoneTriggers? _currentTriggerData = null;
     private NifGeometryProcessor? _nifProcessor = null;
     private bool _isLoading = false;
     private bool _showCollisions = true;
@@ -72,6 +76,7 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool _showPaths = true;
     private bool _showNodes = true; // Make visible by default for debugging
     private bool _showVolumes = true; // Make visible by default
+    private bool _showTriggers = true; // Make visible by default
     
     // Collision shape filters - default to true so all shapes show initially
     private bool _showBoxCollisions = true;
@@ -108,6 +113,9 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectPathCommand = ReactiveCommand.Create<PathVisualizationObject>(SelectPath);
         SelectMeshCommand = ReactiveCommand.Create<NifMeshVisualizationObject>(SelectMesh);
         SelectVolumeCommand = ReactiveCommand.Create<VolumeVisualizationObject>(SelectVolume);
+        SelectTriggerCommand = ReactiveCommand.Create<TriggerVisualizationObject>(SelectTrigger);
+        SelectRelatedTriggerCommand = ReactiveCommand.Create<TriggerVisualizationObject>(SelectRelatedTrigger);
+        SelectRelatedVolumeCommand = ReactiveCommand.Create<VolumeVisualizationObject>(SelectRelatedVolume);
         SelectZoneCommand = ReactiveCommand.Create(SelectZone);
         
         // Initialize viewport commands
@@ -130,6 +138,7 @@ public class ZoneEditorViewModel : ViewModelBase
         PathVisualizationObjects = new ObservableCollection<PathVisualizationObject>();
         NodeVisualizationObjects = new ObservableCollection<NodeVisualizationObject>();
         VolumeVisualizationObjects = new ObservableCollection<VolumeVisualizationObject>();
+        TriggerVisualizationObjects = new ObservableCollection<TriggerVisualizationObject>();
         
         _nifProcessor = new NifGeometryProcessor();
         
@@ -157,11 +166,15 @@ public class ZoneEditorViewModel : ViewModelBase
     public ObservableCollection<PathVisualizationObject> PathVisualizationObjects { get; }
     public ObservableCollection<NodeVisualizationObject> NodeVisualizationObjects { get; }
     public ObservableCollection<VolumeVisualizationObject> VolumeVisualizationObjects { get; }
+    public ObservableCollection<TriggerVisualizationObject> TriggerVisualizationObjects { get; }
 
     public string SelectedZone
     {
         get => _selectedZone;
-        set => this.RaiseAndSetIfChanged(ref _selectedZone, value);
+        set {
+            Console.WriteLine($"[DEBUG ZONE VM] SelectedZone changed to: '{value ?? "null"}'");
+            this.RaiseAndSetIfChanged(ref _selectedZone, value);
+        }
     }
 
     public ZoneVisualizationObject? SelectedObject
@@ -189,6 +202,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedPath = null;
                 SelectedMesh = null;
                 SelectedVolume = null;
+                SelectedTrigger = null;
             }
             
             // Notify property changes
@@ -370,6 +384,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedPath = null;
                 SelectedMesh = null;
                 SelectedVolume = null;
+                SelectedTrigger = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedCollision));
@@ -393,6 +408,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCollision = null;
                 SelectedMesh = null;
                 SelectedVolume = null;
+                SelectedTrigger = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedPath));
@@ -416,6 +432,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCollision = null;
                 SelectedPath = null;
                 SelectedVolume = null;
+                SelectedTrigger = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedMesh));
@@ -439,10 +456,41 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCollision = null;
                 SelectedPath = null;
                 SelectedMesh = null;
+                SelectedTrigger = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedVolume));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(SelectedVolumeEnterTriggers));
+            this.RaisePropertyChanged(nameof(SelectedVolumeExitTriggers));
+            NotifySelectionChanged();
+        }
+    }
+
+    public TriggerVisualizationObject? SelectedTrigger
+    {
+        get => _selectedTrigger;
+        set
+        {
+            Console.WriteLine($"[DEBUG ZONE VM] SelectedTrigger changed to: '{value?.Name ?? "null"}'");
+            this.RaiseAndSetIfChanged(ref _selectedTrigger, value);
+            
+            // Clear other selections when selecting a trigger object
+            if (value != null)
+            {
+                SelectedObject = null;
+                SelectedCoreObject = null;
+                SelectedCollision = null;
+                SelectedPath = null;
+                SelectedMesh = null;
+                SelectedVolume = null;
+            }
+            
+            this.RaisePropertyChanged(nameof(HasSelectedTrigger));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(SelectedTriggerActivatingVolumes));
+            this.RaisePropertyChanged(nameof(SelectedTriggerDeactivatingVolumes));
+            this.RaisePropertyChanged(nameof(SelectedTriggerFireVolumes));
             NotifySelectionChanged();
         }
     }
@@ -523,6 +571,16 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
 
+    public bool ShowTriggers
+    {
+        get => _showTriggers;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showTriggers, value);
+            UpdateVisibility();
+        }
+    }
+
     // Collision shape filter properties
     public bool ShowBoxCollisions
     {
@@ -599,7 +657,103 @@ public class ZoneEditorViewModel : ViewModelBase
     public bool HasSelectedPath => SelectedPath != null;
     public bool HasSelectedMesh => SelectedMesh != null;
     public bool HasSelectedVolume => SelectedVolume != null;
-    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh || HasSelectedVolume;
+    public bool HasSelectedTrigger => SelectedTrigger != null;
+    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh || HasSelectedVolume || HasSelectedTrigger;
+    
+    /// <summary>
+    /// Gets triggers that are related to the currently selected volume's enter events
+    /// </summary>
+    public List<TriggerVisualizationObject> SelectedVolumeEnterTriggers
+    {
+        get
+        {
+            if (SelectedVolume?.EnterEvents == null || !SelectedVolume.EnterEvents.Any())
+                return new List<TriggerVisualizationObject>();
+                
+            var relatedTriggers = new List<TriggerVisualizationObject>();
+            foreach (var enterEvent in SelectedVolume.EnterEvents)
+            {
+                relatedTriggers.AddRange(FindTriggersForEvent(enterEvent));
+            }
+            return relatedTriggers.Distinct().ToList();
+        }
+    }
+    
+    /// <summary>
+    /// Gets triggers that are related to the currently selected volume's exit events
+    /// </summary>
+    public List<TriggerVisualizationObject> SelectedVolumeExitTriggers
+    {
+        get
+        {
+            if (SelectedVolume?.ExitEvents == null || !SelectedVolume.ExitEvents.Any())
+                return new List<TriggerVisualizationObject>();
+                
+            var relatedTriggers = new List<TriggerVisualizationObject>();
+            foreach (var exitEvent in SelectedVolume.ExitEvents)
+            {
+                relatedTriggers.AddRange(FindTriggersForEvent(exitEvent));
+            }
+            return relatedTriggers.Distinct().ToList();
+        }
+    }
+    
+    /// <summary>
+    /// Gets volumes that are related to the currently selected trigger's activate events
+    /// </summary>
+    public List<VolumeVisualizationObject> SelectedTriggerActivatingVolumes
+    {
+        get
+        {
+            if (SelectedTrigger?.ActivateEvents == null || !SelectedTrigger.ActivateEvents.Any())
+                return new List<VolumeVisualizationObject>();
+                
+            var relatedVolumes = new List<VolumeVisualizationObject>();
+            foreach (var activateEvent in SelectedTrigger.ActivateEvents)
+            {
+                relatedVolumes.AddRange(FindVolumesForEvent(activateEvent));
+            }
+            return relatedVolumes.Distinct().ToList();
+        }
+    }
+    
+    /// <summary>
+    /// Gets volumes that are related to the currently selected trigger's deactivate events
+    /// </summary>
+    public List<VolumeVisualizationObject> SelectedTriggerDeactivatingVolumes
+    {
+        get
+        {
+            if (SelectedTrigger?.DeactivateEvents == null || !SelectedTrigger.DeactivateEvents.Any())
+                return new List<VolumeVisualizationObject>();
+                
+            var relatedVolumes = new List<VolumeVisualizationObject>();
+            foreach (var deactivateEvent in SelectedTrigger.DeactivateEvents)
+            {
+                relatedVolumes.AddRange(FindVolumesForEvent(deactivateEvent));
+            }
+            return relatedVolumes.Distinct().ToList();
+        }
+    }
+    
+    /// <summary>
+    /// Gets volumes that are related to the currently selected trigger's fire events
+    /// </summary>
+    public List<VolumeVisualizationObject> SelectedTriggerFireVolumes
+    {
+        get
+        {
+            if (SelectedTrigger?.FireEvents == null || !SelectedTrigger.FireEvents.Any())
+                return new List<VolumeVisualizationObject>();
+                
+            var relatedVolumes = new List<VolumeVisualizationObject>();
+            foreach (var fireEvent in SelectedTrigger.FireEvents)
+            {
+                relatedVolumes.AddRange(FindVolumesForEvent(fireEvent));
+            }
+            return relatedVolumes.Distinct().ToList();
+        }
+    }
 
     // Computed properties for filter counts
     public int VisibleCollisionCount => CollisionVisualizationObjects.Count(ShouldShowCollision);
@@ -701,6 +855,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand SelectPathCommand { get; }
     public ICommand SelectMeshCommand { get; }
     public ICommand SelectVolumeCommand { get; }
+    public ICommand SelectTriggerCommand { get; }
     public ICommand SelectZoneCommand { get; }
     
     // Viewport commands
@@ -748,7 +903,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 .WithDuration(TimeSpan.FromSeconds(2))
                 .Send();
 
-            var (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData, volumeData) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
+            var (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData, volumeData, triggerData) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
             _currentZoneData = zoneData;
             _currentCollisionData = collisionData;
             _currentSceneFile = sceneFile;
@@ -756,6 +911,7 @@ public class ZoneEditorViewModel : ViewModelBase
             _currentPathData = pathData;
             _currentNodeData = nodeData;
             _currentVolumeData = volumeData;
+            _currentTriggerData = triggerData;
             
             if (_currentZoneData != null)
             {
@@ -781,6 +937,12 @@ public class ZoneEditorViewModel : ViewModelBase
                 if (_currentVolumeData != null)
                 {
                     await PopulateVolumeData(_currentVolumeData);
+                }
+                
+                // Process trigger data if available
+                if (_currentTriggerData != null)
+                {
+                    await PopulateTriggerData(_currentTriggerData);
                 }
                 
                 MessageService.Info($"Zone '{SelectedZone}' loaded successfully")
@@ -943,6 +1105,7 @@ public class ZoneEditorViewModel : ViewModelBase
         PathVisualizationObjects.Clear();
         NodeVisualizationObjects.Clear();
         VolumeVisualizationObjects.Clear();
+        TriggerVisualizationObjects.Clear();
         
         // Add all items to UI collections
         foreach (var item in tempZoneObjects)
@@ -1231,6 +1394,44 @@ public class ZoneEditorViewModel : ViewModelBase
         
         // Create volume visuals now that we have volume data
         CreateVolumeVisuals();
+    }
+
+    private async Task PopulateTriggerData(WizZoneTriggers triggerData)
+    {
+        var tempTriggerObjects = new List<TriggerVisualizationObject>();
+        
+        await Task.Run(() =>
+        {
+            Console.WriteLine($"PopulateTriggerData called with {triggerData.m_triggers?.Count ?? 0} triggers");
+            
+            if (triggerData.m_triggers != null)
+            {
+                foreach (var trigger in triggerData.m_triggers)
+                {
+                    if (trigger != null)
+                    {
+                        var triggerVis = new TriggerVisualizationObject(trigger);
+                        tempTriggerObjects.Add(triggerVis);
+                        
+                        // Debug: Log first few trigger objects
+                        if (tempTriggerObjects.Count <= 5)
+                        {
+                            Console.WriteLine($"Trigger: {triggerVis.Name} at ({triggerVis.X:F1}, {triggerVis.Y:F1}, {triggerVis.Z:F1}) - Timing: {triggerVis.TimingText}");
+                        }
+                    }
+                }
+            }
+            
+            Console.WriteLine($"Trigger processing complete. Created {tempTriggerObjects.Count} trigger visualization objects");
+        });
+        
+        // Update UI collection on UI thread
+        foreach (var item in tempTriggerObjects)
+            TriggerVisualizationObjects.Add(item);
+            
+        Console.WriteLine($"TriggerVisualizationObjects updated. Final count: {TriggerVisualizationObjects.Count}");
+        
+        // Note: Triggers don't have visual representation in the viewport, they only appear in the scene hierarchy
     }
 
     private string GetGeometryTypeName(uint typeId)
@@ -1911,6 +2112,81 @@ public class ZoneEditorViewModel : ViewModelBase
             return CreateNifBoundingBoxVisual(mesh);
         }
     }
+    
+    /// <summary>
+    /// Finds triggers that match the given event name in their activate or deactivate events
+    /// </summary>
+    public List<TriggerVisualizationObject> FindTriggersForEvent(string eventName)
+    {
+        if (string.IsNullOrEmpty(eventName) || TriggerVisualizationObjects == null)
+            return new List<TriggerVisualizationObject>();
+            
+        return TriggerVisualizationObjects
+            .Where(trigger => 
+                trigger.ActivateEvents.Contains(eventName) || 
+                trigger.DeactivateEvents.Contains(eventName) ||
+                trigger.FireEvents.Contains(eventName))
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Finds volumes that match the given event name in their enter or exit events
+    /// </summary>
+    public List<VolumeVisualizationObject> FindVolumesForEvent(string eventName)
+    {
+        if (string.IsNullOrEmpty(eventName) || VolumeVisualizationObjects == null)
+            return new List<VolumeVisualizationObject>();
+            
+        return VolumeVisualizationObjects
+            .Where(volume => 
+                volume.EnterEvents.Contains(eventName) || 
+                volume.ExitEvents.Contains(eventName))
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Command to select a trigger from a volume's related triggers
+    /// </summary>
+    public ReactiveCommand<TriggerVisualizationObject, Unit> SelectRelatedTriggerCommand { get; }
+    
+    /// <summary>
+    /// Command to select a volume from a trigger's related volumes
+    /// </summary>
+    public ReactiveCommand<VolumeVisualizationObject, Unit> SelectRelatedVolumeCommand { get; }
+    
+    private void SelectRelatedTrigger(TriggerVisualizationObject trigger)
+    {
+        if (trigger == null) return;
+        
+        // Clear other selections
+        SelectedObject = null;
+        SelectedCollision = null;
+        SelectedPath = null;
+        SelectedMesh = null;
+        SelectedVolume = null;
+        
+        // Select the trigger
+        SelectedTrigger = trigger;
+        
+        Debug.WriteLine($"Selected related trigger: {trigger.Name}");
+    }
+    
+    private void SelectRelatedVolume(VolumeVisualizationObject volume)
+    {
+        if (volume == null) return;
+        
+        // Clear other selections
+        SelectedObject = null;
+        SelectedCollision = null;
+        SelectedPath = null;
+        SelectedMesh = null;
+        SelectedTrigger = null;
+        
+        // Select the volume
+        SelectedVolume = volume;
+        
+        Debug.WriteLine($"Selected related volume: {volume.Name}");
+    }
 
     private Control CreateNifBoundingBoxVisual(NifMeshVisualizationObject mesh)
     {
@@ -2387,6 +2663,13 @@ public class ZoneEditorViewModel : ViewModelBase
         NotifySelectionChanged();
     }
     
+    private void SelectTrigger(TriggerVisualizationObject trigger)
+    {
+        ClearAllSelections();
+        SelectedTrigger = trigger;
+        NotifySelectionChanged();
+    }
+    
     private void ClearAllSelections()
     {
         SelectedObject = null;
@@ -2396,6 +2679,7 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectedPath = null;
         SelectedMesh = null;
         SelectedVolume = null;
+        SelectedTrigger = null;
     }
     
     private void NotifySelectionChanged()
@@ -2406,6 +2690,7 @@ public class ZoneEditorViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(HasSelectedPath));
         this.RaisePropertyChanged(nameof(HasSelectedMesh));
         this.RaisePropertyChanged(nameof(HasSelectedVolume));
+        this.RaisePropertyChanged(nameof(HasSelectedTrigger));
         this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
         this.RaisePropertyChanged(nameof(LocationX));
         this.RaisePropertyChanged(nameof(LocationY));

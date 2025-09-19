@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Imview.Core.ViewModels"
              xmlns:converters="clr-namespace:Imview.Core.Converters"
+             xmlns:views="clr-namespace:Imview.Core.Views"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="Imview.Core.Views.ZoneEditorView"
              x:DataType="vm:ZoneEditorViewModel">
@@ -206,6 +207,10 @@
                                             IsChecked="{Binding ShowVolumes}" 
                                             Foreground="#FF0000" 
                                             FontSize="9"/>
+                                    <CheckBox Content="Triggers" 
+                                            IsChecked="{Binding ShowTriggers}" 
+                                            Foreground="#FF00FF" 
+                                            FontSize="9"/>
                                 </StackPanel>
                                 
                                 <!-- Collision Shape Filters -->
@@ -279,6 +284,10 @@
                             <TextBlock Text="{Binding VolumeVisualizationObjects.Count, StringFormat='Volumes: {0}'}"
                                      FontSize="10"
                                      Foreground="#FF0000"
+                                     Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding TriggerVisualizationObjects.Count, StringFormat='Triggers: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#FF00FF"
                                      Margin="5,0,5,5"/>
                         </StackPanel>
                     </Grid>
@@ -604,6 +613,63 @@
                                         </Style>
                                         <Style Selector="ListBoxItem:pointerover">
                                             <Setter Property="Background" Value="#3A1A1A"/>
+                                        </Style>
+                                    </ListBox.Styles>
+                                </ListBox>
+                            </StackPanel>
+                            
+                            <!-- Triggers -->
+                            <StackPanel Background="Transparent" Margin="0">
+                                <!-- Triggers Header -->
+                                <Button Background="#393939" Padding="4,1" Margin="0" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        BorderThickness="0" CornerRadius="0"
+                                        Name="TriggersToggle">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="▼" Foreground="#AAAAAA" FontSize="8" VerticalAlignment="Center" Name="TriggersArrow"/>
+                                        <TextBlock Grid.Column="1" Text="Triggers" Foreground="#FF00FF" FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding TriggerVisualizationObjects.Count}" Foreground="#888888" FontSize="9" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                                
+                                <!-- Triggers List -->
+                                <ListBox ItemsSource="{Binding TriggerVisualizationObjects}" Margin="0" Name="TriggersList"
+                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                                         SelectedItem="{Binding SelectedTrigger, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="1" Text="⚡" Foreground="#FF00FF" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="#FF00FF" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding TriggerType}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:selected">
+                                            <Setter Property="Background" Value="#4F1F4F"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:pointerover">
+                                            <Setter Property="Background" Value="#3A1A3A"/>
                                         </Style>
                                     </ListBox.Styles>
                                 </ListBox>
@@ -1101,6 +1167,215 @@
                                             <TextBlock Text="(No exit events)" FontSize="8" Foreground="#888888" Margin="4,1"
                                                      IsVisible="{Binding !SelectedVolume.ExitEvents.Count}"/>
                                         </StackPanel>
+                                        
+                                        <!-- Related Triggers -->
+                                        <StackPanel Margin="0,8,0,0" IsVisible="{Binding SelectedVolumeEnterTriggers.Count}">
+                                            <TextBlock Text="Related Enter Triggers" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedVolumeEnterTriggers}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#2A3F2A" Margin="0,2" Padding="6,3" CornerRadius="3" 
+                                                                BorderBrush="#4F6F4F" BorderThickness="1">
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="8" 
+                                                                         Foreground="#90EE90" VerticalAlignment="Center"/>
+                                                                <Button Grid.Column="1" Content="→" 
+                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectRelatedTriggerCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Width="20" Height="16" FontSize="8"
+                                                                        Background="#3F5F3F" Foreground="White"
+                                                                        BorderBrush="#5F7F5F" BorderThickness="1"
+                                                                        ToolTip.Tip="Select this trigger"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedVolumeExitTriggers.Count}">
+                                            <TextBlock Text="Related Exit Triggers" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedVolumeExitTriggers}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#3F2A2A" Margin="0,2" Padding="6,3" CornerRadius="3" 
+                                                                BorderBrush="#6F4F4F" BorderThickness="1">
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="8" 
+                                                                         Foreground="#FFB6C1" VerticalAlignment="Center"/>
+                                                                <Button Grid.Column="1" Content="→" 
+                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectRelatedTriggerCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Width="20" Height="16" FontSize="8"
+                                                                        Background="#5F3F3F" Foreground="White"
+                                                                        BorderBrush="#7F5F5F" BorderThickness="1"
+                                                                        ToolTip.Tip="Select this trigger"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Trigger Object Properties -->
+                            <StackPanel IsVisible="{Binding HasSelectedTrigger}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="Trigger Object" Foreground="#FF00FF" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" 
+                                          Margin="0,2">
+                                        <!-- Name -->
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedTrigger.Name}" 
+                                               Grid.Row="0" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Trigger Type -->
+                                        <TextBlock Text="Trigger Type:" Grid.Row="1" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedTrigger.TriggerType}" 
+                                               Grid.Row="1" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Zone -->
+                                        <TextBlock Text="Zone:" Grid.Row="2" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedTrigger.Zone}" 
+                                               Grid.Row="2" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Location -->
+                                        <TextBlock Text="Location:" Grid.Row="3" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedTrigger.LocationText}" 
+                                               Grid.Row="3" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Timing -->
+                                        <TextBlock Text="Timing:" Grid.Row="4" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedTrigger.TimingText}" 
+                                               Grid.Row="4" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Events Count -->
+                                        <TextBlock Text="Events:" Grid.Row="5" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedTrigger.EventsText}" 
+                                               Grid.Row="5" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                    </Grid>
+                                    
+                                    <!-- Events Detail -->
+                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTrigger.Events.Count}">
+                                        <TextBlock Text="Event Details" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                        <ItemsControl ItemsSource="{Binding SelectedTrigger.Events}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#333333" Margin="0,2" Padding="6,4" CornerRadius="3">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding}" FontSize="8" 
+                                                                     Foreground="#FFB6C1" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                    
+                                    <!-- Results -->
+                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTrigger.OriginalTrigger.m_results.m_results.Count}">
+                                        <TextBlock Text="Results" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                        <Border Background="#2A2A30" BorderBrush="#4A4A50" BorderThickness="1" CornerRadius="2" Padding="2" MaxHeight="350">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding SelectedTrigger.OriginalTrigger.m_results.m_results}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#333338" Margin="0,1" Padding="2" CornerRadius="1">
+                                                                <views:ResultDynamicViewerView MaxHeight="80" 
+                                                                    ZoneName="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectedZone}"
+                                                                    TriggerName="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectedTrigger.Name}"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+                                    
+                                    <!-- Related Volumes -->
+                                    <StackPanel Margin="0,8,0,0" IsVisible="{Binding SelectedTriggerActivatingVolumes.Count}">
+                                        <TextBlock Text="Volumes That Activate This Trigger" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                                        <ItemsControl ItemsSource="{Binding SelectedTriggerActivatingVolumes}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#2A3F2A" Margin="0,2" Padding="6,3" CornerRadius="3" 
+                                                            BorderBrush="#4F6F4F" BorderThickness="1">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="8" 
+                                                                     Foreground="#90EE90" VerticalAlignment="Center"/>
+                                                            <Button Grid.Column="1" Content="→" 
+                                                                    Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectRelatedVolumeCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Width="20" Height="16" FontSize="8"
+                                                                    Background="#3F5F3F" Foreground="White"
+                                                                    BorderBrush="#5F7F5F" BorderThickness="1"
+                                                                    ToolTip.Tip="Select this volume"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                    
+                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTriggerDeactivatingVolumes.Count}">
+                                        <TextBlock Text="Volumes That Deactivate This Trigger" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                                        <ItemsControl ItemsSource="{Binding SelectedTriggerDeactivatingVolumes}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#3F2A2A" Margin="0,2" Padding="6,3" CornerRadius="3" 
+                                                            BorderBrush="#6F4F4F" BorderThickness="1">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="8" 
+                                                                     Foreground="#FFB6C1" VerticalAlignment="Center"/>
+                                                            <Button Grid.Column="1" Content="→" 
+                                                                    Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectRelatedVolumeCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Width="20" Height="16" FontSize="8"
+                                                                    Background="#5F3F3F" Foreground="White"
+                                                                    BorderBrush="#7F5F5F" BorderThickness="1"
+                                                                    ToolTip.Tip="Select this volume"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                    
+                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTriggerFireVolumes.Count}">
+                                        <TextBlock Text="Volumes That Fire This Trigger" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,4"/>
+                                        <ItemsControl ItemsSource="{Binding SelectedTriggerFireVolumes}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#3F3F2A" Margin="0,2" Padding="6,3" CornerRadius="3" 
+                                                            BorderBrush="#6F6F4F" BorderThickness="1">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="8" 
+                                                                     Foreground="#FFFF90" VerticalAlignment="Center"/>
+                                                            <Button Grid.Column="1" Content="→" 
+                                                                    Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectRelatedVolumeCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Width="20" Height="16" FontSize="8"
+                                                                    Background="#5F5F3F" Foreground="White"
+                                                                    BorderBrush="#7F7F5F" BorderThickness="1"
+                                                                    ToolTip.Tip="Select this volume"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>

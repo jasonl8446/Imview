@@ -43,6 +43,7 @@ public class ZoneDataService
     private const string PathDataFileName = "pathData.xml";
     private const string NodeDataFileName = "pathNodeData.bin";
     private const string VolumesDataFileName = "volumes.xml";
+    private const string TriggersDataFileName = "triggers.xml";
     private const string AccessPassFileName = "AccessPass.xml";
     private readonly ClientFileService _clientFileService;
     private readonly RootWadService _rootWadService;
@@ -55,7 +56,7 @@ public class ZoneDataService
         _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
     
-    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile, SpawnManager? SpawnData, PathTemplateList? PathData, NodeTemplateList? NodeData, WizZoneVolumes? VolumeData)> LoadZoneDataAsync(string zoneName)
+    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile, SpawnManager? SpawnData, PathTemplateList? PathData, NodeTemplateList? NodeData, WizZoneVolumes? VolumeData, WizZoneTriggers? TriggerData)> LoadZoneDataAsync(string zoneName)
     {
         try
         {
@@ -67,7 +68,7 @@ public class ZoneDataService
             var zoneWadData = await GetZoneWadDataAsync(zoneWadName);
             if (zoneWadData == null)
             {
-                throw new InvalidOperationException($"Failed to obtain zone WAD data for '{zoneWadName}'. Check if the zone exists in the file list or if download failed.");
+                throw new FileNotFoundException($"Zone WAD '{zoneWadName}' is not available. The zone may not exist in the current client revision or download may have failed.", zoneWadName);
             }
             
             // Parse the zone WAD
@@ -281,7 +282,35 @@ public class ZoneDataService
                 Console.WriteLine($"No '{VolumesDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have volume data");
             }
             
-            return (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData, volumeData);
+            // Load trigger data (optional)
+            WizZoneTriggers? triggerData = null;
+            var triggerFile = zoneArchive.OpenFile(TriggersDataFileName);
+            if (triggerFile != null)
+            {
+                try
+                {
+                    var triggerDataBytes = triggerFile.Value.ToArray();
+                    if (!bindSerializer.Deserialize<WizZoneTriggers>(triggerDataBytes, 1, out triggerData))
+                    {
+                        Console.WriteLine($"Warning: Failed to deserialize trigger data from '{TriggersDataFileName}'");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Loaded trigger data with {triggerData.m_triggers?.Count ?? 0} triggers from '{TriggersDataFileName}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Failed to parse trigger data from '{TriggersDataFileName}': {ex.Message}");
+                    // Continue without trigger data - it's not critical
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No '{TriggersDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have trigger data");
+            }
+            
+            return (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData, volumeData, triggerData);
         }
         catch (Exception ex)
         {
@@ -386,7 +415,16 @@ public class ZoneDataService
         
         // If not cached, try to download it from the patch server
         Console.WriteLine($"Attempting to download zone WAD: {zoneWadName}");
-        return await DownloadZoneWadAsync(zoneWadName);
+        try
+        {
+            return await DownloadZoneWadAsync(zoneWadName);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Download attempt failed for zone WAD '{zoneWadName}': {ex.Message}");
+            // Return null to indicate the zone is not available, rather than throwing
+            return null;
+        }
     }
     
     private async Task<byte[]?> DownloadZoneWadAsync(string zoneWadName)
