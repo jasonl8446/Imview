@@ -40,7 +40,12 @@ public class ResultTypeSelectionDialog : EditorWindowBase<Result> {
         { "Drop Table", "ResDropTable" },
         { "Add Dynamic Modifier", "ResAddDynaMod" },
         { "Remove Dynamic Modifier", "ResRemoveDynaMod" },
-        { "Actor Dialog", "ResActorDialog" }
+        { "Actor Dialog", "ResActorDialog" },
+        { "Teleport", "ResTeleport" },
+        { "Play Sound", "ResPlaySound" },
+        { "Post Event", "ResPostEvent" },
+        { "Modify Entry", "ResModifyEntry" },
+        { "Wait", "ResWait" }
     };
     
     private readonly ListBox _typesList;
@@ -131,6 +136,11 @@ public class ResultTypeSelectionDialog : EditorWindowBase<Result> {
                 "ResAddDynaMod" => new ResAddDynaModEditor(),
                 "ResRemoveDynaMod" => new ResRemoveDynaModEditor(),
                 "ResActorDialog" => new ResActorDialogEditor(),
+                "ResTeleport" => new ResTeleportEditor(),
+                "ResPlaySound" => new ResPlaySoundEditor(),
+                "ResPostEvent" => new ResPostEventEditor(),
+                "ResModifyEntry" => new ResModifyEntryEditor(),
+                "ResWait" => new ResWaitEditor(),
                 _ => null
             };
             

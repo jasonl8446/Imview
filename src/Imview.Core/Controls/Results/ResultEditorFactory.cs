@@ -35,6 +35,11 @@ public static class ResultEditorFactory {
             ResAddDynaMod addDynaMod => new ResAddDynaModEditor(addDynaMod),
             ResRemoveDynaMod removeDynaMod => new ResRemoveDynaModEditor(removeDynaMod),
             ResActorDialog actorDialog => new ResActorDialogEditor(actorDialog),
+            ResTeleport teleport => new ResTeleportEditor(teleport),
+            ResPlaySound playSound => new ResPlaySoundEditor(playSound),
+            ResPostEvent postEvent => new ResPostEventEditor(postEvent),
+            ResModifyEntry modifyEntry => new ResModifyEntryEditor(modifyEntry),
+            ResWait wait => new ResWaitEditor(wait),
             _ => null
         };
     }
@@ -47,6 +52,11 @@ public static class ResultEditorFactory {
             ResAddDynaModEditor addEditor => await addEditor.GetResultAsync(),
             ResRemoveDynaModEditor removeEditor => await removeEditor.GetResultAsync(),
             ResActorDialogEditor dialogEditor => await dialogEditor.GetResultAsync(),
+            ResTeleportEditor teleportEditor => await teleportEditor.GetResultAsync(),
+            ResPlaySoundEditor playSoundEditor => await playSoundEditor.GetResultAsync(),
+            ResPostEventEditor postEventEditor => await postEventEditor.GetResultAsync(),
+            ResModifyEntryEditor modifyEntryEditor => await modifyEntryEditor.GetResultAsync(),
+            ResWaitEditor waitEditor => await waitEditor.GetResultAsync(),
             _ => null
         };
     }
@@ -59,6 +69,11 @@ public static class ResultEditorFactory {
             ResAddDynaMod addDynaMod => $"Add DynaMod: {addDynaMod.m_dynaModClientTag}",
             ResRemoveDynaMod removeDynaMod => $"Remove DynaMod: {removeDynaMod.m_dynaModClientTag}",
             ResActorDialog actorDialog => $"Actor Dialog: {actorDialog.m_activePersona} ({actorDialog.m_registryEntry})",
+            ResTeleport teleport => $"Teleport: {teleport.m_destinationZone} -> {teleport.m_destinationLoc}",
+            ResPlaySound playSound => $"Play Sound: {playSound.m_soundName} (Blocking: {playSound.m_blocking})",
+            ResPostEvent postEvent => $"Post Event: {postEvent.m_eventName}",
+            ResModifyEntry modifyEntry => $"Modify Entry: {modifyEntry.m_entryName} = {modifyEntry.m_value}",
+            ResWait wait => $"Wait: {wait.m_secondsToWait} seconds",
             _ => result.GetType().Name
         };
     }
