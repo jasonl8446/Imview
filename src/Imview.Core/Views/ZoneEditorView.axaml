@@ -290,19 +290,19 @@
                                              Margin="5,0,0,0"/>
                                 </StackPanel>
                                 
-                                <!-- Collision Flag Filters -->
+                                <!-- Collision Shape Filters -->
                                 <StackPanel Spacing="4" Margin="20,5,0,0">
-                                    <TextBlock Text="Filter by Collision Flags:" 
+                                    <TextBlock Text="Filter by Collision Shape:" 
                                              Foreground="#CCCCCC" 
                                              FontSize="11"/>
                                     
                                     <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Walkable"
-                                                IsChecked="{Binding ShowWalkableCollisions}"
+                                        <CheckBox Content="Box"
+                                                IsChecked="{Binding ShowBoxCollisions}"
                                                 Foreground="#AAAAAA"
                                                 FontSize="11"
                                                 Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding WalkableCollisionCount, StringFormat='({0})'}"
+                                        <TextBlock Text="{Binding BoxCollisionCount, StringFormat='({0})'}"
                                                  Foreground="#666666"
                                                  FontSize="9"
                                                  VerticalAlignment="Center"
@@ -310,12 +310,12 @@
                                     </StackPanel>
                                     
                                     <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Water"
-                                                IsChecked="{Binding ShowWaterCollisions}"
+                                        <CheckBox Content="Sphere"
+                                                IsChecked="{Binding ShowSphereCollisions}"
                                                 Foreground="#AAAAAA"
                                                 FontSize="11"
                                                 Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding WaterCollisionCount, StringFormat='({0})'}"
+                                        <TextBlock Text="{Binding SphereCollisionCount, StringFormat='({0})'}"
                                                  Foreground="#666666"
                                                  FontSize="9"
                                                  VerticalAlignment="Center"
@@ -323,65 +323,69 @@
                                     </StackPanel>
                                     
                                     <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Trigger"
-                                                IsChecked="{Binding ShowTriggerCollisions}"
+                                        <CheckBox Content="Cylinder"
+                                                IsChecked="{Binding ShowCylinderCollisions}"
                                                 Foreground="#AAAAAA"
                                                 FontSize="11"
                                                 Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding TriggerCollisionCount, StringFormat='({0})'}"
+                                        <TextBlock Text="{Binding CylinderCollisionCount, StringFormat='({0})'}"
                                                  Foreground="#666666"
                                                  FontSize="9"
                                                  VerticalAlignment="Center"
                                                  Margin="3,0,0,0"/>
                                     </StackPanel>
                                     
-                                    <CheckBox Content="Object"
-                                            IsChecked="{Binding ShowObjectCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Tube"
+                                                IsChecked="{Binding ShowTubeCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding TubeCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
                                     
-                                    <CheckBox Content="Hitscan"
-                                            IsChecked="{Binding ShowHitscanCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Plane"
+                                                IsChecked="{Binding ShowPlaneCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding PlaneCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
                                     
-                                    <CheckBox Content="Local Player"
-                                            IsChecked="{Binding ShowLocalPlayerCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Mesh"
+                                                IsChecked="{Binding ShowMeshCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding MeshCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
                                     
-                                    <CheckBox Content="Client Object"
-                                            IsChecked="{Binding ShowClientObjectCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
-                                    
-                                    <CheckBox Content="Fog"
-                                            IsChecked="{Binding ShowFogCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
-                                    
-                                    <CheckBox Content="Goo"
-                                            IsChecked="{Binding ShowGooCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
-                                    
-                                    <CheckBox Content="Fish"
-                                            IsChecked="{Binding ShowFishCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
-                                    
-                                    <CheckBox Content="Muck"
-                                            IsChecked="{Binding ShowMuckCollisions}"
-                                            Foreground="#AAAAAA"
-                                            FontSize="11"
-                                            Margin="5,2,0,0"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Content="Ray"
+                                                IsChecked="{Binding ShowRayCollisions}"
+                                                Foreground="#AAAAAA"
+                                                FontSize="11"
+                                                Margin="5,2,0,0"/>
+                                        <TextBlock Text="{Binding RayCollisionCount, StringFormat='({0})'}"
+                                                 Foreground="#666666"
+                                                 FontSize="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="3,0,0,0"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>

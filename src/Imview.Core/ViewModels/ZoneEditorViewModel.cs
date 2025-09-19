@@ -61,18 +61,14 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool _showPaths = true;
     private bool _showNodes = true; // Make visible by default for debugging
     
-    // Collision flag filters - default to false so all objects show initially
-    private bool _showWalkableCollisions = false;
-    private bool _showWaterCollisions = false;
-    private bool _showTriggerCollisions = false;
-    private bool _showObjectCollisions = false;
-    private bool _showHitscanCollisions = false;
-    private bool _showLocalPlayerCollisions = false;
-    private bool _showClientObjectCollisions = false;
-    private bool _showFogCollisions = false;
-    private bool _showGooCollisions = false;
-    private bool _showFishCollisions = false;
-    private bool _showMuckCollisions = false;
+    // Collision shape filters - default to true so all shapes show initially
+    private bool _showBoxCollisions = true;
+    private bool _showSphereCollisions = true;
+    private bool _showCylinderCollisions = true;
+    private bool _showTubeCollisions = true;
+    private bool _showPlaneCollisions = true;
+    private bool _showMeshCollisions = true;
+    private bool _showRayCollisions = true;
     
     private Canvas? _zoneObjectCanvas = null;
     
@@ -217,113 +213,73 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
 
-    // Collision flag filter properties
-    public bool ShowWalkableCollisions
+    // Collision shape filter properties
+    public bool ShowBoxCollisions
     {
-        get => _showWalkableCollisions;
+        get => _showBoxCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showWalkableCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showBoxCollisions, value);
             UpdateVisibility();
         }
     }
 
-    public bool ShowWaterCollisions
+    public bool ShowSphereCollisions
     {
-        get => _showWaterCollisions;
+        get => _showSphereCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showWaterCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showSphereCollisions, value);
             UpdateVisibility();
         }
     }
 
-    public bool ShowTriggerCollisions
+    public bool ShowCylinderCollisions
     {
-        get => _showTriggerCollisions;
+        get => _showCylinderCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showTriggerCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showCylinderCollisions, value);
             UpdateVisibility();
         }
     }
 
-    public bool ShowObjectCollisions
+    public bool ShowTubeCollisions
     {
-        get => _showObjectCollisions;
+        get => _showTubeCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showObjectCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showTubeCollisions, value);
             UpdateVisibility();
         }
     }
 
-    public bool ShowHitscanCollisions
+    public bool ShowPlaneCollisions
     {
-        get => _showHitscanCollisions;
+        get => _showPlaneCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showHitscanCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showPlaneCollisions, value);
             UpdateVisibility();
         }
     }
 
-    public bool ShowLocalPlayerCollisions
+    public bool ShowMeshCollisions
     {
-        get => _showLocalPlayerCollisions;
+        get => _showMeshCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showLocalPlayerCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showMeshCollisions, value);
             UpdateVisibility();
         }
     }
 
-    public bool ShowClientObjectCollisions
+    public bool ShowRayCollisions
     {
-        get => _showClientObjectCollisions;
+        get => _showRayCollisions;
         set
         {
-            this.RaiseAndSetIfChanged(ref _showClientObjectCollisions, value);
-            UpdateVisibility();
-        }
-    }
-
-    public bool ShowFogCollisions
-    {
-        get => _showFogCollisions;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _showFogCollisions, value);
-            UpdateVisibility();
-        }
-    }
-
-    public bool ShowGooCollisions
-    {
-        get => _showGooCollisions;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _showGooCollisions, value);
-            UpdateVisibility();
-        }
-    }
-
-    public bool ShowFishCollisions
-    {
-        get => _showFishCollisions;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _showFishCollisions, value);
-            UpdateVisibility();
-        }
-    }
-
-    public bool ShowMuckCollisions
-    {
-        get => _showMuckCollisions;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _showMuckCollisions, value);
+            this.RaiseAndSetIfChanged(ref _showRayCollisions, value);
             UpdateVisibility();
         }
     }
@@ -332,9 +288,13 @@ public class ZoneEditorViewModel : ViewModelBase
 
     // Computed properties for filter counts
     public int VisibleCollisionCount => CollisionVisualizationObjects.Count(ShouldShowCollision);
-    public int WalkableCollisionCount => CollisionVisualizationObjects.Count(c => c.CollisionFlags.HasFlag(CollisionFlags.Walkable));
-    public int WaterCollisionCount => CollisionVisualizationObjects.Count(c => c.CollisionFlags.HasFlag(CollisionFlags.Water));
-    public int TriggerCollisionCount => CollisionVisualizationObjects.Count(c => c.CollisionFlags.HasFlag(CollisionFlags.Trigger));
+    public int BoxCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Box");
+    public int SphereCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Sphere");
+    public int CylinderCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Cylinder");
+    public int TubeCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Tube");
+    public int PlaneCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Plane");
+    public int MeshCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Mesh");
+    public int RayCollisionCount => CollisionVisualizationObjects.Count(c => c.GeometryType == "Ray");
 
     // Viewport properties
     public double ZoomLevel
@@ -687,9 +647,13 @@ public class ZoneEditorViewModel : ViewModelBase
         
         // Notify property changes for collision counts
         this.RaisePropertyChanged(nameof(VisibleCollisionCount));
-        this.RaisePropertyChanged(nameof(WalkableCollisionCount));
-        this.RaisePropertyChanged(nameof(WaterCollisionCount));
-        this.RaisePropertyChanged(nameof(TriggerCollisionCount));
+        this.RaisePropertyChanged(nameof(BoxCollisionCount));
+        this.RaisePropertyChanged(nameof(SphereCollisionCount));
+        this.RaisePropertyChanged(nameof(CylinderCollisionCount));
+        this.RaisePropertyChanged(nameof(TubeCollisionCount));
+        this.RaisePropertyChanged(nameof(PlaneCollisionCount));
+        this.RaisePropertyChanged(nameof(MeshCollisionCount));
+        this.RaisePropertyChanged(nameof(RayCollisionCount));
         
         // Create collision visuals now that we have collision data
         CreateCollisionVisuals();
@@ -1029,56 +993,20 @@ public class ZoneEditorViewModel : ViewModelBase
         if (!ShowCollisions)
             return false;
 
-        // Check if ANY flag filter is enabled
-        bool anyFilterEnabled = ShowWalkableCollisions || ShowWaterCollisions || ShowTriggerCollisions ||
-                               ShowObjectCollisions || ShowHitscanCollisions || ShowLocalPlayerCollisions ||
-                               ShowClientObjectCollisions || ShowFogCollisions || ShowGooCollisions ||
-                               ShowFishCollisions || ShowMuckCollisions;
+        // Check shape-based filters
+        var geometryType = collision.GeometryType;
         
-        // If no flag filters are enabled, show nothing
-        if (!anyFilterEnabled)
-            return false;
-
-        var flags = collision.CollisionFlags;
-        
-        // Check each filter - if filter is enabled, object MUST have that flag
-        // If filter is disabled, we don't care about that flag
-        
-        if (ShowWalkableCollisions && !flags.HasFlag(CollisionFlags.Walkable))
-            return false;
-            
-        if (ShowWaterCollisions && !flags.HasFlag(CollisionFlags.Water))
-            return false;
-            
-        if (ShowTriggerCollisions && !flags.HasFlag(CollisionFlags.Trigger))
-            return false;
-            
-        if (ShowObjectCollisions && !flags.HasFlag(CollisionFlags.Object))
-            return false;
-            
-        if (ShowHitscanCollisions && !flags.HasFlag(CollisionFlags.Hitscan))
-            return false;
-            
-        if (ShowLocalPlayerCollisions && !flags.HasFlag(CollisionFlags.LocalPlayer))
-            return false;
-            
-        if (ShowClientObjectCollisions && !flags.HasFlag(CollisionFlags.ClientObject))
-            return false;
-            
-        if (ShowFogCollisions && !flags.HasFlag(CollisionFlags.Fog))
-            return false;
-            
-        if (ShowGooCollisions && !flags.HasFlag(CollisionFlags.Goo))
-            return false;
-            
-        if (ShowFishCollisions && !flags.HasFlag(CollisionFlags.Fish))
-            return false;
-            
-        if (ShowMuckCollisions && !flags.HasFlag(CollisionFlags.Muck))
-            return false;
-
-        // Show the object - it has all the required flags
-        return true;
+        return geometryType switch
+        {
+            "Box" => ShowBoxCollisions,
+            "Sphere" => ShowSphereCollisions,
+            "Cylinder" => ShowCylinderCollisions,
+            "Tube" => ShowTubeCollisions,
+            "Plane" => ShowPlaneCollisions,
+            "Mesh" => ShowMeshCollisions,
+            "Ray" => ShowRayCollisions,
+            _ => true // Show unknown geometry types by default
+        };
     }
 
     private void UpdateVisibility()
