@@ -329,12 +329,27 @@ public partial class QuestDialogEditor : UserControl {
                         PersonaName = npcEntry.m_personaName ?? "",
                         DialogKey = npcEntry.m_dialog ?? "",
                         SoundFile = npcEntry.m_soundFile ?? "",
-                        ActorTemplateID = (int)npcEntry.m_actorTemplateID,
+                        ActorTemplateID = npcEntry.m_actorTemplateID,
                         CameraName = npcEntry.m_cameraName ?? "",
                         Picture = npcEntry.m_picture ?? "",
                         Action = npcEntry.m_action ?? "",
                         NameOverride = npcEntry.m_nameOverride ?? "",
-                        GuiDisplay = npcEntry.m_guiDisplay ?? ""
+                        GuiDisplay = npcEntry.m_guiDisplay ?? "",
+                        
+                        // Extended Properties
+                        DialogEvent = npcEntry.m_dialogEvent ?? "",
+                        Duration = npcEntry.m_duration,
+                        Delay = npcEntry.m_delay,
+                        InterpolationDuration = npcEntry.m_interpolationDuration,
+                        
+                        // Audio Properties
+                        SoundEffectFile = npcEntry.m_soundEffectFile ?? "",
+                        MusicFile = npcEntry.m_musicFile ?? "",
+                        
+                        // Behavior Flags
+                        AllowPlayerToMove = npcEntry.m_allowPlayerToMove,
+                        DisableBackButton = npcEntry.m_disableBackButton,
+                        EnableExitButton = npcEntry.m_enableExitButton
                     });
                 }
             }
@@ -366,13 +381,27 @@ public partial class QuestDialogEditor : UserControl {
                         m_personaName = wrapper.PersonaName,
                         m_dialog = wrapper.DialogKey,
                         m_soundFile = wrapper.SoundFile,
-                        m_actorTemplateID = (uint)wrapper.ActorTemplateID,
+                        m_actorTemplateID = wrapper.ActorTemplateID,
                         m_cameraName = wrapper.CameraName,
                         m_picture = wrapper.Picture,
                         m_action = wrapper.Action,
                         m_nameOverride = wrapper.NameOverride,
                         m_guiDisplay = wrapper.GuiDisplay,
-                        m_interpolationDuration = 0.0f
+                        m_interpolationDuration = wrapper.InterpolationDuration,
+                        
+                        // Extended Properties
+                        m_dialogEvent = wrapper.DialogEvent,
+                        m_duration = wrapper.Duration,
+                        m_delay = wrapper.Delay,
+                        
+                        // Audio Properties
+                        m_soundEffectFile = wrapper.SoundEffectFile,
+                        m_musicFile = wrapper.MusicFile,
+                        
+                        // Behavior Flags
+                        m_allowPlayerToMove = wrapper.AllowPlayerToMove,
+                        m_disableBackButton = wrapper.DisableBackButton,
+                        m_enableExitButton = wrapper.EnableExitButton
                     }).Cast<ActorDialogEntry>().ToList()
                 };
                 dialogList.m_dialogs.Add(dialog);
@@ -385,26 +414,26 @@ public partial class QuestDialogEditor : UserControl {
 
 /// <summary>
 /// Wrapper class for dialog entries to make UI binding easier
+/// Contains ALL 59 properties from ActorDialogEntry
 /// </summary>
 public class DialogEntryWrapper {
-    // Basic Properties
+    // NPCDialogEntry specific properties
     public string PersonaName { get; set; } = "";
-    public string DialogKey { get; set; } = "";
-    public string SoundFile { get; set; } = "";
-    public int ActorTemplateID { get; set; }
-    public string CameraName { get; set; } = "";
-    public string Picture { get; set; } = "";
-    public string Action { get; set; } = "";
     public string NameOverride { get; set; } = "";
     public string GuiDisplay { get; set; } = "";
     
-    // Extended Properties
+    // Core ActorDialogEntry Properties (1-8)
+    public RequirementList Requirements { get; set; } = new();
+    public string DialogKey { get; set; } = "";
+    public string Picture { get; set; } = "";
+    public string SoundFile { get; set; } = "";
+    public string Action { get; set; } = "";
     public string DialogEvent { get; set; } = "";
-    public float Duration { get; set; }
-    public float Delay { get; set; }
-    public float InterpolationDuration { get; set; }
+    public uint ActorTemplateID { get; set; }
+    public string CameraName { get; set; } = "";
     
-    // Camera Properties
+    // Camera Properties (9-18)
+    public float InterpolationDuration { get; set; }
     public float CameraOffsetX { get; set; }
     public float CameraOffsetY { get; set; }
     public float CameraOffsetZ { get; set; }
@@ -414,17 +443,37 @@ public class DialogEntryWrapper {
     public string CameraShakeType { get; set; } = "";
     public float CameraShakeDuration { get; set; }
     public float CameraShakeAmplitude { get; set; }
+    
+    // Camera Behavior (19-24)
     public bool BypassCameraOnReview { get; set; }
     public string CameraZoneName { get; set; } = "";
-    public string CameraFadeType { get; set; } = "";
-    public float CameraFadeTime { get; set; }
+    public float Duration { get; set; }
+    public float Delay { get; set; }
+    public int CameraHidePlayers { get; set; }
+    public uint WalkAwayNpcTemplateID { get; set; }
     
-    // Animation Properties  
-    public string IdleAnimation { get; set; } = "";
+    // Walk Away Properties (25-27)
+    public float WalkAwayExitDirectionInDegrees { get; set; }
+    public float WalkAwayFadeTime { get; set; }
+    public bool WalkAwayUseCurrentFacing { get; set; }
+    
+    // Stand-in and Camera (28-32)
+    public string StandInPlayerTag { get; set; } = "";
+    public bool FadeOutCamera { get; set; }
+    public bool SnapCameraToPlayerAtExit { get; set; }
+    public string SecondaryCameraName { get; set; } = "";
+    public float SecondaryInterpolationDuration { get; set; }
+    
+    // Lists and Arrays (33-35)
+    public List<string> NpcStandInList { get; set; } = new();
+    public List<string> DialogAnimationList { get; set; } = new();
+    public List<string> DialogTurningList { get; set; } = new();
+    
+    // NPC Behavior (36-37)
     public float NpcYawOffsetInDegrees { get; set; }
     public bool AllowPlayerToMove { get; set; }
     
-    // Audio Properties
+    // Audio Properties (38-45)
     public string SoundEffectFile { get; set; } = "";
     public string MusicFile { get; set; } = "";
     public bool NonStackableMusic { get; set; }
@@ -434,14 +483,23 @@ public class DialogEntryWrapper {
     public float MusicDelay { get; set; }
     public float MusicFadeTime { get; set; }
     
-    // Behavior Flags
+    // Camera and Dialog Behavior (46-51)
     public bool DontReleaseCameraAtExit { get; set; }
     public bool DisableBackButton { get; set; }
     public bool EnableExitButton { get; set; }
-    public bool FadeOutCamera { get; set; }
-    public bool SnapCameraToPlayerAtExit { get; set; }
+    public string CameraFadeType { get; set; } = "";
+    public float CameraFadeTime { get; set; }
+    public string IdleAnimation { get; set; } = "";
+    
+    // Spam and Music Control (52-57)
     public float SpamTime { get; set; }
     public bool PlaySoundIfSpamming { get; set; }
     public bool PlayMusicIfSpamming { get; set; }
+    public float StopMusicFadeTime { get; set; }
+    public float RestartMusicFadeTime { get; set; }
+    public bool MeetsRequirements { get; set; }
+    
+    // Final Properties (58-59)
+    public float SecondaryCameraInitialDelay { get; set; }
     public bool DisplayButtonsOnTimedDialog { get; set; }
 }
