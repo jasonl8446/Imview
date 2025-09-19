@@ -20,7 +20,9 @@ modification, are permitted provided that the following conditions are met:
 
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Imview.Core.ViewModels;
+using Imview.Core.Models;
 
 namespace Imview.Core.Views;
 
@@ -47,7 +49,7 @@ public partial class ZoneEditorView : UserControl
     
     private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        // Wire up the canvas to the ViewModel
+        // Wire up the canvas and scroll viewer to the ViewModel
         if (DataContext is ZoneEditorViewModel viewModel)
         {
             var canvas = this.FindControl<Canvas>("ZoneObjectCanvas");
@@ -55,7 +57,27 @@ public partial class ZoneEditorView : UserControl
             {
                 viewModel.SetZoneObjectCanvas(canvas);
             }
+            
+            var scrollViewer = this.FindControl<ScrollViewer>("ZoneScrollViewer");
+            if (scrollViewer != null)
+            {
+                viewModel.SetScrollViewer(scrollViewer);
+                
+                // Initialize viewport and zoom after everything is loaded
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    // Apply initial zoom transform first
+                    viewModel.UpdateCanvasTransform();
+                    // Then center the viewport
+                    viewModel.InitializeViewportCenter();
+                }, Avalonia.Threading.DispatcherPriority.Background);
+            }
         }
+        
+        // Set up collapse/expand toggle buttons
+        SetupToggleButtons();
+        
+        // Selection is now handled via direct binding in XAML
         
         // Set focus to enable keyboard input
         Focus();
@@ -119,7 +141,8 @@ public partial class ZoneEditorView : UserControl
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        // Only start dragging if the click wasn't handled by a zone object
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && !e.Handled)
         {
             _isDragging = true;
             _lastPointerPosition = e.GetPosition(this);
@@ -152,4 +175,58 @@ public partial class ZoneEditorView : UserControl
             e.Handled = true;
         }
     }
+    
+    private void SetupToggleButtons()
+    {
+        // Zone Objects Toggle
+        var zoneObjectsToggle = this.FindControl<Button>("ZoneObjectsToggle");
+        var zoneObjectsList = this.FindControl<ListBox>("ZoneObjectsList");
+        var zoneObjectsArrow = this.FindControl<TextBlock>("ZoneObjectsArrow");
+        if (zoneObjectsToggle != null && zoneObjectsList != null && zoneObjectsArrow != null)
+        {
+            zoneObjectsToggle.Click += (s, e) => ToggleSection(zoneObjectsList, zoneObjectsArrow);
+        }
+        
+        // Collision Objects Toggle
+        var collisionObjectsToggle = this.FindControl<Button>("CollisionObjectsToggle");
+        var collisionObjectsList = this.FindControl<ListBox>("CollisionObjectsList");
+        var collisionObjectsArrow = this.FindControl<TextBlock>("CollisionObjectsArrow");
+        var collisionFilters = this.FindControl<Border>("CollisionFilters");
+        if (collisionObjectsToggle != null && collisionObjectsList != null && collisionObjectsArrow != null && collisionFilters != null)
+        {
+            collisionObjectsToggle.Click += (s, e) => ToggleSectionWithFilters(collisionObjectsList, collisionObjectsArrow, collisionFilters);
+        }
+        
+        // Paths & Spawns Toggle
+        var pathsToggle = this.FindControl<Button>("PathsToggle");
+        var pathsList = this.FindControl<ListBox>("PathsList");
+        var pathsArrow = this.FindControl<TextBlock>("PathsArrow");
+        if (pathsToggle != null && pathsList != null && pathsArrow != null)
+        {
+            pathsToggle.Click += (s, e) => ToggleSection(pathsList, pathsArrow);
+        }
+        
+        // NIF Geometry Toggle (starts collapsed)
+        var nifGeometryToggle = this.FindControl<Button>("NifGeometryToggle");
+        var nifGeometryList = this.FindControl<ListBox>("NifGeometryList");
+        var nifGeometryArrow = this.FindControl<TextBlock>("NifGeometryArrow");
+        if (nifGeometryToggle != null && nifGeometryList != null && nifGeometryArrow != null)
+        {
+            nifGeometryToggle.Click += (s, e) => ToggleSection(nifGeometryList, nifGeometryArrow);
+        }
+    }
+    
+    private void ToggleSection(ListBox listBox, TextBlock arrow)
+    {
+        listBox.IsVisible = !listBox.IsVisible;
+        arrow.Text = listBox.IsVisible ? "▼" : "►";
+    }
+    
+    private void ToggleSectionWithFilters(ListBox listBox, TextBlock arrow, Border filters)
+    {
+        listBox.IsVisible = !listBox.IsVisible;
+        filters.IsVisible = listBox.IsVisible;
+        arrow.Text = listBox.IsVisible ? "▼" : "►";
+    }
+    
 }

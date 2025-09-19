@@ -21,21 +21,25 @@ modification, are permitted provided that the following conditions are met:
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Windows.Input;
-using System.Threading.Tasks;
 using System.Linq;
-using ReactiveUI;
+using System.Reflection;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
 using Avalonia.Media;
+using ReactiveUI;
+using Avalonia.Controls.Shapes;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Imview.Core.Services;
 using Imcodec.ObjectProperty.TypeCache;
+using Imcodec.ObjectProperty;
 using Imcodec.Math;
 using Imcodec.BCD;
 using BcdGeomParams = Imcodec.BCD.GeomParams;
 using WizardTea.Core;
+using Imview.PacketReader.Services;
 
 namespace Imview.Core.ViewModels;
 
@@ -46,6 +50,10 @@ public class ZoneEditorViewModel : ViewModelBase
     private string _selectedZone = string.Empty;
     private ZoneVisualizationObject? _selectedObject = null;
     private CoreObjectInfo? _selectedCoreObject = null;
+    private PropertyClass? _selectedTemplate = null;
+    private CollisionVisualizationObject? _selectedCollision = null;
+    private PathVisualizationObject? _selectedPath = null;
+    private NifMeshVisualizationObject? _selectedMesh = null;
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
     private NifFile? _currentSceneFile = null;
@@ -71,9 +79,10 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool _showRayCollisions = true;
     
     private Canvas? _zoneObjectCanvas = null;
+    private ScrollViewer? _scrollViewer = null;
     
     // Viewport state for camera control
-    private double _zoomLevel = 1.0;
+    private double _zoomLevel = 0.5; // Default to 50% zoom
     private double _panX = 0.0;
     private double _panY = 0.0;
     private const double MinZoom = 0.1;
@@ -91,6 +100,9 @@ public class ZoneEditorViewModel : ViewModelBase
         LoadZoneCommand = ReactiveCommand.Create(LoadZone);
         SaveZoneCommand = ReactiveCommand.Create(SaveZone);
         SelectObjectCommand = ReactiveCommand.Create<ZoneVisualizationObject>(SelectObject);
+        SelectCollisionCommand = ReactiveCommand.Create<CollisionVisualizationObject>(SelectCollision);
+        SelectPathCommand = ReactiveCommand.Create<PathVisualizationObject>(SelectPath);
+        SelectMeshCommand = ReactiveCommand.Create<NifMeshVisualizationObject>(SelectMesh);
         SelectZoneCommand = ReactiveCommand.Create(SelectZone);
         
         // Initialize viewport commands
@@ -115,6 +127,16 @@ public class ZoneEditorViewModel : ViewModelBase
         
         _nifProcessor = new NifGeometryProcessor();
         
+        // Initialize viewport to show coordinates (0,0) in the center
+        // Also ensure the initial zoom transform is applied
+        InitializeViewportCenter();
+        
+        // Apply initial zoom transform (since field initialization doesn't trigger property setter)
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            UpdateCanvasTransform();
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+        
         LoadAvailableZones();
     }
 
@@ -138,13 +160,257 @@ public class ZoneEditorViewModel : ViewModelBase
     public ZoneVisualizationObject? SelectedObject
     {
         get => _selectedObject;
-        set => this.RaiseAndSetIfChanged(ref _selectedObject, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedObject, value);
+            
+            // Update SelectedCoreObject when a zone object is selected
+            if (value != null && _currentZoneData?.m_objectList != null)
+            {
+                SelectedCoreObject = _currentZoneData.m_objectList
+                    .FirstOrDefault(obj => obj != null && (ulong)obj.m_templateID == value.TemplateID);
+            }
+            else
+            {
+                SelectedCoreObject = null;
+            }
+            
+            // Clear other selections when selecting a zone object
+            if (value != null)
+            {
+                SelectedCollision = null;
+                SelectedPath = null;
+                SelectedMesh = null;
+            }
+            
+            // Notify property changes
+            this.RaisePropertyChanged(nameof(HasSelectedObject));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            NotifySelectionChanged();
+            
+            // Update visual selection in the viewport
+            UpdateVisualSelection();
+        }
     }
 
     public CoreObjectInfo? SelectedCoreObject
     {
         get => _selectedCoreObject;
-        set => this.RaiseAndSetIfChanged(ref _selectedCoreObject, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedCoreObject, value);
+            
+            // Load template data when a core object is selected
+            if (value != null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    var template = await LoadTemplateAsync(value);
+                    SelectedTemplate = template;
+                });
+            }
+            else
+            {
+                SelectedTemplate = null;
+            }
+        }
+    }
+    
+    public PropertyClass? SelectedTemplate
+    {
+        get => _selectedTemplate;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedTemplate, value);
+            this.RaisePropertyChanged(nameof(SelectedTemplateTypeName));
+            this.RaisePropertyChanged(nameof(SelectedGameObjectTemplate));
+            this.RaisePropertyChanged(nameof(SelectedGameObjectTemplateBehaviors));
+            this.RaisePropertyChanged(nameof(SelectedTemplateDisplayNameResolved));
+            this.RaisePropertyChanged(nameof(SelectedTemplateDisplayNameLocaleId));
+            this.RaisePropertyChanged(nameof(SelectedTemplateDescriptionResolved));
+            this.RaisePropertyChanged(nameof(SelectedTemplateDescriptionLocaleId));
+            this.RaisePropertyChanged(nameof(SelectedTemplateObjectNameResolved));
+            this.RaisePropertyChanged(nameof(SelectedTemplateObjectNameLocaleId));
+        }
+    }
+    
+    public string SelectedTemplateTypeName => SelectedTemplate?.GetType().Name ?? "Unknown";
+    
+    public GameObjectTemplate? SelectedGameObjectTemplate => SelectedTemplate as GameObjectTemplate;
+    
+    /// <summary>
+    /// Gets the resolved English display name from the locale service for the selected template.
+    /// Returns null if no template is selected or locale resolution fails.
+    /// </summary>
+    public string? SelectedTemplateDisplayNameResolved
+    {
+        get
+        {
+            var displayName = SelectedGameObjectTemplate?.m_displayName;
+            if (string.IsNullOrWhiteSpace(displayName) || !LocaleService.Instance.IsLoaded)
+            {
+                return null;
+            }
+            
+            return ResolveLocaleString(displayName);
+        }
+    }
+    
+    /// <summary>
+    /// Gets the raw locale ID for the selected template's display name.
+    /// </summary>
+    public string? SelectedTemplateDisplayNameLocaleId
+    {
+        get
+        {
+            var displayName = SelectedGameObjectTemplate?.m_displayName;
+            return string.IsNullOrWhiteSpace(displayName) ? null : displayName;
+        }
+    }
+    
+    /// <summary>
+    /// Gets the resolved English description from the locale service for the selected template.
+    /// Returns null if no template is selected or locale resolution fails.
+    /// </summary>
+    public string? SelectedTemplateDescriptionResolved
+    {
+        get
+        {
+            var description = SelectedGameObjectTemplate?.m_description;
+            if (string.IsNullOrWhiteSpace(description) || !LocaleService.Instance.IsLoaded)
+            {
+                return null;
+            }
+            
+            return ResolveLocaleString(description);
+        }
+    }
+    
+    /// <summary>
+    /// Gets the raw locale ID for the selected template's description.
+    /// </summary>
+    public string? SelectedTemplateDescriptionLocaleId
+    {
+        get
+        {
+            var description = SelectedGameObjectTemplate?.m_description;
+            return string.IsNullOrWhiteSpace(description) ? null : description;
+        }
+    }
+    
+    /// <summary>
+    /// Gets the resolved English object name from the locale service for the selected template.
+    /// Returns null if no template is selected or locale resolution fails.
+    /// </summary>
+    public string? SelectedTemplateObjectNameResolved
+    {
+        get
+        {
+            var objectName = SelectedGameObjectTemplate?.m_objectName;
+            if (string.IsNullOrWhiteSpace(objectName) || !LocaleService.Instance.IsLoaded)
+            {
+                return null;
+            }
+            
+            return ResolveLocaleString(objectName);
+        }
+    }
+    
+    /// <summary>
+    /// Gets the raw locale ID for the selected template's object name.
+    /// </summary>
+    public string? SelectedTemplateObjectNameLocaleId
+    {
+        get
+        {
+            var objectName = SelectedGameObjectTemplate?.m_objectName;
+            return string.IsNullOrWhiteSpace(objectName) ? null : objectName;
+        }
+    }
+    
+    public ObservableCollection<BehaviorWrapper> SelectedGameObjectTemplateBehaviors
+    {
+        get
+        {
+            var behaviors = new ObservableCollection<BehaviorWrapper>();
+            if (SelectedGameObjectTemplate?.m_behaviors != null)
+            {
+                foreach (var behavior in SelectedGameObjectTemplate.m_behaviors)
+                {
+                    if (behavior != null)
+                    {
+                        behaviors.Add(new BehaviorWrapper(behavior));
+                    }
+                }
+            }
+            return behaviors;
+        }
+    }
+
+    public CollisionVisualizationObject? SelectedCollision
+    {
+        get => _selectedCollision;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedCollision, value);
+            
+            // Clear other selections when selecting a collision object
+            if (value != null)
+            {
+                SelectedObject = null;
+                SelectedCoreObject = null;
+                SelectedPath = null;
+                SelectedMesh = null;
+            }
+            
+            this.RaisePropertyChanged(nameof(HasSelectedCollision));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            NotifySelectionChanged();
+        }
+    }
+
+    public PathVisualizationObject? SelectedPath
+    {
+        get => _selectedPath;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedPath, value);
+            
+            // Clear other selections when selecting a path object
+            if (value != null)
+            {
+                SelectedObject = null;
+                SelectedCoreObject = null;
+                SelectedCollision = null;
+                SelectedMesh = null;
+            }
+            
+            this.RaisePropertyChanged(nameof(HasSelectedPath));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            NotifySelectionChanged();
+        }
+    }
+
+    public NifMeshVisualizationObject? SelectedMesh
+    {
+        get => _selectedMesh;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedMesh, value);
+            
+            // Clear other selections when selecting a mesh object
+            if (value != null)
+            {
+                SelectedObject = null;
+                SelectedCoreObject = null;
+                SelectedCollision = null;
+                SelectedPath = null;
+            }
+            
+            this.RaisePropertyChanged(nameof(HasSelectedMesh));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            NotifySelectionChanged();
+        }
     }
 
     public bool IsLoading
@@ -285,6 +551,10 @@ public class ZoneEditorViewModel : ViewModelBase
     }
 
     public bool HasSelectedObject => SelectedObject != null;
+    public bool HasSelectedCollision => SelectedCollision != null;
+    public bool HasSelectedPath => SelectedPath != null;
+    public bool HasSelectedMesh => SelectedMesh != null;
+    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh;
 
     // Computed properties for filter counts
     public int VisibleCollisionCount => CollisionVisualizationObjects.Count(ShouldShowCollision);
@@ -330,17 +600,61 @@ public class ZoneEditorViewModel : ViewModelBase
 
     public string ZoomDisplayText => $"Zoom: {ZoomLevel:P0}";
 
-    // Expose Vector3 components for XAML binding
+    // Expose Vector3 components for XAML binding (Zone Objects)
     public float LocationX => SelectedCoreObject?.m_location.X ?? 0f;
     public float LocationY => SelectedCoreObject?.m_location.Y ?? 0f;  
     public float LocationZ => SelectedCoreObject?.m_location.Z ?? 0f;
     public float OrientationX => SelectedCoreObject?.m_orientation.X ?? 0f;
     public float OrientationY => SelectedCoreObject?.m_orientation.Y ?? 0f;
     public float OrientationZ => SelectedCoreObject?.m_orientation.Z ?? 0f;
+    
+    // Unified transform properties for current selected object
+    public float CurrentLocationX 
+    {
+        get
+        {
+            if (SelectedCoreObject != null) return SelectedCoreObject.m_location.X;
+            if (SelectedCollision != null) return SelectedCollision.X;
+            return 0f;
+        }
+    }
+    
+    public float CurrentLocationY 
+    {
+        get
+        {
+            if (SelectedCoreObject != null) return SelectedCoreObject.m_location.Y;
+            if (SelectedCollision != null) return SelectedCollision.Y;
+            return 0f;
+        }
+    }
+    
+    public float CurrentLocationZ 
+    {
+        get
+        {
+            if (SelectedCoreObject != null) return SelectedCoreObject.m_location.Z;
+            if (SelectedCollision != null) return SelectedCollision.Z;
+            return 0f;
+        }
+    }
+    
+    public float CurrentScale 
+    {
+        get
+        {
+            if (SelectedCoreObject != null) return SelectedCoreObject.m_fScale;
+            if (SelectedCollision != null) return SelectedCollision.Scale;
+            return 1f;
+        }
+    }
 
     public ICommand LoadZoneCommand { get; }
     public ICommand SaveZoneCommand { get; }
     public ICommand SelectObjectCommand { get; }
+    public ICommand SelectCollisionCommand { get; }
+    public ICommand SelectPathCommand { get; }
+    public ICommand SelectMeshCommand { get; }
     public ICommand SelectZoneCommand { get; }
     
     // Viewport commands
@@ -355,6 +669,11 @@ public class ZoneEditorViewModel : ViewModelBase
     public void SetZoneObjectCanvas(Canvas canvas)
     {
         _zoneObjectCanvas = canvas;
+    }
+    
+    public void SetScrollViewer(ScrollViewer scrollViewer)
+    {
+        _scrollViewer = scrollViewer;
     }
 
     private void SelectZone()
@@ -849,29 +1168,91 @@ public class ZoneEditorViewModel : ViewModelBase
 
     private void ResetView()
     {
-        ZoomLevel = 1.0;
-        PanX = 0.0;
-        PanY = 0.0;
+        ZoomLevel = 0.5; // Reset to 50% zoom
+        InitializeViewportCenter();
+    }
+    
+    public void InitializeViewportCenter()
+    {
+        if (_scrollViewer == null) return;
+        
+        // Use dispatcher to ensure ScrollViewer is properly initialized
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            // Center the ScrollViewer on game coordinates (0,0)
+            // Game coordinate (0,0) is at canvas position (10000, 10000)
+            // Get actual viewport size or use reasonable defaults
+            var viewportWidth = _scrollViewer.Viewport.Width > 0 ? _scrollViewer.Viewport.Width : 800;
+            var viewportHeight = _scrollViewer.Viewport.Height > 0 ? _scrollViewer.Viewport.Height : 600;
+            
+            // Center by scrolling to that position minus half the viewport size
+            var scrollToX = Math.Max(0, 10000 - (viewportWidth / 2));
+            var scrollToY = Math.Max(0, 10000 - (viewportHeight / 2));
+            
+            Console.WriteLine($"Centering viewport: scrolling to ({scrollToX:F1}, {scrollToY:F1}), viewport size: ({viewportWidth:F1}, {viewportHeight:F1})");
+            _scrollViewer.Offset = new Vector(scrollToX, scrollToY);
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+    
+    private void UpdateVisualSelection()
+    {
+        if (_zoneObjectCanvas == null)
+            return;
+            
+        // Update selection highlighting for all zone objects
+        foreach (var child in _zoneObjectCanvas.Children.OfType<Border>())
+        {
+            if (child.Tag is ZoneVisualizationObject obj)
+            {
+                // Highlight selected object
+                if (SelectedObject != null && obj.TemplateID == SelectedObject.TemplateID)
+                {
+                    child.BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)); // Yellow border for selected
+                    child.BorderThickness = new Avalonia.Thickness(2);
+                }
+                else
+                {
+                    child.BorderBrush = Brushes.White; // Default white border
+                    child.BorderThickness = new Avalonia.Thickness(1);
+                }
+            }
+        }
     }
 
     private void PanUp()
     {
-        PanY -= PanStep / ZoomLevel;
+        if (_scrollViewer != null)
+        {
+            var newOffset = _scrollViewer.Offset + new Vector(0, -PanStep);
+            _scrollViewer.Offset = newOffset;
+        }
     }
 
     private void PanDown()
     {
-        PanY += PanStep / ZoomLevel;
+        if (_scrollViewer != null)
+        {
+            var newOffset = _scrollViewer.Offset + new Vector(0, PanStep);
+            _scrollViewer.Offset = newOffset;
+        }
     }
 
     private void PanLeft()
     {
-        PanX -= PanStep / ZoomLevel;
+        if (_scrollViewer != null)
+        {
+            var newOffset = _scrollViewer.Offset + new Vector(-PanStep, 0);
+            _scrollViewer.Offset = newOffset;
+        }
     }
 
     private void PanRight()
     {
-        PanX += PanStep / ZoomLevel;
+        if (_scrollViewer != null)
+        {
+            var newOffset = _scrollViewer.Offset + new Vector(PanStep, 0);
+            _scrollViewer.Offset = newOffset;
+        }
     }
 
     public void HandleMouseWheel(double delta, Avalonia.Point mousePosition)
@@ -892,20 +1273,21 @@ public class ZoneEditorViewModel : ViewModelBase
 
     public void HandleMouseDrag(double deltaX, double deltaY)
     {
-        PanX += deltaX;
-        PanY += deltaY;
+        if (_scrollViewer != null)
+        {
+            var newOffset = _scrollViewer.Offset + new Vector(-deltaX, -deltaY);
+            _scrollViewer.Offset = newOffset;
+        }
     }
 
-    private void UpdateCanvasTransform()
+    public void UpdateCanvasTransform()
     {
-        if (_zoneObjectCanvas == null)
-            return;
-
-        var transform = new TransformGroup();
-        transform.Children.Add(new TranslateTransform(PanX, PanY));
-        transform.Children.Add(new ScaleTransform(ZoomLevel, ZoomLevel));
-        
-        _zoneObjectCanvas.RenderTransform = transform;
+        if (_zoneObjectCanvas?.Parent is Canvas mainCanvas)
+        {
+            // Apply zoom to the main canvas
+            var scaleTransform = new ScaleTransform(ZoomLevel, ZoomLevel);
+            mainCanvas.RenderTransform = scaleTransform;
+        }
         
         // Update zoom display
         this.RaisePropertyChanged(nameof(ZoomDisplayText));
@@ -964,6 +1346,19 @@ public class ZoneEditorViewModel : ViewModelBase
                 // Tag for identification
                 border.Tag = obj;
                 
+                // Add click handler for selection
+                border.PointerPressed += (sender, e) => {
+                    if (e.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
+                    {
+                        // Select this object in the hierarchy and properties
+                        SelectedObject = obj;
+                        e.Handled = true;
+                    }
+                };
+                
+                // Set cursor to indicate clickable
+                border.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+                
                 // Set initial visibility
                 border.IsVisible = ShowZoneObjects;
                 
@@ -983,6 +1378,9 @@ public class ZoneEditorViewModel : ViewModelBase
         }
         
         Console.WriteLine($"Created {_zoneObjectCanvas.Children.Count} visual objects on canvas");
+        
+        // Update visual selection highlights
+        UpdateVisualSelection();
         
         // Create collision visuals if available and enabled
         CreateCollisionVisuals();
@@ -1591,6 +1989,8 @@ public class ZoneEditorViewModel : ViewModelBase
 
     private void SelectObject(ZoneVisualizationObject visualObj)
     {
+        ClearAllSelections();
+        
         SelectedObject = visualObj;
         
         // Find the corresponding CoreObjectInfo
@@ -1600,14 +2000,137 @@ public class ZoneEditorViewModel : ViewModelBase
                 .FirstOrDefault(obj => obj != null && (ulong)obj.m_templateID == visualObj.TemplateID);
         }
         
-        // Notify UI of property changes
+        NotifySelectionChanged();
+    }
+    
+    private void SelectCollision(CollisionVisualizationObject collision)
+    {
+        ClearAllSelections();
+        SelectedCollision = collision;
+        NotifySelectionChanged();
+    }
+    
+    private void SelectPath(PathVisualizationObject path)
+    {
+        ClearAllSelections();
+        SelectedPath = path;
+        NotifySelectionChanged();
+    }
+    
+    private void SelectMesh(NifMeshVisualizationObject mesh)
+    {
+        ClearAllSelections();
+        SelectedMesh = mesh;
+        NotifySelectionChanged();
+    }
+    
+    private void ClearAllSelections()
+    {
+        SelectedObject = null;
+        SelectedCoreObject = null;
+        SelectedTemplate = null;
+        SelectedCollision = null;
+        SelectedPath = null;
+        SelectedMesh = null;
+    }
+    
+    private void NotifySelectionChanged()
+    {
+        // Notify UI of property changes for all transform properties
         this.RaisePropertyChanged(nameof(HasSelectedObject));
+        this.RaisePropertyChanged(nameof(HasSelectedCollision));
+        this.RaisePropertyChanged(nameof(HasSelectedPath));
+        this.RaisePropertyChanged(nameof(HasSelectedMesh));
+        this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
         this.RaisePropertyChanged(nameof(LocationX));
         this.RaisePropertyChanged(nameof(LocationY));
         this.RaisePropertyChanged(nameof(LocationZ));
         this.RaisePropertyChanged(nameof(OrientationX));
         this.RaisePropertyChanged(nameof(OrientationY));
         this.RaisePropertyChanged(nameof(OrientationZ));
+        this.RaisePropertyChanged(nameof(CurrentLocationX));
+        this.RaisePropertyChanged(nameof(CurrentLocationY));
+        this.RaisePropertyChanged(nameof(CurrentLocationZ));
+        this.RaisePropertyChanged(nameof(CurrentScale));
+        this.RaisePropertyChanged(nameof(SelectedTemplate));
+    }
+    
+    /// <summary>
+    /// Loads the template data for the given CoreObjectInfo using the TemplateManifestService
+    /// </summary>
+    /// <param name="coreObject">The core object to load template for</param>
+    /// <returns>The loaded template, or null if not found or failed to load</returns>
+    private async Task<PropertyClass?> LoadTemplateAsync(CoreObjectInfo coreObject)
+    {
+        try
+        {
+            if (coreObject == null)
+                return null;
+
+            // First, ensure template manifest is loaded
+            var manifestService = TemplateManifestService.Instance;
+            if (!manifestService.IsLoaded)
+            {
+                // Try to load template manifest from Root.wad
+                var templateManifestData = await RootWadService.Instance.GetFileAsync("TemplateManifest.xml");
+                if (templateManifestData == null || !templateManifestData.HasValue)
+                {
+                    Console.WriteLine("Failed to load TemplateManifest.xml from Root.wad");
+                    return null;
+                }
+                
+                if (!manifestService.LoadFromFileData(templateManifestData.Value))
+                {
+                    Console.WriteLine("Failed to parse TemplateManifest.xml");
+                    return null;
+                }
+            }
+
+            // Find the template location by template ID
+            var templateLocations = manifestService.GetAllTemplateLocations();
+            var templateLocation = templateLocations.FirstOrDefault(t => t.m_id == coreObject.m_templateID);
+            
+            if (templateLocation == null)
+            {
+                Console.WriteLine($"Template with ID {coreObject.m_templateID} not found in manifest");
+                return null;
+            }
+
+            Console.WriteLine($"Found template: {templateLocation.m_filename} for template ID {coreObject.m_templateID}");
+
+            // Load the template file from Root.wad
+            var templateData = await RootWadService.Instance.GetFileAsync(templateLocation.m_filename);
+            if (templateData == null || !templateData.HasValue)
+            {
+                Console.WriteLine($"Failed to load template file: {templateLocation.m_filename}");
+                return null;
+            }
+
+            // Try to deserialize as GameObjectTemplate first, then fallback to PropertyClass
+            var serializer = new BindSerializer();
+            
+            // First try GameObjectTemplate specifically
+            if (serializer.Deserialize<GameObjectTemplate>(templateData.Value.ToArray(), 1, out var gameObjectTemplate) && gameObjectTemplate != null)
+            {
+                Console.WriteLine($"Successfully loaded GameObjectTemplate: {gameObjectTemplate.GetType().Name} for {coreObject.m_zoneTag ?? "Unknown"}");
+                return gameObjectTemplate;
+            }
+            
+            // Fallback to generic PropertyClass deserialization
+            if (serializer.Deserialize<PropertyClass>(templateData.Value.ToArray(), 1, out var template) && template != null)
+            {
+                Console.WriteLine($"Successfully loaded template as PropertyClass: {template.GetType().Name} for {coreObject.m_zoneTag ?? "Unknown"}");
+                return template;
+            }
+            
+            Console.WriteLine($"Failed to deserialize template from {templateLocation.m_filename}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading template for object {coreObject.m_zoneTag}: {ex.Message}");
+            return null;
+        }
     }
 
     private string DetermineObjectType(CoreObjectInfo obj)
@@ -1689,6 +2212,37 @@ public class ZoneEditorViewModel : ViewModelBase
                 name.Contains("guard") || 
                 name.Contains("citizen") ||
                 char.IsUpper(name[0])); // Names starting with uppercase are likely NPCs
+    }
+    
+    /// <summary>
+    /// Resolves a locale string reference (e.g., "WC-NPCs_00002516") to its English text.
+    /// </summary>
+    /// <param name="localeReference">The locale reference string.</param>
+    /// <returns>The resolved English text, or null if not found.</returns>
+    private string? ResolveLocaleString(string localeReference)
+    {
+        if (string.IsNullOrEmpty(localeReference) || !LocaleService.Instance.IsLoaded)
+        {
+            return null;
+        }
+
+        // Split the locale reference into category and key (e.g., "WC-NPCs_00002516")
+        var underscoreIndex = localeReference.LastIndexOf('_');
+        if (underscoreIndex == -1)
+        {
+            return null; // Invalid format
+        }
+
+        var category = localeReference.Substring(0, underscoreIndex);
+        var key = localeReference.Substring(underscoreIndex + 1);
+
+        // Pad the key to 8 digits if it's not already and is all numeric
+        if (key.Length < 8 && key.All(char.IsDigit))
+        {
+            key = key.PadLeft(8, '0');
+        }
+
+        return LocaleService.Instance.GetString(category, key);
     }
     
     private IBrush GetObjectColorBrush(string objectType)
@@ -1834,4 +2388,83 @@ public class PathVisualizationObject
     public string NodeInfo => $"Nodes: {Nodes.Count}";
     public string SpawnInfo => SpawnIds.Count > 0 ? $"Used by {SpawnIds.Count} spawn(s)" : "Unused path";
     public bool HasNodes => Nodes.Count > 0;
+}
+
+public class BehaviorWrapper
+{
+    public object? OriginalBehavior { get; }
+    public string TypeName { get; }
+    public string FormattedJson { get; }
+    
+    public BehaviorWrapper(object? behavior)
+    {
+        OriginalBehavior = behavior;
+        
+        if (behavior == null)
+        {
+            TypeName = "Unknown";
+            FormattedJson = "// Behavior object is null";
+            return;
+        }
+        
+        TypeName = behavior.GetType().Name;
+        
+        try
+        {
+            // Try to serialize as JSON with pretty formatting
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                IncludeFields = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true
+            };
+            FormattedJson = JsonSerializer.Serialize(behavior, behavior.GetType(), options);
+        }
+        catch (Exception ex)
+        {
+            // If JSON serialization fails, try a simple property-by-property approach
+            try
+            {
+                var properties = behavior.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("{");
+                sb.AppendLine($"  \"_type\": \"{behavior.GetType().Name}\",");
+                
+                foreach (var prop in properties)
+                {
+                    try
+                    {
+                        var value = prop.GetValue(behavior);
+                        var valueStr = value?.ToString() ?? "null";
+                        
+                        // Escape quotes in the value
+                        valueStr = valueStr.Replace("\"", "\\\"");
+                        
+                        sb.AppendLine($"  \"{prop.Name}\": \"{valueStr}\",");
+                    }
+                    catch (Exception propEx)
+                    {
+                        sb.AppendLine($"  \"{prop.Name}\": \"<Error: {propEx.Message}>\",");
+                    }
+                }
+                
+                // Remove trailing comma and close
+                var result = sb.ToString().TrimEnd(',', '\n', '\r');
+                if (result.EndsWith(","))
+                {
+                    result = result.Substring(0, result.Length - 1) + "\n";
+                }
+                result += "\n}";
+                FormattedJson = result;
+            }
+            catch (Exception fallbackEx)
+            {
+                // Final fallback to ToString
+                FormattedJson = $"// JSON Serialization Failed: {ex.Message}\n// Property Reflection Failed: {fallbackEx.Message}\n\n{behavior}";
+            }
+        }
+    }
 }

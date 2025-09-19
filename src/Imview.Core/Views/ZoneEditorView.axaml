@@ -17,7 +17,8 @@
     <Grid Background="#2B2B30">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="350" />
+            <ColumnDefinition Width="5" />
+            <ColumnDefinition Width="650" MinWidth="400" MaxWidth="1000" />
         </Grid.ColumnDefinitions>
 
         <!-- Main Zone View Area (Left Side) -->
@@ -167,6 +168,76 @@
                             </StackPanel>
                         </Border>
                         
+                        <!-- Visibility Filter Dropdown (Top Right) -->
+                        <Border Background="#2B2B30" 
+                                CornerRadius="3" 
+                                Padding="8" 
+                                HorizontalAlignment="Right" 
+                                VerticalAlignment="Top" 
+                                Margin="10" 
+                                Opacity="0.95"
+                                IsVisible="{Binding !IsLoading}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Visibility" 
+                                         FontSize="10" 
+                                         FontWeight="Bold"
+                                         Foreground="White" 
+                                         HorizontalAlignment="Center"/>
+                                
+                                <!-- Main Object Type Filters -->
+                                <StackPanel Spacing="2">
+                                    <CheckBox Content="Zone Objects" 
+                                            IsChecked="{Binding ShowZoneObjects}" 
+                                            Foreground="White" 
+                                            FontSize="9"/>
+                                    <CheckBox Content="Collisions" 
+                                            IsChecked="{Binding ShowCollisions}" 
+                                            Foreground="#00FFFF" 
+                                            FontSize="9"/>
+                                    <CheckBox Content="NIF Geometry" 
+                                            IsChecked="{Binding ShowNifGeometry}" 
+                                            Foreground="#FFFF00" 
+                                            FontSize="9"/>
+                                    <CheckBox Content="Paths &amp; Spawns" 
+                                            IsChecked="{Binding ShowSpawns}" 
+                                            Foreground="#FF8C00" 
+                                            FontSize="9"/>
+                                </StackPanel>
+                                
+                                <!-- Collision Shape Filters -->
+                                <Border BorderThickness="1" 
+                                        BorderBrush="#555555" 
+                                        Background="#1A1A1A" 
+                                        CornerRadius="2" 
+                                        Padding="4" 
+                                        IsVisible="{Binding ShowCollisions}">
+                                    <StackPanel Spacing="1">
+                                        <TextBlock Text="Collision Shapes" 
+                                                 FontSize="8" 
+                                                 FontWeight="Bold" 
+                                                 Foreground="#CCCCCC" 
+                                                 HorizontalAlignment="Center"/>
+                                        <CheckBox Content="Box" 
+                                                IsChecked="{Binding ShowBoxCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
+                                        <CheckBox Content="Sphere" 
+                                                IsChecked="{Binding ShowSphereCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
+                                        <CheckBox Content="Cylinder" 
+                                                IsChecked="{Binding ShowCylinderCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
+                                        <CheckBox Content="Mesh" 
+                                                IsChecked="{Binding ShowMeshCollisions}" 
+                                                FontSize="8" 
+                                                Foreground="#CCCCCC"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        
                         <!-- Visualization info overlay -->
                         <StackPanel HorizontalAlignment="Right" 
                                   VerticalAlignment="Bottom" 
@@ -206,444 +277,701 @@
                 </Border>
             </Grid>
         </Border>
+        
+        <!-- GridSplitter for resizable panels -->
+        <GridSplitter Grid.Column="1" Background="#3F3F46" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeDirection="Columns"/>
 
-        <!-- Right Panel - Object Inspector -->
-        <Border Grid.Column="1" 
-                Background="#2B2B30" 
-                BorderBrush="#3F3F46" 
-                BorderThickness="1,1,1,1"
-                Margin="0,5,5,5">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="15" Margin="15">
-
-                    <!-- Visualization Filters -->
-                    <Expander Header="Visualization Filters" 
-                            IsExpanded="True"
-                            Background="#383838">
-                        <StackPanel Spacing="12" Margin="10">
-                            
-                            <!-- Zone Objects Filter -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Zone Objects" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="White"/>
-                                
-                                <CheckBox Content="Show Zone Objects"
-                                        IsChecked="{Binding ShowZoneObjects}"
-                                        Foreground="White"
-                                        Margin="10,0,0,0"/>
-                            </StackPanel>
-                            
-                            <!-- NIF Geometry Filter -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Zone Geometry" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="#FFFF00"/>
-                                
-                                <CheckBox Content="Show NIF Geometry"
-                                        IsChecked="{Binding ShowNifGeometry}"
-                                        Foreground="#FFFF00"
-                                        Margin="10,0,0,0"/>
-                            </StackPanel>
-                            
-                            <!-- Spawn and Path Filters -->
-                            <StackPanel Spacing="8">
-<TextBlock Text="Mob Spawns &amp; Paths" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="#FF8C00"/>
-                                
-                                <CheckBox Content="Show Spawn Points"
-                                        IsChecked="{Binding ShowSpawns}"
-                                        Foreground="#FF8C00"
-                                        Margin="10,0,0,0"/>
-                                        
-                                <CheckBox Content="Show Mob Paths"
-                                        IsChecked="{Binding ShowPaths}"
-                                        Foreground="#FFFF00"
-                                        Margin="10,0,0,0"/>
-                                        
-                                <CheckBox Content="Show Path Nodes"
-                                        IsChecked="{Binding ShowNodes}"
-                                        Foreground="#00FF00"
-                                        Margin="10,0,0,0"/>
-                            </StackPanel>
-                            
-                            <!-- Collision Objects Filter -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Collision Objects" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="#00FFFF"/>
-                                
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox Content="Show All Collisions"
-                                            IsChecked="{Binding ShowCollisions}"
-                                            Foreground="#00FFFF"
-                                            Margin="10,0,0,0"/>
-                                    <TextBlock Text="{Binding VisibleCollisionCount, StringFormat='({0} visible)'}"
-                                             Foreground="#888888"
-                                             FontSize="10"
-                                             VerticalAlignment="Center"
-                                             Margin="5,0,0,0"/>
-                                </StackPanel>
-                                
-                                <!-- Collision Shape Filters -->
-                                <StackPanel Spacing="4" Margin="20,5,0,0">
-                                    <TextBlock Text="Filter by Collision Shape:" 
-                                             Foreground="#CCCCCC" 
-                                             FontSize="11"/>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Box"
-                                                IsChecked="{Binding ShowBoxCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding BoxCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Sphere"
-                                                IsChecked="{Binding ShowSphereCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding SphereCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Cylinder"
-                                                IsChecked="{Binding ShowCylinderCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding CylinderCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Tube"
-                                                IsChecked="{Binding ShowTubeCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding TubeCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Plane"
-                                                IsChecked="{Binding ShowPlaneCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding PlaneCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Mesh"
-                                                IsChecked="{Binding ShowMeshCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding MeshCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="Ray"
-                                                IsChecked="{Binding ShowRayCollisions}"
-                                                Foreground="#AAAAAA"
-                                                FontSize="11"
-                                                Margin="5,2,0,0"/>
-                                        <TextBlock Text="{Binding RayCollisionCount, StringFormat='({0})'}"
-                                                 Foreground="#666666"
-                                                 FontSize="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="3,0,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </StackPanel>
-                        </StackPanel>
-                    </Expander>
-
-                    <!-- Selected Object Details -->
-                    <Expander Header="Selected Object" 
-                            IsExpanded="True"
-                            Background="#383838"
-                            IsVisible="{Binding HasSelectedObject}">
-                        <StackPanel Spacing="12" Margin="10">
-                            <!-- Basic Info -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Object Information" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="White"/>
-                                
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Name:" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBox Text="{Binding SelectedCoreObject.m_zoneTag}" Height="25"/>
-                                </StackPanel>
-                                
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Template ID:" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBox Text="{Binding SelectedCoreObject.m_templateID}" Height="25" IsReadOnly="True"/>
-                                </StackPanel>
-                                
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Object ID:" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBox Text="{Binding SelectedCoreObject.m_nObjectID}" Height="25"/>
-                                </StackPanel>
-                                
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Type:" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBox Text="{Binding SelectedObject.Type}" Height="25" IsReadOnly="True"/>
-                                </StackPanel>
-                            </StackPanel>
-                            
-                            <!-- Location -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Location" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="White"/>
-                                
-                                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,5,0,0">
-                                    <TextBlock Text="X:" Grid.Row="0" Grid.Column="0" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBlock Text="Y:" Grid.Row="0" Grid.Column="1" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBlock Text="Z:" Grid.Row="0" Grid.Column="2" Foreground="#CCCCCC" FontSize="11"/>
-                                    
-                                    <TextBox Text="{Binding LocationX}" 
-                                           Grid.Row="1" Grid.Column="0" 
-                                           Height="25" Margin="0,2,5,0"/>
-                                    <TextBox Text="{Binding LocationY}" 
-                                           Grid.Row="1" Grid.Column="1" 
-                                           Height="25" Margin="2,2,2,0"/>
-                                    <TextBox Text="{Binding LocationZ}" 
-                                           Grid.Row="1" Grid.Column="2" 
-                                           Height="25" Margin="5,2,0,0"/>
-                                </Grid>
-                            </StackPanel>
-                            
-                            <!-- Orientation -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Orientation" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="White"/>
-                                
-                                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,5,0,0">
-                                    <TextBlock Text="Pitch:" Grid.Row="0" Grid.Column="0" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBlock Text="Yaw:" Grid.Row="0" Grid.Column="1" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBlock Text="Roll:" Grid.Row="0" Grid.Column="2" Foreground="#CCCCCC" FontSize="11"/>
-                                    
-                                    <TextBox Text="{Binding OrientationX}" 
-                                           Grid.Row="1" Grid.Column="0" 
-                                           Height="25" Margin="0,2,5,0"/>
-                                    <TextBox Text="{Binding OrientationY}" 
-                                           Grid.Row="1" Grid.Column="1" 
-                                           Height="25" Margin="2,2,2,0"/>
-                                    <TextBox Text="{Binding OrientationZ}" 
-                                           Grid.Row="1" Grid.Column="2" 
-                                           Height="25" Margin="5,2,0,0"/>
-                                </Grid>
-                            </StackPanel>
-                            
-                            <!-- Scale -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Scale:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBox Text="{Binding SelectedCoreObject.m_fScale}" Height="25"/>
-                            </StackPanel>
-                            
-                            <!-- Advanced Properties -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Advanced Properties" 
-                                         FontWeight="Bold" 
-                                         FontSize="14"
-                                         Foreground="White"/>
-                                
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Start State:" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBox Text="{Binding SelectedCoreObject.m_startState}" Height="25"/>
-                                </StackPanel>
-                                
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Override Name:" Foreground="#CCCCCC" FontSize="11"/>
-                                    <TextBox Text="{Binding SelectedCoreObject.m_overrideName}" Height="25"/>
-                                </StackPanel>
-                                
-                                <CheckBox Content="Global Dynamic" 
-                                        IsChecked="{Binding SelectedCoreObject.m_globalDynamic}"
-                                        Foreground="White"/>
-                                
-                                <CheckBox Content="Undetectable" 
-                                        IsChecked="{Binding SelectedCoreObject.m_bUndetectable}"
-                                        Foreground="White"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Expander>
-
-                    <!-- No Selection Message -->
-                    <Border Background="#383838"
-                          CornerRadius="5"
-                          Padding="20"
-                          IsVisible="{Binding !HasSelectedObject}">
-                        <StackPanel Spacing="10" HorizontalAlignment="Center">
-                            <TextBlock Text="No Object Selected" 
-                                     FontSize="16"
-                                     FontWeight="Bold"
-                                     Foreground="#AAAAAA"
-                                     HorizontalAlignment="Center"/>
-                            <TextBlock Text="Click on an object in the zone view to inspect its properties" 
-                                     FontSize="12"
-                                     Foreground="#888888"
-                                     TextWrapping="Wrap"
-                                     HorizontalAlignment="Center"
-                                     TextAlignment="Center"/>
-                        </StackPanel>
+        <!-- Right Panel - Unity-like Editor Layout -->
+        <Grid Grid.Column="2" Margin="0,5,5,5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="280" />
+                <ColumnDefinition Width="5" />
+                <ColumnDefinition Width="*" MinWidth="320" />
+            </Grid.ColumnDefinitions>
+            
+            <!-- Scene Hierarchy Panel (Left) -->
+            <Border Grid.Column="0" 
+                    Background="#2B2B30" 
+                    BorderBrush="#3F3F46" 
+                    BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Scene Hierarchy Header -->
+                    <Border Grid.Row="0" 
+                            Background="#383838" 
+                            BorderBrush="#3F3F46"
+                            BorderThickness="0,0,0,1"
+                            Padding="8,6">
+                        <TextBlock Text="Scene Hierarchy" 
+                                 FontWeight="Bold" 
+                                 FontSize="13"
+                                 Foreground="White"/>
                     </Border>
-
-                    <!-- Scene Hierarchy -->
-                    <Expander Header="Scene Hierarchy" 
-                            IsExpanded="True"
-                            Background="#383838">
-                        <StackPanel Spacing="10" Margin="10">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Zone Objects:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding ZoneVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
+                    
+                    <!-- Hierarchy Content -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="0">
+                            
+                            <!-- Zone Objects -->
+                            <StackPanel Background="Transparent" Margin="0">
+                                <!-- Zone Objects Header -->
+                                <Button Background="#393939" Padding="4,1" Margin="0" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        BorderThickness="0" CornerRadius="0"
+                                        Name="ZoneObjectsToggle">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="▼" Foreground="#AAAAAA" FontSize="8" VerticalAlignment="Center" Name="ZoneObjectsArrow"/>
+                                        <TextBlock Grid.Column="1" Text="Zone Objects" Foreground="White" FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ZoneVisualizationObjects.Count}" Foreground="#888888" FontSize="9" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                                
+                                <!-- Zone Objects List -->
+                                <ListBox ItemsSource="{Binding ZoneVisualizationObjects}" Margin="0" Name="ZoneObjectsList"
+                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                                         SelectedItem="{Binding SelectedObject, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="1" Text="○" Foreground="White" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="White" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:selected">
+                                            <Setter Property="Background" Value="#3F5F8F"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:pointerover">
+                                            <Setter Property="Background" Value="#3A3A3A"/>
+                                        </Style>
+                                    </ListBox.Styles>
+                                </ListBox>
                             </StackPanel>
                             
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Collision Objects:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding CollisionVisualizationObjects.Count}" Foreground="#00FFFF" FontWeight="Medium"/>
+                            <!-- Collision Objects -->
+                            <StackPanel Background="Transparent" Margin="0">
+                                <!-- Collision Objects Header -->
+                                <Button Background="#393939" Padding="4,1" Margin="0" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        BorderThickness="0" CornerRadius="0"
+                                        Name="CollisionObjectsToggle">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="▼" Foreground="#AAAAAA" FontSize="8" VerticalAlignment="Center" Name="CollisionObjectsArrow"/>
+                                        <TextBlock Grid.Column="1" Text="Collision Objects" Foreground="#00FFFF" FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding CollisionVisualizationObjects.Count}" Foreground="#888888" FontSize="9" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                                
+                                
+                                <!-- Collision Objects List -->
+                                <ListBox ItemsSource="{Binding CollisionVisualizationObjects}" Margin="0" Name="CollisionObjectsList"
+                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                                         SelectedItem="{Binding SelectedCollision, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="1" Text="◇" Foreground="#00FFFF" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="#00FFFF" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding GeometryType}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:selected">
+                                            <Setter Property="Background" Value="#1F4F6F"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:pointerover">
+                                            <Setter Property="Background" Value="#2A3A3A"/>
+                                        </Style>
+                                    </ListBox.Styles>
+                                </ListBox>
                             </StackPanel>
                             
-                            <ScrollViewer Height="300" VerticalScrollBarVisibility="Auto">
-                                <StackPanel Spacing="5">
-                                    <!-- Zone Objects -->
-                                    <TextBlock Text="Zone Objects" Foreground="#CCCCCC" FontSize="10" FontWeight="Bold"/>
-                                    <ListBox ItemsSource="{Binding ZoneVisualizationObjects}"
-                                           Background="Transparent"
-                                           BorderThickness="0">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#2A2A2A" 
-                                                      Margin="2" 
-                                                      Padding="8,4"
-                                                      CornerRadius="3">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Name}" 
-                                                                 Foreground="White" 
-                                                                 FontWeight="Medium"
-                                                                 FontSize="11"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="10">
-                                                            <TextBlock Text="{Binding Type}" 
-                                                                     Foreground="#AAAAAA" 
-                                                                     FontSize="10"/>
-                                                            <TextBlock Text="{Binding CoordinateText}" 
-                                                                     Foreground="#888888" 
-                                                                     FontSize="10"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                            <!-- Paths &amp; Spawns -->
+                            <StackPanel Background="Transparent" Margin="0">
+                                <!-- Paths &amp; Spawns Header -->
+                                <Button Background="#393939" Padding="4,1" Margin="0" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        BorderThickness="0" CornerRadius="0"
+                                        Name="PathsToggle">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="▼" Foreground="#AAAAAA" FontSize="8" VerticalAlignment="Center" Name="PathsArrow"/>
+                                        <TextBlock Grid.Column="1" Text="Paths &amp; Spawns" Foreground="#FF8C00" FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding PathVisualizationObjects.Count}" Foreground="#888888" FontSize="9" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                                
+                                <!-- Paths &amp; Spawns List -->
+                                <ListBox ItemsSource="{Binding PathVisualizationObjects}" Margin="0" Name="PathsList"
+                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                                         SelectedItem="{Binding SelectedPath, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="1" Text="→" Foreground="#FF8C00" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="#FF8C00" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding NodeInfo}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:selected">
+                                            <Setter Property="Background" Value="#4F3F1F"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:pointerover">
+                                            <Setter Property="Background" Value="#3A2A1A"/>
+                                        </Style>
+                                    </ListBox.Styles>
+                                </ListBox>
+                            </StackPanel>
+                            
+                            <!-- NIF Geometry -->
+                            <StackPanel Background="Transparent" Margin="0">
+                                <!-- NIF Geometry Header -->
+                                <Button Background="#393939" Padding="4,1" Margin="0" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        BorderThickness="0" CornerRadius="0"
+                                        Name="NifGeometryToggle">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="►" Foreground="#AAAAAA" FontSize="8" VerticalAlignment="Center" Name="NifGeometryArrow"/>
+                                        <TextBlock Grid.Column="1" Text="NIF Geometry" Foreground="#FFFF00" FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding NifMeshVisualizationObjects.Count}" Foreground="#888888" FontSize="9" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                                
+                                <!-- NIF Geometry List -->
+                                <ListBox ItemsSource="{Binding NifMeshVisualizationObjects}" Margin="0" Name="NifGeometryList"
+                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                                         IsVisible="False"
+                                         SelectedItem="{Binding SelectedMesh, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="1" Text="▲" Foreground="#FFFF00" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="#FFFF00" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding GeometryInfo}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:selected">
+                                            <Setter Property="Background" Value="#4F4F1F"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:pointerover">
+                                            <Setter Property="Background" Value="#3A3A1A"/>
+                                        </Style>
+                                    </ListBox.Styles>
+                                </ListBox>
+                            </StackPanel>
+                            
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+            
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" 
+                        Background="#3F3F46" 
+                        ResizeDirection="Columns" 
+                        ResizeBehavior="PreviousAndNext" />
+            
+            <!-- Properties Panel (Right) -->
+            <Border Grid.Column="2" 
+                    Background="#2B2B30" 
+                    BorderBrush="#3F3F46" 
+                    BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Properties Panel Header -->
+                    <Border Grid.Row="0" 
+                            Background="#383838" 
+                            BorderBrush="#3F3F46"
+                            BorderThickness="0,0,0,1"
+                            Padding="8,6">
+                        <TextBlock Text="Properties" 
+                                 FontWeight="Bold" 
+                                 FontSize="13"
+                                 Foreground="White"/>
+                    </Border>
+                    
+                    <!-- Properties Content -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="0" Margin="0">
+                            
+                            <!-- Transform Properties (First - Most Important) -->
+                            <StackPanel IsVisible="{Binding HasSelectedAnyObject}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="5,3" Margin="0">
+                                    <TextBlock Text="Transform" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <!-- Position -->
+                                    <TextBlock Text="Position" Foreground="#CCCCCC" FontSize="10" FontWeight="Bold" Margin="0,3,0,3"/>
+                                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,1">
+                                        <TextBlock Text="X" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="8" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Y" Grid.Row="0" Grid.Column="1" 
+                                                 Foreground="#CCCCCC" FontSize="8" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Z" Grid.Row="0" Grid.Column="2" 
+                                                 Foreground="#CCCCCC" FontSize="8" HorizontalAlignment="Center"/>
+                                        
+                                        <TextBox Text="{Binding CurrentLocationX}" 
+                                               Grid.Row="1" Grid.Column="0" 
+                                               Height="18" FontSize="8" Margin="0,1,1,0"/>
+                                        <TextBox Text="{Binding CurrentLocationY}" 
+                                               Grid.Row="1" Grid.Column="1" 
+                                               Height="18" FontSize="8" Margin="1,1,1,0"/>
+                                        <TextBox Text="{Binding CurrentLocationZ}" 
+                                               Grid.Row="1" Grid.Column="2" 
+                                               Height="18" FontSize="8" Margin="1,1,0,0"/>
+                                    </Grid>
                                     
-                                    <!-- Collision Objects -->
-                                    <TextBlock Text="Collision Objects" Foreground="#00FFFF" FontSize="10" FontWeight="Bold"/>
-                                    <ListBox ItemsSource="{Binding CollisionVisualizationObjects}"
-                                           Background="Transparent"
-                                           BorderThickness="0">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#1A3A3A" 
-                                                      Margin="2" 
-                                                      Padding="8,4"
-                                                      CornerRadius="3">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Name}" 
-                                                                 Foreground="#00FFFF" 
-                                                                 FontWeight="Medium"
-                                                                 FontSize="11"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="10">
-                                                            <TextBlock Text="{Binding GeometryType}" 
-                                                                     Foreground="#AAAAAA" 
-                                                                     FontSize="10"/>
-                                                            <TextBlock Text="{Binding CoordinateText}" 
-                                                                     Foreground="#888888" 
-                                                                     FontSize="10"/>
-                                                        </StackPanel>
-                                                        <TextBlock Text="{Binding FlagsText}" 
-                                                                 Foreground="#888888" 
-                                                                 FontSize="9"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <!-- Rotation (Zone Objects Only) -->
+                                    <StackPanel IsVisible="{Binding HasSelectedObject}" Margin="0,4,0,0">
+                                        <TextBlock Text="Rotation" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                        <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,1">
+                                            <TextBlock Text="X" Grid.Row="0" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="8" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="Y" Grid.Row="0" Grid.Column="1" 
+                                                     Foreground="#CCCCCC" FontSize="8" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="Z" Grid.Row="0" Grid.Column="2" 
+                                                     Foreground="#CCCCCC" FontSize="8" HorizontalAlignment="Center"/>
+                                            
+                                            <TextBox Text="{Binding OrientationX}" 
+                                                   Grid.Row="1" Grid.Column="0" 
+                                                   Height="18" FontSize="8" Margin="0,1,1,0"/>
+                                            <TextBox Text="{Binding OrientationY}" 
+                                                   Grid.Row="1" Grid.Column="1" 
+                                                   Height="18" FontSize="8" Margin="1,1,1,0"/>
+                                            <TextBox Text="{Binding OrientationZ}" 
+                                                   Grid.Row="1" Grid.Column="2" 
+                                                   Height="18" FontSize="8" Margin="1,1,0,0"/>
+                                        </Grid>
+                                    </StackPanel>
+                                    
+                                    <!-- Scale -->
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Text="Scale" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding CurrentScale}" Height="18" FontSize="8"/>
+                                    </StackPanel>
                                 </StackPanel>
-                            </ScrollViewer>
-                        </StackPanel>
-                    </Expander>
+                            </StackPanel>
+                            
+                            <!-- Core Object Properties (Second) -->
+                            <StackPanel IsVisible="{Binding HasSelectedObject}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="5,3" Margin="0">
+                                    <TextBlock Text="Core Object" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" 
+                                          Margin="0,2">
+                                        <!-- Name -->
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCoreObject.m_zoneTag}" 
+                                               Grid.Row="0" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Template ID -->
+                                        <TextBlock Text="Template ID:" Grid.Row="1" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCoreObject.m_templateID}" 
+                                               Grid.Row="1" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Object ID -->
+                                        <TextBlock Text="Object ID:" Grid.Row="2" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCoreObject.m_nObjectID}" 
+                                               Grid.Row="2" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Start State -->
+                                        <TextBlock Text="Start State:" Grid.Row="3" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCoreObject.m_startState}" 
+                                               Grid.Row="3" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Override Name -->
+                                        <TextBlock Text="Override Name:" Grid.Row="4" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCoreObject.m_overrideName}" 
+                                               Grid.Row="4" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Loading Type -->
+                                        <TextBlock Text="Loading Type:" Grid.Row="5" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCoreObject.m_loadingType}" 
+                                               Grid.Row="5" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                    </Grid>
+                                    
+                                    <!-- Flags -->
+                                    <StackPanel Margin="0,4,0,0">
+                                        <CheckBox Content="Global Dynamic" 
+                                                IsChecked="{Binding SelectedCoreObject.m_globalDynamic}"
+                                                Foreground="White" FontSize="9" Margin="0,1"/>
+                                        <CheckBox Content="Undetectable" 
+                                                IsChecked="{Binding SelectedCoreObject.m_bUndetectable}"
+                                                Foreground="White" FontSize="9" Margin="0,1"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Template Properties (Third) -->
+                            <StackPanel IsVisible="{Binding SelectedTemplate, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Template" Foreground="#FFD700" FontSize="10" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding SelectedTemplateTypeName}" 
+                                                 Foreground="#CCCCCC" FontSize="9" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <!-- Template Properties -->
+                                <StackPanel Margin="4,2">
+                                    <TextBlock Text="Template loaded successfully" 
+                                             FontSize="9" 
+                                             Foreground="#90EE90" 
+                                             Margin="0,0,0,4"/>
+                                    
+                                    <!-- GameObjectTemplate Properties -->
+                                    <StackPanel IsVisible="{Binding SelectedGameObjectTemplate, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" 
+                                              Margin="0,2">
+                                            <!-- Object Name -->
+                                            <TextBlock Text="Object Name:" Grid.Row="0" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Top"/>
+                                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,1">
+                                                <!-- Locale ID -->
+                                                <TextBox Text="{Binding SelectedTemplateObjectNameLocaleId}" 
+                                                       Height="18" FontSize="8" 
+                                                       IsReadOnly="True"
+                                                       Background="#333333"
+                                                       Foreground="#AAAAAA"
+                                                       ToolTip.Tip="Locale ID"/>
+                                                <!-- Resolved English Text -->
+                                                <TextBox Text="{Binding SelectedTemplateObjectNameResolved}" 
+                                                       Height="18" FontSize="8" Margin="0,2,0,0"
+                                                       IsReadOnly="True"
+                                                       Background="#1E3A1E"
+                                                       Foreground="#90EE90"
+                                                       ToolTip.Tip="Resolved English text from locale service"
+                                                       IsVisible="{Binding SelectedTemplateObjectNameResolved, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                            </StackPanel>
+                                            
+                                            <!-- Template ID -->
+                                            <TextBlock Text="Template ID:" Grid.Row="1" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                            <TextBox Text="{Binding SelectedGameObjectTemplate.m_templateID}" 
+                                                   Grid.Row="1" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                            
+                                            <!-- Visual ID -->
+                                            <TextBlock Text="Visual ID:" Grid.Row="2" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                            <TextBox Text="{Binding SelectedGameObjectTemplate.m_visualID}" 
+                                                   Grid.Row="2" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                            
+                                            <!-- Display Name -->
+                                            <TextBlock Text="Display Name:" Grid.Row="3" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Top"/>
+                                            <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,1">
+                                                <!-- Locale ID -->
+                                                <TextBox Text="{Binding SelectedTemplateDisplayNameLocaleId}" 
+                                                       Height="18" FontSize="8" 
+                                                       IsReadOnly="True"
+                                                       Background="#333333"
+                                                       Foreground="#AAAAAA"
+                                                       ToolTip.Tip="Locale ID"/>
+                                                <!-- Resolved English Text -->
+                                                <TextBox Text="{Binding SelectedTemplateDisplayNameResolved}" 
+                                                       Height="18" FontSize="8" Margin="0,2,0,0"
+                                                       IsReadOnly="True"
+                                                       Background="#1E3A1E"
+                                                       Foreground="#90EE90"
+                                                       ToolTip.Tip="Resolved English text from locale service"
+                                                       IsVisible="{Binding SelectedTemplateDisplayNameResolved, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                            </StackPanel>
+                                            
+                                            <!-- Description -->
+                                            <TextBlock Text="Description:" Grid.Row="4" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Top"/>
+                                            <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,1">
+                                                <!-- Locale ID -->
+                                                <TextBox Text="{Binding SelectedTemplateDescriptionLocaleId}" 
+                                                       Height="18" FontSize="8" 
+                                                       IsReadOnly="True"
+                                                       Background="#333333"
+                                                       Foreground="#AAAAAA"
+                                                       ToolTip.Tip="Locale ID"/>
+                                                <!-- Resolved English Text -->
+                                                <TextBox Text="{Binding SelectedTemplateDescriptionResolved}" 
+                                                       Height="18" FontSize="8" Margin="0,2,0,0"
+                                                       IsReadOnly="True"
+                                                       Background="#1E3A1E"
+                                                       Foreground="#90EE90"
+                                                       ToolTip.Tip="Resolved English text from locale service"
+                                                       IsVisible="{Binding SelectedTemplateDescriptionResolved, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                            </StackPanel>
+                                            
+                                            <!-- Object Type -->
+                                            <TextBlock Text="Object Type:" Grid.Row="5" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                            <TextBox Text="{Binding SelectedGameObjectTemplate.m_nObjectType}" 
+                                                   Grid.Row="5" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                            
+                                            <!-- Icon -->
+                                            <TextBlock Text="Icon:" Grid.Row="6" Grid.Column="0" 
+                                                     Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                            <TextBox Text="{Binding SelectedGameObjectTemplate.m_sIcon}" 
+                                                   Grid.Row="6" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        </Grid>
+                                        
+                                        <!-- Flags -->
+                                        <StackPanel Margin="0,4,0,0">
+                                            <CheckBox Content="Exempt From AOI" 
+                                                    IsChecked="{Binding SelectedGameObjectTemplate.m_exemptFromAOI}"
+                                                    Foreground="White" FontSize="9" Margin="0,1"/>
+                                        </StackPanel>
+                                        
+                                        <!-- Adjectives -->
+                                        <StackPanel Margin="0,4,0,0">
+                                            <TextBlock Text="Adjectives:" FontSize="9" FontWeight="Bold" 
+                                                     Foreground="#CCCCCC" Margin="0,0,0,2"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedGameObjectTemplate.m_adjectiveList}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="8" 
+                                                                 Foreground="#AAAAAA" Margin="2,1"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        
+                                        <!-- Behaviors -->
+                                        <StackPanel Margin="0,8,0,0" IsVisible="{Binding SelectedGameObjectTemplateBehaviors.Count}">
+                                            <TextBlock Text="{Binding SelectedGameObjectTemplateBehaviors.Count, StringFormat='Behaviors ({0}):'}" FontSize="11" FontWeight="Bold" 
+                                                     Foreground="#CCCCCC" Margin="0,0,0,4"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedGameObjectTemplateBehaviors}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#333333" Margin="0,3" Padding="10,6" CornerRadius="4">
+                                                            <StackPanel>
+                                                                <!-- Behavior Header with Type Name -->
+                                                                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+                                                                    <TextBlock Text="Type:" Grid.Column="0" FontSize="10" FontWeight="Bold" 
+                                                                             Foreground="#FFD700" Margin="0,0,8,0"/>
+                                                                    <TextBlock Text="{Binding TypeName}" Grid.Column="1" FontSize="10" FontWeight="Bold" 
+                                                                             Foreground="#FFD700"/>
+                                                                </Grid>
+                                                                
+                                                                <!-- JSON Content -->
+                                                                <ScrollViewer MaxHeight="150" HorizontalScrollBarVisibility="Auto" 
+                                                                            VerticalScrollBarVisibility="Auto">
+                                                                    <TextBox Text="{Binding FormattedJson}" IsReadOnly="True" FontSize="9" 
+                                                                           FontFamily="Consolas,Monaco,monospace" Background="#1E1E1E" 
+                                                                           Foreground="#D4D4D4" TextWrapping="Wrap" 
+                                                                           AcceptsReturn="True" BorderThickness="1" 
+                                                                           BorderBrush="#555555" Padding="6"
+                                                                           MinHeight="40"/>
+                                                                </ScrollViewer>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    
+                                    <!-- Non-GameObjectTemplate fallback -->
+                                    <StackPanel IsVisible="{Binding SelectedGameObjectTemplate, Converter={x:Static ObjectConverters.IsNull}}">
+                                        <TextBlock Text="Template Type Information:" 
+                                                 FontSize="9" FontWeight="Bold" 
+                                                 Foreground="#CCCCCC" 
+                                                 Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding SelectedTemplate}" 
+                                               FontSize="8" 
+                                               TextWrapping="Wrap"
+                                               Foreground="#CCCCCC"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Template Loading Message -->
+                            <StackPanel IsVisible="{Binding HasSelectedObject}" Margin="0">
+                                <StackPanel IsVisible="{Binding SelectedTemplate, Converter={x:Static ObjectConverters.IsNull}}">
+                                    <!-- Header -->
+                                    <Border Background="#393939" Padding="4,2" Margin="0">
+                                        <TextBlock Text="Template" Foreground="#FFD700" FontSize="10" FontWeight="Bold"/>
+                                    </Border>
+                                    
+                                    <!-- Loading Message -->
+                                    <StackPanel Margin="4,2">
+                                        <TextBlock Text="Loading template..." 
+                                                 FontSize="9" 
+                                                 Foreground="#FFA500" 
+                                                 Margin="0,0,0,2"/>
+                                        <TextBlock Text="Template data will appear here once loaded from Root.wad" 
+                                                 FontSize="8" 
+                                                 Foreground="#888888" 
+                                                 TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Collision Object Properties -->
+                            <StackPanel IsVisible="{Binding HasSelectedCollision}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="Collision Object" Foreground="#00FFFF" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" 
+                                          Margin="0,2">
+                                        <!-- Name -->
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCollision.Name}" 
+                                               Grid.Row="0" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Geometry Type -->
+                                        <TextBlock Text="Geometry Type:" Grid.Row="1" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCollision.GeometryType}" 
+                                               Grid.Row="1" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Material -->
+                                        <TextBlock Text="Material:" Grid.Row="2" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCollision.Material}" 
+                                               Grid.Row="2" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Category Flags -->
+                                        <TextBlock Text="Category Flags:" Grid.Row="3" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCollision.CategoryFlags}" 
+                                               Grid.Row="3" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Collision Flags -->
+                                        <TextBlock Text="Collision Flags:" Grid.Row="4" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedCollision.CollisionFlags}" 
+                                               Grid.Row="4" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            
+                            <!-- No Selection Message -->
+                            <StackPanel IsVisible="{Binding !HasSelectedAnyObject}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="No Selection" Foreground="#AAAAAA" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Message -->
+                                <StackPanel Margin="4,8">
+                                    <TextBlock Text="Select an object from the hierarchy to view its properties" 
+                                             FontSize="9"
+                                             Foreground="#888888"
+                                             TextWrapping="Wrap"
+                                             HorizontalAlignment="Center"
+                                             TextAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
 
-                    <!-- Zone Summary -->
-                    <Expander Header="Zone Summary" 
-                            Background="#383838">
-                        <StackPanel Spacing="10" Margin="10">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Zone Name:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding SelectedZone}" Foreground="White" FontWeight="Medium"/>
-                            </StackPanel>
-                            
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Total Objects:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding ZoneVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
-                            </StackPanel>
-                            
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Shopkeepers:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding Shopkeepers.Count}" Foreground="White" FontWeight="Medium"/>
-                            </StackPanel>
-                            
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Collision Objects:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding CollisionVisualizationObjects.Count}" Foreground="White" FontWeight="Medium"/>
-                            </StackPanel>
-                            
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="NIF Geometry Meshes:" Foreground="#CCCCCC" FontSize="11"/>
-                                <TextBlock Text="{Binding NifMeshVisualizationObjects.Count}" Foreground="#FFFF00" FontWeight="Medium"/>
-                            </StackPanel>
                         </StackPanel>
-                    </Expander>
-
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
