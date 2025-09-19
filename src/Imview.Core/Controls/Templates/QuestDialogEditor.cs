@@ -326,30 +326,90 @@ public partial class QuestDialogEditor : UserControl {
             foreach (var entry in dialog.m_dialogEntries) {
                 if (entry is NPCDialogEntry npcEntry) {
                     targetCollection.Add(new DialogEntryWrapper {
+                        // NPCDialogEntry specific
                         PersonaName = npcEntry.m_personaName ?? "",
-                        DialogKey = npcEntry.m_dialog ?? "",
-                        SoundFile = npcEntry.m_soundFile ?? "",
-                        ActorTemplateID = npcEntry.m_actorTemplateID,
-                        CameraName = npcEntry.m_cameraName ?? "",
-                        Picture = npcEntry.m_picture ?? "",
-                        Action = npcEntry.m_action ?? "",
                         NameOverride = npcEntry.m_nameOverride ?? "",
                         GuiDisplay = npcEntry.m_guiDisplay ?? "",
                         
-                        // Extended Properties
+                        // Core ActorDialogEntry Properties
+                        DialogKey = npcEntry.m_dialog ?? "",
+                        Picture = npcEntry.m_picture ?? "",
+                        SoundFile = npcEntry.m_soundFile ?? "",
+                        Action = npcEntry.m_action ?? "",
                         DialogEvent = npcEntry.m_dialogEvent ?? "",
+                        ActorTemplateID = npcEntry.m_actorTemplateID,
+                        CameraName = npcEntry.m_cameraName ?? "",
+                        
+                        // Camera Properties
+                        InterpolationDuration = npcEntry.m_interpolationDuration,
+                        CameraOffsetX = npcEntry.m_cameraOffsetX,
+                        CameraOffsetY = npcEntry.m_cameraOffsetY,
+                        CameraOffsetZ = npcEntry.m_cameraOffsetZ,
+                        Pitch = npcEntry.m_pitch,
+                        Yaw = npcEntry.m_yaw,
+                        Roll = npcEntry.m_roll,
+                        CameraShakeType = npcEntry.m_cameraShakeType ?? "",
+                        CameraShakeDuration = npcEntry.m_cameraShakeDuration,
+                        CameraShakeAmplitude = npcEntry.m_cameraShakeAmplitude,
+                        
+                        // Camera Behavior
+                        BypassCameraOnReview = npcEntry.m_bypassCameraOnReview,
+                        CameraZoneName = npcEntry.m_cameraZoneName ?? "",
                         Duration = npcEntry.m_duration,
                         Delay = npcEntry.m_delay,
-                        InterpolationDuration = npcEntry.m_interpolationDuration,
+                        CameraHidePlayers = npcEntry.m_cameraHidePlayers,
+                        WalkAwayNpcTemplateID = (uint)npcEntry.m_walkAwayNpcTemplateID,
+                        
+                        // Walk Away Properties
+                        WalkAwayExitDirectionInDegrees = npcEntry.m_walkAwayExitDirectionInDegrees,
+                        WalkAwayFadeTime = npcEntry.m_walkAwayFadeTime,
+                        WalkAwayUseCurrentFacing = npcEntry.m_walkAwayUseCurrentFacing,
+                        
+                        // Stand-in and Camera
+                        StandInPlayerTag = npcEntry.m_standInPlayerTag ?? "",
+                        FadeOutCamera = npcEntry.m_fadeOutCamera,
+                        SnapCameraToPlayerAtExit = npcEntry.m_snapCameraToPlayerAtExit,
+                        SecondaryCameraName = npcEntry.m_secondaryCameraName ?? "",
+                        SecondaryInterpolationDuration = npcEntry.m_secondaryInterpolationDuration,
+                        
+                        // Lists and Arrays
+                        NpcStandInList = new List<string>(npcEntry.m_npcStandInList ?? new List<string>()),
+                        DialogAnimationList = new List<string>(npcEntry.m_dialogAnimationList ?? new List<string>()),
+                        DialogTurningList = new List<string>(npcEntry.m_dialogTurningList ?? new List<string>()),
+                        
+                        // NPC Behavior
+                        NpcYawOffsetInDegrees = npcEntry.m_npcYawOffsetInDegrees,
+                        AllowPlayerToMove = npcEntry.m_allowPlayerToMove,
                         
                         // Audio Properties
                         SoundEffectFile = npcEntry.m_soundEffectFile ?? "",
                         MusicFile = npcEntry.m_musicFile ?? "",
+                        NonStackableMusic = npcEntry.m_nonStackableMusic,
+                        NonRepeatableMusic = npcEntry.m_nonRepeatableMusic,
+                        PlayMusicAtSFXVolume = npcEntry.m_playMusicAtSFXVolume,
+                        SoundEffectDelay = npcEntry.m_soundEffectDelay,
+                        MusicDelay = npcEntry.m_musicDelay,
+                        MusicFadeTime = npcEntry.m_musicFadeTime,
                         
-                        // Behavior Flags
-                        AllowPlayerToMove = npcEntry.m_allowPlayerToMove,
+                        // Camera and Dialog Behavior
+                        DontReleaseCameraAtExit = npcEntry.m_dontReleaseCameraAtExit,
                         DisableBackButton = npcEntry.m_disableBackButton,
-                        EnableExitButton = npcEntry.m_enableExitButton
+                        EnableExitButton = npcEntry.m_enableExitButton,
+                        CameraFadeType = npcEntry.m_cameraFadeType ?? "",
+                        CameraFadeTime = npcEntry.m_cameraFadeTime,
+                        IdleAnimation = npcEntry.m_idleAnimation ?? "",
+                        
+                        // Spam and Music Control
+                        SpamTime = npcEntry.m_spamTime,
+                        PlaySoundIfSpamming = npcEntry.m_playSoundIfSpamming,
+                        PlayMusicIfSpamming = npcEntry.m_playMusicIfSpamming,
+                        StopMusicFadeTime = npcEntry.m_stopMusicFadeTime,
+                        RestartMusicFadeTime = npcEntry.m_restartMusicFadeTime,
+                        MeetsRequirements = npcEntry.m_meetsRequirements,
+                        
+                        // Final Properties
+                        SecondaryCameraInitialDelay = npcEntry.m_secondaryCameraInitalDelay,
+                        DisplayButtonsOnTimedDialog = npcEntry.m_displayButtonsOnTimedDialog
                     });
                 }
             }
@@ -378,30 +438,90 @@ public partial class QuestDialogEditor : UserControl {
                 var dialog = new ActorDialog {
                     m_dialogTag = tag,
                     m_dialogEntries = entries.Select(wrapper => new NPCDialogEntry {
+                        // NPCDialogEntry specific
                         m_personaName = wrapper.PersonaName,
-                        m_dialog = wrapper.DialogKey,
-                        m_soundFile = wrapper.SoundFile,
-                        m_actorTemplateID = wrapper.ActorTemplateID,
-                        m_cameraName = wrapper.CameraName,
-                        m_picture = wrapper.Picture,
-                        m_action = wrapper.Action,
                         m_nameOverride = wrapper.NameOverride,
                         m_guiDisplay = wrapper.GuiDisplay,
-                        m_interpolationDuration = wrapper.InterpolationDuration,
                         
-                        // Extended Properties
+                        // Core ActorDialogEntry Properties
+                        m_dialog = wrapper.DialogKey,
+                        m_picture = wrapper.Picture,
+                        m_soundFile = wrapper.SoundFile,
+                        m_action = wrapper.Action,
                         m_dialogEvent = wrapper.DialogEvent,
+                        m_actorTemplateID = wrapper.ActorTemplateID,
+                        m_cameraName = wrapper.CameraName,
+                        
+                        // Camera Properties
+                        m_interpolationDuration = wrapper.InterpolationDuration,
+                        m_cameraOffsetX = wrapper.CameraOffsetX,
+                        m_cameraOffsetY = wrapper.CameraOffsetY,
+                        m_cameraOffsetZ = wrapper.CameraOffsetZ,
+                        m_pitch = wrapper.Pitch,
+                        m_yaw = wrapper.Yaw,
+                        m_roll = wrapper.Roll,
+                        m_cameraShakeType = wrapper.CameraShakeType,
+                        m_cameraShakeDuration = wrapper.CameraShakeDuration,
+                        m_cameraShakeAmplitude = wrapper.CameraShakeAmplitude,
+                        
+                        // Camera Behavior
+                        m_bypassCameraOnReview = wrapper.BypassCameraOnReview,
+                        m_cameraZoneName = wrapper.CameraZoneName,
                         m_duration = wrapper.Duration,
                         m_delay = wrapper.Delay,
+                        m_cameraHidePlayers = wrapper.CameraHidePlayers,
+                        m_walkAwayNpcTemplateID = wrapper.WalkAwayNpcTemplateID,
+                        
+                        // Walk Away Properties
+                        m_walkAwayExitDirectionInDegrees = wrapper.WalkAwayExitDirectionInDegrees,
+                        m_walkAwayFadeTime = wrapper.WalkAwayFadeTime,
+                        m_walkAwayUseCurrentFacing = wrapper.WalkAwayUseCurrentFacing,
+                        
+                        // Stand-in and Camera
+                        m_standInPlayerTag = wrapper.StandInPlayerTag,
+                        m_fadeOutCamera = wrapper.FadeOutCamera,
+                        m_snapCameraToPlayerAtExit = wrapper.SnapCameraToPlayerAtExit,
+                        m_secondaryCameraName = wrapper.SecondaryCameraName,
+                        m_secondaryInterpolationDuration = wrapper.SecondaryInterpolationDuration,
+                        
+                        // Lists and Arrays
+                        m_npcStandInList = new List<string>(wrapper.NpcStandInList),
+                        m_dialogAnimationList = new List<string>(wrapper.DialogAnimationList),
+                        m_dialogTurningList = new List<string>(wrapper.DialogTurningList),
+                        
+                        // NPC Behavior
+                        m_npcYawOffsetInDegrees = wrapper.NpcYawOffsetInDegrees,
+                        m_allowPlayerToMove = wrapper.AllowPlayerToMove,
                         
                         // Audio Properties
                         m_soundEffectFile = wrapper.SoundEffectFile,
                         m_musicFile = wrapper.MusicFile,
+                        m_nonStackableMusic = wrapper.NonStackableMusic,
+                        m_nonRepeatableMusic = wrapper.NonRepeatableMusic,
+                        m_playMusicAtSFXVolume = wrapper.PlayMusicAtSFXVolume,
+                        m_soundEffectDelay = wrapper.SoundEffectDelay,
+                        m_musicDelay = wrapper.MusicDelay,
+                        m_musicFadeTime = wrapper.MusicFadeTime,
                         
-                        // Behavior Flags
-                        m_allowPlayerToMove = wrapper.AllowPlayerToMove,
+                        // Camera and Dialog Behavior
+                        m_dontReleaseCameraAtExit = wrapper.DontReleaseCameraAtExit,
                         m_disableBackButton = wrapper.DisableBackButton,
-                        m_enableExitButton = wrapper.EnableExitButton
+                        m_enableExitButton = wrapper.EnableExitButton,
+                        m_cameraFadeType = wrapper.CameraFadeType,
+                        m_cameraFadeTime = wrapper.CameraFadeTime,
+                        m_idleAnimation = wrapper.IdleAnimation,
+                        
+                        // Spam and Music Control
+                        m_spamTime = wrapper.SpamTime,
+                        m_playSoundIfSpamming = wrapper.PlaySoundIfSpamming,
+                        m_playMusicIfSpamming = wrapper.PlayMusicIfSpamming,
+                        m_stopMusicFadeTime = wrapper.StopMusicFadeTime,
+                        m_restartMusicFadeTime = wrapper.RestartMusicFadeTime,
+                        m_meetsRequirements = wrapper.MeetsRequirements,
+                        
+                        // Final Properties
+                        m_secondaryCameraInitalDelay = wrapper.SecondaryCameraInitialDelay,
+                        m_displayButtonsOnTimedDialog = wrapper.DisplayButtonsOnTimedDialog
                     }).Cast<ActorDialogEntry>().ToList()
                 };
                 dialogList.m_dialogs.Add(dialog);

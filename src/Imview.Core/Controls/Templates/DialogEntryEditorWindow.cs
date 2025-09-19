@@ -91,9 +91,9 @@ public class DialogEntryEditorWindow : Window {
     private NumericUpDown _secondaryInterpolationDurationBox = null!;
     
     // Animation and NPC Controls
-    private ListBox _npcStandInListBox = null!;
-    private ListBox _dialogAnimationListBox = null!;
-    private ListBox _dialogTurningListBox = null!;
+    private TextBox _npcStandInListBox = null!;
+    private TextBox _dialogAnimationListBox = null!;
+    private TextBox _dialogTurningListBox = null!;
     private NumericUpDown _npcYawOffsetBox = null!;
     private CheckBox _allowPlayerToMoveBox = null!;
     
@@ -251,7 +251,6 @@ public class DialogEntryEditorWindow : Window {
         mainPanel.Children.Add(CreateAnimationSection());
         mainPanel.Children.Add(CreateAudioSection());
         mainPanel.Children.Add(CreateDialogBehaviorSection());
-        mainPanel.Children.Add(CreateAdvancedSection());
         mainPanel.Children.Add(CreateActionButtons());
 
         scrollViewer.Content = mainPanel;
@@ -413,34 +412,6 @@ public class DialogEntryEditorWindow : Window {
         return LocaleService.Instance.GetString(category, key);
     }
 
-    private Control CreateAdvancedSection() {
-        var content = new StackPanel {
-            Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
-            Children = {
-                CreateLabeledControl("Camera Name:", 
-                    "Camera angle or position for this dialogue (optional)", 
-                    _cameraNameBox = new TextBox()),
-                    
-                CreateLabeledControl("Picture/Icon:", 
-                    "Image or icon to display with this dialogue (e.g., GUI/NpcPortraits/Art_Portrait_Ambrose.dds)", 
-                    _pictureBox = new TextBox()),
-                    
-                CreateLabeledControl("Action:", 
-                    "Special action or animation to perform during dialogue (optional)", 
-                    _actionBox = new TextBox()),
-                    
-                CreateLabeledControl("Name Override:", 
-                    "Override the displayed name of the speaker (optional)", 
-                    _nameOverrideBox = new TextBox()),
-                    
-                CreateLabeledControl("GUI Display:", 
-                    "Special GUI display settings for this dialogue (optional)", 
-                    _guiDisplayBox = new TextBox())
-            }
-        };
-
-        return CreateGroupBox("Advanced Properties", content);
-    }
 
     private Control CreateExtendedSection() {
         var content = new StackPanel {
@@ -672,9 +643,17 @@ public class DialogEntryEditorWindow : Window {
                     "NPC yaw offset in degrees", 
                     _npcYawOffsetBox = CreateFloatNumericUpDown()),
 
-                CreateListSection("NPC Stand-in List:", "List of NPC stand-ins", ref _npcStandInListBox),
-                CreateListSection("Dialog Animation List:", "List of dialog animations", ref _dialogAnimationListBox),
-                CreateListSection("Dialog Turning List:", "List of dialog turning animations", ref _dialogTurningListBox)
+                CreateLabeledControl("NPC Stand-in List:", 
+                    "Comma-separated list of NPC stand-ins (e.g., npc1,npc2,npc3)", 
+                    _npcStandInListBox = new TextBox()),
+                    
+                CreateLabeledControl("Dialog Animation List:", 
+                    "Comma-separated list of dialog animations (e.g., anim1,anim2,anim3)", 
+                    _dialogAnimationListBox = new TextBox()),
+                    
+                CreateLabeledControl("Dialog Turning List:", 
+                    "Comma-separated list of dialog turning animations (e.g., turn1,turn2,turn3)", 
+                    _dialogTurningListBox = new TextBox())
             }
         };
         return CreateGroupBox("Animation & NPCs", content);
@@ -746,33 +725,6 @@ public class DialogEntryEditorWindow : Window {
         };
     }
 
-    private Control CreateListSection(string title, string description, ref ListBox listBox) {
-        listBox = new ListBox { Height = 80 };
-        
-        var addButton = new Button { Content = "Add", MinWidth = 60 };
-        var removeButton = new Button { Content = "Remove", MinWidth = 60 };
-        
-        var buttonPanel = new StackPanel {
-            Orientation = Orientation.Horizontal,
-            Spacing = 5,
-            Children = { addButton, removeButton }
-        };
-
-        return new StackPanel {
-            Spacing = 3,
-            Children = {
-                new TextBlock { Text = title, FontWeight = FontWeight.SemiBold },
-                new TextBlock { 
-                    Text = description,
-                    Foreground = Brushes.LightGray,
-                    FontStyle = FontStyle.Italic,
-                    FontSize = 11
-                },
-                listBox,
-                buttonPanel
-            }
-        };
-    }
 
     private Control CreateActionButtons() {
         return new StackPanel {
@@ -843,6 +795,7 @@ public class DialogEntryEditorWindow : Window {
         };
 
     private void PopulateControls() {
+        // BASIC PROPERTIES
         _personaNameBox.Text = _result.PersonaName;
         _dialogKeyValue = _result.DialogKey;
         UpdateDialogKeyDisplay();
@@ -853,20 +806,76 @@ public class DialogEntryEditorWindow : Window {
         _actionBox.Text = _result.Action;
         _nameOverrideBox.Text = _result.NameOverride;
         _guiDisplayBox.Text = _result.GuiDisplay;
-        
-        // Extended properties
         _dialogEventBox.Text = _result.DialogEvent;
+        
+        // CAMERA POSITION PROPERTIES
+        _interpolationDurationBox.Value = (decimal)_result.InterpolationDuration;
+        _cameraOffsetXBox.Value = (decimal)_result.CameraOffsetX;
+        _cameraOffsetYBox.Value = (decimal)_result.CameraOffsetY;
+        _cameraOffsetZBox.Value = (decimal)_result.CameraOffsetZ;
+        _pitchBox.Value = (decimal)_result.Pitch;
+        _yawBox.Value = (decimal)_result.Yaw;
+        _rollBox.Value = (decimal)_result.Roll;
+        
+        // CAMERA EFFECTS PROPERTIES
+        _cameraShakeTypeBox.Text = _result.CameraShakeType;
+        _cameraShakeDurationBox.Value = (decimal)_result.CameraShakeDuration;
+        _cameraShakeAmplitudeBox.Value = (decimal)_result.CameraShakeAmplitude;
+        _cameraZoneNameBox.Text = _result.CameraZoneName;
+        _cameraFadeTypeBox.Text = _result.CameraFadeType;
+        _cameraFadeTimeBox.Value = (decimal)_result.CameraFadeTime;
+        _bypassCameraOnReviewBox.IsChecked = _result.BypassCameraOnReview;
+        _fadeOutCameraBox.IsChecked = _result.FadeOutCamera;
+        _snapCameraToPlayerAtExitBox.IsChecked = _result.SnapCameraToPlayerAtExit;
+        _dontReleaseCameraAtExitBox.IsChecked = _result.DontReleaseCameraAtExit;
+        
+        // TIMING AND BEHAVIOR PROPERTIES
         _durationBox.Value = (decimal)_result.Duration;
         _delayBox.Value = (decimal)_result.Delay;
-        _soundEffectFileBox.Text = _result.SoundEffectFile;
-        _musicFileBox.Text = _result.MusicFile;
+        _cameraHidePlayersBox.Value = (decimal)_result.CameraHidePlayers;
+        _spamTimeBox.Value = (decimal)_result.SpamTime;
         _allowPlayerToMoveBox.IsChecked = _result.AllowPlayerToMove;
         _disableBackButtonBox.IsChecked = _result.DisableBackButton;
         _enableExitButtonBox.IsChecked = _result.EnableExitButton;
+        _displayButtonsOnTimedDialogBox.IsChecked = _result.DisplayButtonsOnTimedDialog;
+        _meetsRequirementsBox.IsChecked = _result.MeetsRequirements;
+        
+        // WALK AWAY PROPERTIES
+        _walkAwayNpcTemplateIDBox.Value = (decimal)_result.WalkAwayNpcTemplateID;
+        _walkAwayExitDirectionBox.Value = (decimal)_result.WalkAwayExitDirectionInDegrees;
+        _walkAwayFadeTimeBox.Value = (decimal)_result.WalkAwayFadeTime;
+        _walkAwayUseCurrentFacingBox.IsChecked = _result.WalkAwayUseCurrentFacing;
+        
+        // ANIMATION AND NPC PROPERTIES
+        _standInPlayerTagBox.Text = _result.StandInPlayerTag;
+        _secondaryCameraNameBox.Text = _result.SecondaryCameraName;
+        _secondaryInterpolationDurationBox.Value = (decimal)_result.SecondaryInterpolationDuration;
+        _secondaryCameraInitialDelayBox.Value = (decimal)_result.SecondaryCameraInitialDelay;
+        _idleAnimationBox.Text = _result.IdleAnimation;
+        _npcYawOffsetBox.Value = (decimal)_result.NpcYawOffsetInDegrees;
+        
+        // AUDIO PROPERTIES
+        _soundEffectFileBox.Text = _result.SoundEffectFile;
+        _musicFileBox.Text = _result.MusicFile;
+        _soundEffectDelayBox.Value = (decimal)_result.SoundEffectDelay;
+        _musicDelayBox.Value = (decimal)_result.MusicDelay;
+        _musicFadeTimeBox.Value = (decimal)_result.MusicFadeTime;
+        _stopMusicFadeTimeBox.Value = (decimal)_result.StopMusicFadeTime;
+        _restartMusicFadeTimeBox.Value = (decimal)_result.RestartMusicFadeTime;
+        _nonStackableMusicBox.IsChecked = _result.NonStackableMusic;
+        _nonRepeatableMusicBox.IsChecked = _result.NonRepeatableMusic;
+        _playMusicAtSFXVolumeBox.IsChecked = _result.PlayMusicAtSFXVolume;
+        _playSoundIfSpammingBox.IsChecked = _result.PlaySoundIfSpamming;
+        _playMusicIfSpammingBox.IsChecked = _result.PlayMusicIfSpamming;
+        
+        // LIST PROPERTIES (populate existing lists as comma-separated strings)
+        _npcStandInListBox.Text = string.Join(",", _result.NpcStandInList);
+        _dialogAnimationListBox.Text = string.Join(",", _result.DialogAnimationList);
+        _dialogTurningListBox.Text = string.Join(",", _result.DialogTurningList);
     }
 
     private void SaveAndClose() {
-        // Update the result with current values
+        // Update the result with current values - BASIC PROPERTIES
         _result.PersonaName = _personaNameBox.Text ?? "";
         _result.DialogKey = _dialogKeyValue ?? "";
         _result.SoundFile = _soundFileBox.Text ?? "";
@@ -876,17 +885,87 @@ public class DialogEntryEditorWindow : Window {
         _result.Action = _actionBox.Text ?? "";
         _result.NameOverride = _nameOverrideBox.Text ?? "";
         _result.GuiDisplay = _guiDisplayBox.Text ?? "";
-        
-        // Extended properties
         _result.DialogEvent = _dialogEventBox.Text ?? "";
-        _result.Duration = (float)(_durationBox.Value ?? 0);
-        _result.Delay = (float)(_delayBox.Value ?? 0);
-        _result.SoundEffectFile = _soundEffectFileBox.Text ?? "";
-        _result.MusicFile = _musicFileBox.Text ?? "";
-        _result.AllowPlayerToMove = _allowPlayerToMoveBox.IsChecked ?? false;
-        _result.DisableBackButton = _disableBackButtonBox.IsChecked ?? false;
-        _result.EnableExitButton = _enableExitButtonBox.IsChecked ?? false;
+        
+        // CAMERA POSITION PROPERTIES
+        _result.InterpolationDuration = (float)(_interpolationDurationBox?.Value ?? 0);
+        _result.CameraOffsetX = (float)(_cameraOffsetXBox?.Value ?? 0);
+        _result.CameraOffsetY = (float)(_cameraOffsetYBox?.Value ?? 0);
+        _result.CameraOffsetZ = (float)(_cameraOffsetZBox?.Value ?? 0);
+        _result.Pitch = (float)(_pitchBox?.Value ?? 0);
+        _result.Yaw = (float)(_yawBox?.Value ?? 0);
+        _result.Roll = (float)(_rollBox?.Value ?? 0);
+        
+        // CAMERA EFFECTS PROPERTIES
+        _result.CameraShakeType = _cameraShakeTypeBox?.Text ?? "";
+        _result.CameraShakeDuration = (float)(_cameraShakeDurationBox?.Value ?? 0);
+        _result.CameraShakeAmplitude = (float)(_cameraShakeAmplitudeBox?.Value ?? 0);
+        _result.CameraZoneName = _cameraZoneNameBox?.Text ?? "";
+        _result.CameraFadeType = _cameraFadeTypeBox?.Text ?? "";
+        _result.CameraFadeTime = (float)(_cameraFadeTimeBox?.Value ?? 0);
+        _result.BypassCameraOnReview = _bypassCameraOnReviewBox?.IsChecked ?? false;
+        _result.FadeOutCamera = _fadeOutCameraBox?.IsChecked ?? false;
+        _result.SnapCameraToPlayerAtExit = _snapCameraToPlayerAtExitBox?.IsChecked ?? false;
+        _result.DontReleaseCameraAtExit = _dontReleaseCameraAtExitBox?.IsChecked ?? false;
+        
+        // TIMING AND BEHAVIOR PROPERTIES
+        _result.Duration = (float)(_durationBox?.Value ?? 0);
+        _result.Delay = (float)(_delayBox?.Value ?? 0);
+        _result.CameraHidePlayers = (int)(_cameraHidePlayersBox?.Value ?? 0);
+        _result.SpamTime = (float)(_spamTimeBox?.Value ?? 0);
+        _result.AllowPlayerToMove = _allowPlayerToMoveBox?.IsChecked ?? false;
+        _result.DisableBackButton = _disableBackButtonBox?.IsChecked ?? false;
+        _result.EnableExitButton = _enableExitButtonBox?.IsChecked ?? false;
+        _result.DisplayButtonsOnTimedDialog = _displayButtonsOnTimedDialogBox?.IsChecked ?? false;
+        _result.MeetsRequirements = _meetsRequirementsBox?.IsChecked ?? false;
+        
+        // WALK AWAY PROPERTIES
+        _result.WalkAwayNpcTemplateID = (uint)(_walkAwayNpcTemplateIDBox?.Value ?? 0);
+        _result.WalkAwayExitDirectionInDegrees = (float)(_walkAwayExitDirectionBox?.Value ?? 0);
+        _result.WalkAwayFadeTime = (float)(_walkAwayFadeTimeBox?.Value ?? 0);
+        _result.WalkAwayUseCurrentFacing = _walkAwayUseCurrentFacingBox?.IsChecked ?? false;
+        
+        // ANIMATION AND NPC PROPERTIES
+        _result.StandInPlayerTag = _standInPlayerTagBox?.Text ?? "";
+        _result.SecondaryCameraName = _secondaryCameraNameBox?.Text ?? "";
+        _result.SecondaryInterpolationDuration = (float)(_secondaryInterpolationDurationBox?.Value ?? 0);
+        _result.SecondaryCameraInitialDelay = (float)(_secondaryCameraInitialDelayBox?.Value ?? 0);
+        _result.IdleAnimation = _idleAnimationBox?.Text ?? "";
+        _result.NpcYawOffsetInDegrees = (float)(_npcYawOffsetBox?.Value ?? 0);
+        
+        // AUDIO PROPERTIES
+        _result.SoundEffectFile = _soundEffectFileBox?.Text ?? "";
+        _result.MusicFile = _musicFileBox?.Text ?? "";
+        _result.SoundEffectDelay = (float)(_soundEffectDelayBox?.Value ?? 0);
+        _result.MusicDelay = (float)(_musicDelayBox?.Value ?? 0);
+        _result.MusicFadeTime = (float)(_musicFadeTimeBox?.Value ?? 0);
+        _result.StopMusicFadeTime = (float)(_stopMusicFadeTimeBox?.Value ?? 0);
+        _result.RestartMusicFadeTime = (float)(_restartMusicFadeTimeBox?.Value ?? 0);
+        _result.NonStackableMusic = _nonStackableMusicBox?.IsChecked ?? false;
+        _result.NonRepeatableMusic = _nonRepeatableMusicBox?.IsChecked ?? false;
+        _result.PlayMusicAtSFXVolume = _playMusicAtSFXVolumeBox?.IsChecked ?? false;
+        _result.PlaySoundIfSpamming = _playSoundIfSpammingBox?.IsChecked ?? false;
+        _result.PlayMusicIfSpamming = _playMusicIfSpammingBox?.IsChecked ?? false;
+        
+        // LIST PROPERTIES (parse comma-separated strings back to lists)
+        _result.NpcStandInList = ParseCommaSeparatedString(_npcStandInListBox.Text);
+        _result.DialogAnimationList = ParseCommaSeparatedString(_dialogAnimationListBox.Text);
+        _result.DialogTurningList = ParseCommaSeparatedString(_dialogTurningListBox.Text);
 
         Close(_result);
+    }
+    
+    /// <summary>
+    /// Parse a comma-separated string into a list of strings, handling empty strings and trimming whitespace
+    /// </summary>
+    private static List<string> ParseCommaSeparatedString(string? input) {
+        if (string.IsNullOrWhiteSpace(input)) {
+            return new List<string>();
+        }
+        
+        return input.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                   .Select(s => s.Trim())
+                   .Where(s => !string.IsNullOrEmpty(s))
+                   .ToList();
     }
 }
