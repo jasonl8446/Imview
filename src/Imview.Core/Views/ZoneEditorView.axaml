@@ -202,6 +202,10 @@
                                             IsChecked="{Binding ShowSpawns}" 
                                             Foreground="#FF8C00" 
                                             FontSize="9"/>
+                                    <CheckBox Content="Volumes" 
+                                            IsChecked="{Binding ShowVolumes}" 
+                                            Foreground="#FF0000" 
+                                            FontSize="9"/>
                                 </StackPanel>
                                 
                                 <!-- Collision Shape Filters -->
@@ -271,6 +275,10 @@
                             <TextBlock Text="{Binding NodeVisualizationObjects.Count, StringFormat='Nodes: {0}'}"
                                      FontSize="10"
                                      Foreground="#00FF00"
+                                     Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding VolumeVisualizationObjects.Count, StringFormat='Volumes: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#FF0000"
                                      Margin="5,0,5,5"/>
                         </StackPanel>
                     </Grid>
@@ -539,6 +547,63 @@
                                         </Style>
                                         <Style Selector="ListBoxItem:pointerover">
                                             <Setter Property="Background" Value="#3A3A1A"/>
+                                        </Style>
+                                    </ListBox.Styles>
+                                </ListBox>
+                            </StackPanel>
+                            
+                            <!-- Volumes -->
+                            <StackPanel Background="Transparent" Margin="0">
+                                <!-- Volumes Header -->
+                                <Button Background="#393939" Padding="4,1" Margin="0" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        BorderThickness="0" CornerRadius="0"
+                                        Name="VolumesToggle">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="▼" Foreground="#AAAAAA" FontSize="8" VerticalAlignment="Center" Name="VolumesArrow"/>
+                                        <TextBlock Grid.Column="1" Text="Volumes" Foreground="#FF0000" FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding VolumeVisualizationObjects.Count}" Foreground="#888888" FontSize="9" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                                
+                                <!-- Volumes List -->
+                                <ListBox ItemsSource="{Binding VolumeVisualizationObjects}" Margin="0" Name="VolumesList"
+                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                                         SelectedItem="{Binding SelectedVolume, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="1" Text="□" Foreground="#FF0000" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="#FF0000" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding PrimitiveType}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:selected">
+                                            <Setter Property="Background" Value="#4F1F1F"/>
+                                        </Style>
+                                        <Style Selector="ListBoxItem:pointerover">
+                                            <Setter Property="Background" Value="#3A1A1A"/>
                                         </Style>
                                     </ListBox.Styles>
                                 </ListBox>
@@ -949,6 +1014,96 @@
                                 </StackPanel>
                             </StackPanel>
                             
+                            <!-- Volume Object Properties -->
+                            <StackPanel IsVisible="{Binding HasSelectedVolume}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="Volume Object" Foreground="#FF0000" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" 
+                                          Margin="0,2">
+                                        <!-- Name -->
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.Name}" 
+                                               Grid.Row="0" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Template ID -->
+                                        <TextBlock Text="Template ID:" Grid.Row="1" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.TemplateID}" 
+                                               Grid.Row="1" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Primitive Type -->
+                                        <TextBlock Text="Primitive Type:" Grid.Row="2" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.PrimitiveType}" 
+                                               Grid.Row="2" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                        
+                                        <!-- Radius -->
+                                        <TextBlock Text="Radius:" Grid.Row="3" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.Radius}" 
+                                               Grid.Row="3" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Length -->
+                                        <TextBlock Text="Length:" Grid.Row="4" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.Length}" 
+                                               Grid.Row="4" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Width -->
+                                        <TextBlock Text="Width:" Grid.Row="5" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.Width}" 
+                                               Grid.Row="5" Grid.Column="1" Height="20" FontSize="9" Margin="0,1"/>
+                                        
+                                        <!-- Dimensions Text -->
+                                        <TextBlock Text="Dimensions:" Grid.Row="6" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding SelectedVolume.DimensionsText}" 
+                                               Grid.Row="6" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                    </Grid>
+                                    
+                                    <!-- Events -->
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Text="Events" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                        
+                                        <!-- Enter Events -->
+                                        <StackPanel Margin="0,2,0,0">
+                                            <TextBlock Text="Enter Events:" FontSize="8" Foreground="#CCCCCC" Margin="0,0,0,1"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedVolume.EnterEvents}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="8" 
+                                                                 Foreground="#90EE90" Margin="4,1"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock Text="(No enter events)" FontSize="8" Foreground="#888888" Margin="4,1"
+                                                     IsVisible="{Binding !SelectedVolume.EnterEvents.Count}"/>
+                                        </StackPanel>
+                                        
+                                        <!-- Exit Events -->
+                                        <StackPanel Margin="0,4,0,0">
+                                            <TextBlock Text="Exit Events:" FontSize="8" Foreground="#CCCCCC" Margin="0,0,0,1"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedVolume.ExitEvents}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="8" 
+                                                                 Foreground="#FFB6C1" Margin="4,1"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock Text="(No exit events)" FontSize="8" Foreground="#888888" Margin="4,1"
+                                                     IsVisible="{Binding !SelectedVolume.ExitEvents.Count}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
                             
                             <!-- No Selection Message -->
                             <StackPanel IsVisible="{Binding !HasSelectedAnyObject}" Margin="0">

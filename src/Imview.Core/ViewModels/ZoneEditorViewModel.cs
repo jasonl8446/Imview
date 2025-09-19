@@ -33,6 +33,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Imview.Core.Services;
+using Imview.Core.Models;
 using Imcodec.ObjectProperty.TypeCache;
 using Imcodec.ObjectProperty;
 using Imcodec.Math;
@@ -54,12 +55,14 @@ public class ZoneEditorViewModel : ViewModelBase
     private CollisionVisualizationObject? _selectedCollision = null;
     private PathVisualizationObject? _selectedPath = null;
     private NifMeshVisualizationObject? _selectedMesh = null;
+    private VolumeVisualizationObject? _selectedVolume = null;
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
     private NifFile? _currentSceneFile = null;
     private SpawnManager? _currentSpawnData = null;
     private PathTemplateList? _currentPathData = null;
     private NodeTemplateList? _currentNodeData = null;
+    private WizZoneVolumes? _currentVolumeData = null;
     private NifGeometryProcessor? _nifProcessor = null;
     private bool _isLoading = false;
     private bool _showCollisions = true;
@@ -68,6 +71,7 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool _showSpawns = true;
     private bool _showPaths = true;
     private bool _showNodes = true; // Make visible by default for debugging
+    private bool _showVolumes = true; // Make visible by default
     
     // Collision shape filters - default to true so all shapes show initially
     private bool _showBoxCollisions = true;
@@ -103,6 +107,7 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectCollisionCommand = ReactiveCommand.Create<CollisionVisualizationObject>(SelectCollision);
         SelectPathCommand = ReactiveCommand.Create<PathVisualizationObject>(SelectPath);
         SelectMeshCommand = ReactiveCommand.Create<NifMeshVisualizationObject>(SelectMesh);
+        SelectVolumeCommand = ReactiveCommand.Create<VolumeVisualizationObject>(SelectVolume);
         SelectZoneCommand = ReactiveCommand.Create(SelectZone);
         
         // Initialize viewport commands
@@ -124,6 +129,7 @@ public class ZoneEditorViewModel : ViewModelBase
         SpawnVisualizationObjects = new ObservableCollection<SpawnVisualizationObject>();
         PathVisualizationObjects = new ObservableCollection<PathVisualizationObject>();
         NodeVisualizationObjects = new ObservableCollection<NodeVisualizationObject>();
+        VolumeVisualizationObjects = new ObservableCollection<VolumeVisualizationObject>();
         
         _nifProcessor = new NifGeometryProcessor();
         
@@ -150,6 +156,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ObservableCollection<SpawnVisualizationObject> SpawnVisualizationObjects { get; }
     public ObservableCollection<PathVisualizationObject> PathVisualizationObjects { get; }
     public ObservableCollection<NodeVisualizationObject> NodeVisualizationObjects { get; }
+    public ObservableCollection<VolumeVisualizationObject> VolumeVisualizationObjects { get; }
 
     public string SelectedZone
     {
@@ -181,6 +188,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCollision = null;
                 SelectedPath = null;
                 SelectedMesh = null;
+                SelectedVolume = null;
             }
             
             // Notify property changes
@@ -361,6 +369,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCoreObject = null;
                 SelectedPath = null;
                 SelectedMesh = null;
+                SelectedVolume = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedCollision));
@@ -383,6 +392,7 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCoreObject = null;
                 SelectedCollision = null;
                 SelectedMesh = null;
+                SelectedVolume = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedPath));
@@ -405,9 +415,33 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedCoreObject = null;
                 SelectedCollision = null;
                 SelectedPath = null;
+                SelectedVolume = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedMesh));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            NotifySelectionChanged();
+        }
+    }
+
+    public VolumeVisualizationObject? SelectedVolume
+    {
+        get => _selectedVolume;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedVolume, value);
+            
+            // Clear other selections when selecting a volume object
+            if (value != null)
+            {
+                SelectedObject = null;
+                SelectedCoreObject = null;
+                SelectedCollision = null;
+                SelectedPath = null;
+                SelectedMesh = null;
+            }
+            
+            this.RaisePropertyChanged(nameof(HasSelectedVolume));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
             NotifySelectionChanged();
         }
@@ -475,6 +509,16 @@ public class ZoneEditorViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _showNodes, value);
+            UpdateVisibility();
+        }
+    }
+
+    public bool ShowVolumes
+    {
+        get => _showVolumes;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showVolumes, value);
             UpdateVisibility();
         }
     }
@@ -554,7 +598,8 @@ public class ZoneEditorViewModel : ViewModelBase
     public bool HasSelectedCollision => SelectedCollision != null;
     public bool HasSelectedPath => SelectedPath != null;
     public bool HasSelectedMesh => SelectedMesh != null;
-    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh;
+    public bool HasSelectedVolume => SelectedVolume != null;
+    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh || HasSelectedVolume;
 
     // Computed properties for filter counts
     public int VisibleCollisionCount => CollisionVisualizationObjects.Count(ShouldShowCollision);
@@ -655,6 +700,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand SelectCollisionCommand { get; }
     public ICommand SelectPathCommand { get; }
     public ICommand SelectMeshCommand { get; }
+    public ICommand SelectVolumeCommand { get; }
     public ICommand SelectZoneCommand { get; }
     
     // Viewport commands
@@ -702,13 +748,14 @@ public class ZoneEditorViewModel : ViewModelBase
                 .WithDuration(TimeSpan.FromSeconds(2))
                 .Send();
 
-            var (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
+            var (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData, volumeData) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
             _currentZoneData = zoneData;
             _currentCollisionData = collisionData;
             _currentSceneFile = sceneFile;
             _currentSpawnData = spawnData;
             _currentPathData = pathData;
             _currentNodeData = nodeData;
+            _currentVolumeData = volumeData;
             
             if (_currentZoneData != null)
             {
@@ -728,6 +775,12 @@ public class ZoneEditorViewModel : ViewModelBase
                 if (_currentSpawnData != null || _currentPathData != null || _currentNodeData != null)
                 {
                     await PopulatePathData(_currentSpawnData, _currentPathData, _currentNodeData);
+                }
+                
+                // Process volume data if available
+                if (_currentVolumeData != null)
+                {
+                    await PopulateVolumeData(_currentVolumeData);
                 }
                 
                 MessageService.Info($"Zone '{SelectedZone}' loaded successfully")
@@ -889,6 +942,7 @@ public class ZoneEditorViewModel : ViewModelBase
         SpawnVisualizationObjects.Clear();
         PathVisualizationObjects.Clear();
         NodeVisualizationObjects.Clear();
+        VolumeVisualizationObjects.Clear();
         
         // Add all items to UI collections
         foreach (var item in tempZoneObjects)
@@ -1138,6 +1192,45 @@ public class ZoneEditorViewModel : ViewModelBase
         
         // Create path visuals now that we have path data
         CreatePathVisuals();
+    }
+
+    private async Task PopulateVolumeData(WizZoneVolumes volumeData)
+    {
+        var tempVolumeObjects = new List<VolumeVisualizationObject>();
+        
+        await Task.Run(() =>
+        {
+            Console.WriteLine($"PopulateVolumeData called with {volumeData.m_volumes?.Count ?? 0} volumes");
+            
+            if (volumeData.m_volumes != null)
+            {
+                foreach (var volume in volumeData.m_volumes)
+                {
+                    if (volume != null)
+                    {
+                        var volumeVis = new VolumeVisualizationObject(volume);
+                        tempVolumeObjects.Add(volumeVis);
+                        
+                        // Debug: Log first few volume objects
+                        if (tempVolumeObjects.Count <= 5)
+                        {
+                            Console.WriteLine($"Volume: {volumeVis.Name} at ({volumeVis.X:F1}, {volumeVis.Y:F1}, {volumeVis.Z:F1}) - Type: {volumeVis.PrimitiveType}");
+                        }
+                    }
+                }
+            }
+            
+            Console.WriteLine($"Volume processing complete. Created {tempVolumeObjects.Count} volume visualization objects");
+        });
+        
+        // Update UI collection on UI thread
+        foreach (var item in tempVolumeObjects)
+            VolumeVisualizationObjects.Add(item);
+            
+        Console.WriteLine($"VolumeVisualizationObjects updated. Final count: {VolumeVisualizationObjects.Count}");
+        
+        // Create volume visuals now that we have volume data
+        CreateVolumeVisuals();
     }
 
     private string GetGeometryTypeName(uint typeId)
@@ -1481,6 +1574,17 @@ public class ZoneEditorViewModel : ViewModelBase
             visual.IsVisible = ShowNodes;
         }
         
+        // Update volume visibility
+        var volumeVisuals = _zoneObjectCanvas.Children
+            .OfType<Control>()
+            .Where(c => c.Tag is VolumeVisualizationObject)
+            .ToList();
+            
+        foreach (var visual in volumeVisuals)
+        {
+            visual.IsVisible = ShowVolumes;
+        }
+        
         // Notify property changes for count updates
         this.RaisePropertyChanged(nameof(VisibleCollisionCount));
     }
@@ -1624,6 +1728,41 @@ public class ZoneEditorViewModel : ViewModelBase
         }
         
         Console.WriteLine($"Created path visuals on canvas. Total children in canvas: {_zoneObjectCanvas?.Children.Count ?? 0}");
+    }
+    
+    private void CreateVolumeVisuals()
+    {
+        if (_zoneObjectCanvas == null)
+        {
+            Console.WriteLine("Canvas not set, cannot create volume visuals");
+            return;
+        }
+        
+        Console.WriteLine($"Creating volume visuals for {VolumeVisualizationObjects.Count} volumes");
+        
+        foreach (var volume in VolumeVisualizationObjects)
+        {
+            try
+            {
+                var visual = CreateVolumeVisual(volume);
+                if (visual != null)
+                {
+                    visual.IsVisible = ShowVolumes;
+                    _zoneObjectCanvas.Children.Add(visual);
+                    Console.WriteLine($"Added volume visual for '{volume.Name}' to canvas (visible: {visual.IsVisible})");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to create visual for volume '{volume.Name}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating volume visual for '{volume.Name}': {ex.Message}");
+            }
+        }
+        
+        Console.WriteLine($"Created volume visuals on canvas");
     }
     
     private Control? CreateSpawnVisual(SpawnVisualizationObject spawn)
@@ -1828,6 +1967,223 @@ public class ZoneEditorViewModel : ViewModelBase
 
         return marker;
     }
+    
+    private Control? CreateVolumeVisual(VolumeVisualizationObject volume)
+    {
+        // Convert coordinates (same as zone objects)
+        var canvasX = 10000.0 + (volume.X * 0.25);
+        var canvasY = 10000.0 - (volume.Y * 0.25);
+        
+        // Use red color as requested
+        var volumeBrush = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0)); // Red
+        var volumeStroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(200, 0, 0)); // Darker red for stroke
+        
+        Control? visual = null;
+        
+        // Create shape based on primitive type
+        var primitiveType = volume.PrimitiveType?.ToLowerInvariant() ?? "unknown";
+        switch (primitiveType)
+        {
+            case "box":
+            case "cube":
+                visual = CreateVolumeBoxVisual(volume);
+                break;
+            case "sphere":
+            case "ball":
+                visual = CreateVolumeSphereVisual(volume);
+                break;
+            case "cylinder":
+                visual = CreateVolumeCylinderVisual(volume);
+                break;
+            default:
+                // Fallback to box for unknown types
+                visual = CreateVolumeBoxVisual(volume);
+                break;
+        }
+        
+        if (visual != null)
+        {
+            // Position on canvas
+            Canvas.SetLeft(visual, canvasX);
+            Canvas.SetTop(visual, canvasY);
+            
+            // Add tooltip
+            ToolTip.SetTip(visual, $"{volume.Name} ({volume.PrimitiveType})\n{volume.DimensionsText}\nAt: ({volume.X:F1}, {volume.Y:F1}, {volume.Z:F1})\n{volume.EventsText}");
+            
+            // Tag for identification and selection
+            visual.Tag = volume;
+            
+            // Add click handler for selection
+            visual.PointerPressed += (sender, e) => {
+                if (e.GetCurrentPoint(visual).Properties.IsLeftButtonPressed)
+                {
+                    SelectedVolume = volume;
+                    e.Handled = true;
+                }
+            };
+            
+            // Set cursor to indicate clickable
+            visual.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+        }
+        
+        return visual;
+    }
+    
+    private Control CreateVolumeBoxVisual(VolumeVisualizationObject volume)
+    {
+        var width = Math.Max(10, volume.Width * 0.25);
+        var height = Math.Max(10, volume.Length * 0.25);
+        
+        // Create a canvas to hold the shape and diagonal lines
+        var canvas = new Canvas
+        {
+            Width = width,
+            Height = height
+        };
+        
+        // Create the rectangle outline
+        var rectangle = new Avalonia.Controls.Shapes.Rectangle
+        {
+            Width = width,
+            Height = height,
+            Fill = Brushes.Transparent, // No solid fill
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0)),
+            StrokeThickness = 2
+        };
+        canvas.Children.Add(rectangle);
+        
+        // Add diagonal lines for shading
+        AddDiagonalLines(canvas, width, height);
+        
+        return canvas;
+    }
+    
+    private Control CreateVolumeSphereVisual(VolumeVisualizationObject volume)
+    {
+        var diameter = Math.Max(10, volume.Radius * 2 * 0.25);
+        
+        // Create a canvas to hold the shape and diagonal lines
+        var canvas = new Canvas
+        {
+            Width = diameter,
+            Height = diameter
+        };
+        
+        // Create the ellipse outline
+        var ellipse = new Ellipse
+        {
+            Width = diameter,
+            Height = diameter,
+            Fill = Brushes.Transparent, // No solid fill
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0)),
+            StrokeThickness = 2
+        };
+        canvas.Children.Add(ellipse);
+        
+        // Add diagonal lines for shading (clipped to circle)
+        AddDiagonalLinesClipped(canvas, diameter, diameter, true);
+        
+        return canvas;
+    }
+    
+    private Control CreateVolumeCylinderVisual(VolumeVisualizationObject volume)
+    {
+        // For 2D view, cylinder appears as circle
+        var diameter = Math.Max(10, volume.Radius * 2 * 0.25);
+        
+        // Create a canvas to hold the shape and diagonal lines
+        var canvas = new Canvas
+        {
+            Width = diameter,
+            Height = diameter
+        };
+        
+        // Create the ellipse outline
+        var ellipse = new Ellipse
+        {
+            Width = diameter,
+            Height = diameter,
+            Fill = Brushes.Transparent, // No solid fill
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0)),
+            StrokeThickness = 2
+        };
+        canvas.Children.Add(ellipse);
+        
+        // Add diagonal lines for shading (clipped to circle)
+        AddDiagonalLinesClipped(canvas, diameter, diameter, true);
+        
+        return canvas;
+    }
+    
+    private void AddDiagonalLines(Canvas canvas, double width, double height)
+    {
+        const double lineSpacing = 8; // Spacing between diagonal lines
+        var lineColor = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0));
+        
+        // Add diagonal lines from top-left to bottom-right
+        for (double offset = -height; offset < width + height; offset += lineSpacing)
+        {
+            var line = new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Avalonia.Point(Math.Max(0, offset), Math.Max(0, -offset)),
+                EndPoint = new Avalonia.Point(Math.Min(width, offset + height), Math.Min(height, height - offset)),
+                Stroke = lineColor,
+                StrokeThickness = 1,
+                Opacity = 0.6
+            };
+            
+            canvas.Children.Add(line);
+        }
+    }
+    
+    private void AddDiagonalLinesClipped(Canvas canvas, double width, double height, bool isCircle)
+    {
+        const double lineSpacing = 8; // Spacing between diagonal lines
+        var lineColor = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0));
+        
+        var centerX = width / 2;
+        var centerY = height / 2;
+        var radius = Math.Min(width, height) / 2;
+        
+        // Add diagonal lines, but clip them to the circle if needed
+        for (double offset = -height; offset < width + height; offset += lineSpacing)
+        {
+            var startX = Math.Max(0, offset);
+            var startY = Math.Max(0, -offset);
+            var endX = Math.Min(width, offset + height);
+            var endY = Math.Min(height, height - offset);
+            
+            if (isCircle)
+            {
+                // Clip line to circle bounds (simplified approach)
+                var line = new Avalonia.Controls.Shapes.Line
+                {
+                    StartPoint = new Avalonia.Point(startX, startY),
+                    EndPoint = new Avalonia.Point(endX, endY),
+                    Stroke = lineColor,
+                    StrokeThickness = 1,
+                    Opacity = 0.6
+                };
+                
+                // Apply a circular clip geometry
+                line.Clip = new EllipseGeometry(new Avalonia.Rect(0, 0, width, height));
+                canvas.Children.Add(line);
+            }
+            else
+            {
+                var line = new Avalonia.Controls.Shapes.Line
+                {
+                    StartPoint = new Avalonia.Point(startX, startY),
+                    EndPoint = new Avalonia.Point(endX, endY),
+                    Stroke = lineColor,
+                    StrokeThickness = 1,
+                    Opacity = 0.6
+                };
+                
+                canvas.Children.Add(line);
+            }
+        }
+    }
 
 
     private Control? CreateCollisionShapeVisual(CollisionVisualizationObject collision)
@@ -2024,6 +2380,13 @@ public class ZoneEditorViewModel : ViewModelBase
         NotifySelectionChanged();
     }
     
+    private void SelectVolume(VolumeVisualizationObject volume)
+    {
+        ClearAllSelections();
+        SelectedVolume = volume;
+        NotifySelectionChanged();
+    }
+    
     private void ClearAllSelections()
     {
         SelectedObject = null;
@@ -2032,6 +2395,7 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectedCollision = null;
         SelectedPath = null;
         SelectedMesh = null;
+        SelectedVolume = null;
     }
     
     private void NotifySelectionChanged()
@@ -2041,6 +2405,7 @@ public class ZoneEditorViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(HasSelectedCollision));
         this.RaisePropertyChanged(nameof(HasSelectedPath));
         this.RaisePropertyChanged(nameof(HasSelectedMesh));
+        this.RaisePropertyChanged(nameof(HasSelectedVolume));
         this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
         this.RaisePropertyChanged(nameof(LocationX));
         this.RaisePropertyChanged(nameof(LocationY));

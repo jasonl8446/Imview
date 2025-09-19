@@ -42,6 +42,7 @@ public class ZoneDataService
     private const string SpawnDataFileName = "spawnData.xml";
     private const string PathDataFileName = "pathData.xml";
     private const string NodeDataFileName = "pathNodeData.bin";
+    private const string VolumesDataFileName = "volumes.xml";
     private const string AccessPassFileName = "AccessPass.xml";
     private readonly ClientFileService _clientFileService;
     private readonly RootWadService _rootWadService;
@@ -54,7 +55,7 @@ public class ZoneDataService
         _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
     
-    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile, SpawnManager? SpawnData, PathTemplateList? PathData, NodeTemplateList? NodeData)> LoadZoneDataAsync(string zoneName)
+    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile, SpawnManager? SpawnData, PathTemplateList? PathData, NodeTemplateList? NodeData, WizZoneVolumes? VolumeData)> LoadZoneDataAsync(string zoneName)
     {
         try
         {
@@ -252,7 +253,35 @@ public class ZoneDataService
                 }
             }
             
-            return (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData);
+            // Load volume data (optional)
+            WizZoneVolumes? volumeData = null;
+            var volumeFile = zoneArchive.OpenFile(VolumesDataFileName);
+            if (volumeFile != null)
+            {
+                try
+                {
+                    var volumeDataBytes = volumeFile.Value.ToArray();
+                    if (!bindSerializer.Deserialize<WizZoneVolumes>(volumeDataBytes, 1, out volumeData))
+                    {
+                        Console.WriteLine($"Warning: Failed to deserialize volume data from '{VolumesDataFileName}'");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Loaded volume data with {volumeData.m_volumes?.Count ?? 0} volumes from '{VolumesDataFileName}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Failed to parse volume data from '{VolumesDataFileName}': {ex.Message}");
+                    // Continue without volume data - it's not critical
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No '{VolumesDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have volume data");
+            }
+            
+            return (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData, volumeData);
         }
         catch (Exception ex)
         {
