@@ -49,11 +49,17 @@ public class ZoneEditorViewModel : ViewModelBase
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
     private NifFile? _currentSceneFile = null;
+    private SpawnManager? _currentSpawnData = null;
+    private PathTemplateList? _currentPathData = null;
+    private NodeTemplateList? _currentNodeData = null;
     private NifGeometryProcessor? _nifProcessor = null;
     private bool _isLoading = false;
     private bool _showCollisions = true;
     private bool _showZoneObjects = true;
     private bool _showNifGeometry = true;
+    private bool _showSpawns = true;
+    private bool _showPaths = true;
+    private bool _showNodes = true; // Make visible by default for debugging
     
     // Collision flag filters - default to false so all objects show initially
     private bool _showWalkableCollisions = false;
@@ -107,6 +113,9 @@ public class ZoneEditorViewModel : ViewModelBase
         ZoneVisualizationObjects = new ObservableCollection<ZoneVisualizationObject>();
         CollisionVisualizationObjects = new ObservableCollection<CollisionVisualizationObject>();
         NifMeshVisualizationObjects = new ObservableCollection<NifMeshVisualizationObject>();
+        SpawnVisualizationObjects = new ObservableCollection<SpawnVisualizationObject>();
+        PathVisualizationObjects = new ObservableCollection<PathVisualizationObject>();
+        NodeVisualizationObjects = new ObservableCollection<NodeVisualizationObject>();
         
         _nifProcessor = new NifGeometryProcessor();
         
@@ -120,6 +129,9 @@ public class ZoneEditorViewModel : ViewModelBase
     public ObservableCollection<ZoneVisualizationObject> ZoneVisualizationObjects { get; }
     public ObservableCollection<CollisionVisualizationObject> CollisionVisualizationObjects { get; }
     public ObservableCollection<NifMeshVisualizationObject> NifMeshVisualizationObjects { get; }
+    public ObservableCollection<SpawnVisualizationObject> SpawnVisualizationObjects { get; }
+    public ObservableCollection<PathVisualizationObject> PathVisualizationObjects { get; }
+    public ObservableCollection<NodeVisualizationObject> NodeVisualizationObjects { get; }
 
     public string SelectedZone
     {
@@ -171,6 +183,36 @@ public class ZoneEditorViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _showNifGeometry, value);
+            UpdateVisibility();
+        }
+    }
+
+    public bool ShowSpawns
+    {
+        get => _showSpawns;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showSpawns, value);
+            UpdateVisibility();
+        }
+    }
+
+    public bool ShowPaths
+    {
+        get => _showPaths;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showPaths, value);
+            UpdateVisibility();
+        }
+    }
+
+    public bool ShowNodes
+    {
+        get => _showNodes;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showNodes, value);
             UpdateVisibility();
         }
     }
@@ -381,10 +423,13 @@ public class ZoneEditorViewModel : ViewModelBase
                 .WithDuration(TimeSpan.FromSeconds(2))
                 .Send();
 
-            var (zoneData, collisionData, sceneFile) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
+            var (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData) = await _zoneDataService.LoadZoneDataAsync(SelectedZone);
             _currentZoneData = zoneData;
             _currentCollisionData = collisionData;
             _currentSceneFile = sceneFile;
+            _currentSpawnData = spawnData;
+            _currentPathData = pathData;
+            _currentNodeData = nodeData;
             
             if (_currentZoneData != null)
             {
@@ -398,6 +443,12 @@ public class ZoneEditorViewModel : ViewModelBase
                 if (_currentSceneFile != null)
                 {
                     await PopulateNifGeometry(_currentSceneFile);
+                }
+                
+                // Process path data if available
+                if (_currentSpawnData != null || _currentPathData != null || _currentNodeData != null)
+                {
+                    await PopulatePathData(_currentSpawnData, _currentPathData, _currentNodeData);
                 }
                 
                 MessageService.Info($"Zone '{SelectedZone}' loaded successfully")
@@ -556,6 +607,9 @@ public class ZoneEditorViewModel : ViewModelBase
         ZoneVisualizationObjects.Clear();
         CollisionVisualizationObjects.Clear();
         NifMeshVisualizationObjects.Clear();
+        SpawnVisualizationObjects.Clear();
+        PathVisualizationObjects.Clear();
+        NodeVisualizationObjects.Clear();
         
         // Add all items to UI collections
         foreach (var item in tempZoneObjects)
@@ -691,6 +745,116 @@ public class ZoneEditorViewModel : ViewModelBase
         
         // Create NIF geometry visuals now that we have mesh data
         CreateNifGeometryVisuals();
+    }
+
+    private async Task PopulatePathData(SpawnManager? spawnData, PathTemplateList? pathData, NodeTemplateList? nodeData)
+    {
+        var tempSpawns = new List<SpawnVisualizationObject>();
+        var tempPaths = new List<PathVisualizationObject>();
+        var tempNodes = new List<NodeVisualizationObject>();
+        
+        await Task.Run(() =>
+        {
+            Console.WriteLine($"PopulatePathData called with:");
+            Console.WriteLine($"  - Spawn data: {(spawnData != null ? $"{spawnData.m_spawners?.Count ?? 0} spawners" : "null")}");
+            Console.WriteLine($"  - Path data: {(pathData != null ? $"{pathData.m_pathList?.Count ?? 0} paths" : "null")}");
+            Console.WriteLine($"  - Node data: {(nodeData != null ? $"{nodeData.m_nodeList?.Count ?? 0} nodes" : "null")}");
+            
+            // Process nodes first since paths reference them
+            Dictionary<ulong, NodeVisualizationObject> nodeMap = new();
+            if (nodeData?.m_nodeList != null)
+            {
+                Console.WriteLine($"Node data contains {nodeData.m_nodeList.Count} node entries");
+                
+                foreach (var nodeObj in nodeData.m_nodeList)
+                {
+                    if (nodeObj != null)
+                    {
+                        Console.WriteLine($"Processing node: ID={nodeObj.m_id}, Location=({nodeObj.m_location.X}, {nodeObj.m_location.Y}, {nodeObj.m_location.Z})");
+                        
+                        var nodeVis = new NodeVisualizationObject
+                        {
+                            NodeId = (ulong)nodeObj.m_id,
+                            Name = $"Node_{nodeObj.m_id}", // NodeObject doesn't have m_zoneTag
+                            X = nodeObj.m_location.X,
+                            Y = nodeObj.m_location.Y,
+                            Z = nodeObj.m_location.Z
+                        };
+                        
+                        tempNodes.Add(nodeVis);
+                        nodeMap[nodeVis.NodeId] = nodeVis;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Found null node object in node list");
+                    }
+                }
+                Console.WriteLine($"Processed {tempNodes.Count} nodes from {nodeData.m_nodeList.Count} entries");
+            }
+            else
+            {
+                Console.WriteLine("Node data is null or m_nodeList is null");
+            }
+            
+            // Process paths and connect them to nodes
+            Dictionary<ulong, PathVisualizationObject> pathMap = new();
+            if (pathData?.m_pathList != null)
+            {
+                foreach (var pathTemplate in pathData.m_pathList)
+                {
+                    if (pathTemplate != null)
+                    {
+                        var pathVis = new PathVisualizationObject
+                        {
+                            PathId = (ulong)pathTemplate.m_id,
+                            Name = pathTemplate.m_name ?? $"Path_{pathTemplate.m_id}",
+                            PathType = "Mob Path"
+                        };
+                        
+                        // Connect nodes to this path
+                        if (pathTemplate.m_nodeIDs != null)
+                        {
+                            var pathNodes = new List<NodeVisualizationObject>();
+                            for (int i = 0; i < pathTemplate.m_nodeIDs.Count; i++)
+                            {
+                                var nodeId = (ulong)pathTemplate.m_nodeIDs[i];
+                                if (nodeMap.TryGetValue(nodeId, out var node))
+                                {
+                                    node.PathId = pathVis.PathId;
+                                    node.NodeIndex = i;
+                                    pathNodes.Add(node);
+                                }
+                            }
+                            pathVis.Nodes = pathNodes;
+                        }
+                        
+                        tempPaths.Add(pathVis);
+                        pathMap[pathVis.PathId] = pathVis;
+                    }
+                }
+                Console.WriteLine($"Processed {tempPaths.Count} paths");
+            }
+            
+            // Skip spawn processing since spawn data doesn't contain location info
+            // Spawns are just metadata about what creatures use paths - the physical locations are the nodes
+            
+            Console.WriteLine($"Path data processing complete. Spawns: {tempSpawns.Count}, Paths: {tempPaths.Count}, Nodes: {tempNodes.Count}");
+        });
+        
+        // Update UI collections on UI thread
+        foreach (var item in tempSpawns)
+            SpawnVisualizationObjects.Add(item);
+            
+        foreach (var item in tempPaths)
+            PathVisualizationObjects.Add(item);
+            
+        foreach (var item in tempNodes)
+            NodeVisualizationObjects.Add(item);
+            
+        Console.WriteLine($"Path UI collections updated. Final counts: Spawns: {SpawnVisualizationObjects.Count}, Paths: {PathVisualizationObjects.Count}, Nodes: {NodeVisualizationObjects.Count}");
+        
+        // Create path visuals now that we have path data
+        CreatePathVisuals();
     }
 
     private string GetGeometryTypeName(uint typeId)
@@ -958,6 +1122,39 @@ public class ZoneEditorViewModel : ViewModelBase
             visual.IsVisible = ShowNifGeometry;
         }
         
+        // Update spawn visibility
+        var spawnVisuals = _zoneObjectCanvas.Children
+            .OfType<Control>()
+            .Where(c => c.Tag is SpawnVisualizationObject)
+            .ToList();
+            
+        foreach (var visual in spawnVisuals)
+        {
+            visual.IsVisible = ShowSpawns;
+        }
+        
+        // Update path visibility (path lines)
+        var pathVisuals = _zoneObjectCanvas.Children
+            .OfType<Control>()
+            .Where(c => c.Tag is PathVisualizationObject)
+            .ToList();
+            
+        foreach (var visual in pathVisuals)
+        {
+            visual.IsVisible = ShowPaths;
+        }
+        
+        // Update node visibility
+        var nodeVisuals = _zoneObjectCanvas.Children
+            .OfType<Control>()
+            .Where(c => c.Tag is NodeVisualizationObject)
+            .ToList();
+            
+        foreach (var visual in nodeVisuals)
+        {
+            visual.IsVisible = ShowNodes;
+        }
+        
         // Notify property changes for count updates
         this.RaisePropertyChanged(nameof(VisibleCollisionCount));
     }
@@ -1025,6 +1222,186 @@ public class ZoneEditorViewModel : ViewModelBase
         }
         
         Console.WriteLine($"Created NIF geometry visuals on canvas");
+    }
+    
+    private void CreatePathVisuals()
+    {
+        if (_zoneObjectCanvas == null)
+        {
+            Console.WriteLine("Canvas not set, cannot create path visuals");
+            return;
+        }
+        
+        Console.WriteLine($"Creating path visuals for {SpawnVisualizationObjects.Count} spawns, {PathVisualizationObjects.Count} paths, {NodeVisualizationObjects.Count} nodes");
+        Console.WriteLine($"Canvas is null: {_zoneObjectCanvas == null}, ShowSpawns: {ShowSpawns}, ShowPaths: {ShowPaths}, ShowNodes: {ShowNodes}");
+        
+        // Create spawn visuals
+        foreach (var spawn in SpawnVisualizationObjects)
+        {
+            try
+            {
+                var visual = CreateSpawnVisual(spawn);
+                if (visual != null)
+                {
+                    visual.IsVisible = ShowSpawns;
+                    _zoneObjectCanvas.Children.Add(visual);
+                    Console.WriteLine($"Added spawn visual for '{spawn.Name}' to canvas (visible: {visual.IsVisible})");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to create visual for spawn '{spawn.Name}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating spawn visual for '{spawn.Name}': {ex.Message}");
+            }
+        }
+        
+        // Create node visuals
+        foreach (var node in NodeVisualizationObjects)
+        {
+            try
+            {
+                var visual = CreateNodeVisual(node);
+                if (visual != null)
+                {
+                    visual.IsVisible = ShowNodes;
+                    _zoneObjectCanvas.Children.Add(visual);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating node visual for '{node.Name}': {ex.Message}");
+            }
+        }
+        
+        // Create path visuals (lines connecting nodes)
+        foreach (var path in PathVisualizationObjects)
+        {
+            try
+            {
+                if (path.HasNodes)
+                {
+                    var visuals = CreatePathLineVisuals(path);
+                    foreach (var visual in visuals)
+                    {
+                        visual.IsVisible = ShowPaths;
+                        _zoneObjectCanvas.Children.Add(visual);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating path visuals for '{path.Name}': {ex.Message}");
+            }
+        }
+        
+        Console.WriteLine($"Created path visuals on canvas. Total children in canvas: {_zoneObjectCanvas?.Children.Count ?? 0}");
+    }
+    
+    private Control? CreateSpawnVisual(SpawnVisualizationObject spawn)
+    {
+        // Convert coordinates (same as zone objects)
+        var canvasX = 10000.0 + (spawn.X * 0.25);
+        var canvasY = 10000.0 - (spawn.Y * 0.25);
+        
+        Console.WriteLine($"Creating spawn visual for '{spawn.Name}' at game coords ({spawn.X:F1}, {spawn.Y:F1}, {spawn.Z:F1}) -> canvas coords ({canvasX:F1}, {canvasY:F1})");
+        
+        // Use a distinctive color for spawns - bright orange
+        var spawnBrush = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 140, 0)); // Orange
+        
+        var spawn_visual = new Ellipse
+        {
+            Width = 12,
+            Height = 12,
+            Fill = spawnBrush,
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 255)), // White outline
+            StrokeThickness = 2
+        };
+        
+        // Position on canvas
+        Canvas.SetLeft(spawn_visual, canvasX - 6); // Center the circle
+        Canvas.SetTop(spawn_visual, canvasY - 6);
+        
+        // Add tooltip
+        ToolTip.SetTip(spawn_visual, $"{spawn.Name} ({spawn.SpawnType})\nID: {spawn.SpawnId}\nTemplate: {spawn.TemplateId}\nAt: ({spawn.X:F1}, {spawn.Y:F1}, {spawn.Z:F1})\n{spawn.PathInfo}");
+        
+        // Tag for identification
+        spawn_visual.Tag = spawn;
+        
+        return spawn_visual;
+    }
+    
+    private Control? CreateNodeVisual(NodeVisualizationObject node)
+    {
+        // Convert coordinates (same as zone objects)
+        var canvasX = 10000.0 + (node.X * 0.25);
+        var canvasY = 10000.0 - (node.Y * 0.25);
+        
+        // Use a distinctive color for nodes - bright green
+        var nodeBrush = new SolidColorBrush(Avalonia.Media.Color.FromRgb(0, 255, 0)); // Bright green
+        
+        var node_visual = new Ellipse
+        {
+            Width = 6,
+            Height = 6,
+            Fill = nodeBrush,
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 255)), // White outline
+            StrokeThickness = 1
+        };
+        
+        // Position on canvas
+        Canvas.SetLeft(node_visual, canvasX - 3); // Center the circle
+        Canvas.SetTop(node_visual, canvasY - 3);
+        
+        // Add tooltip
+        ToolTip.SetTip(node_visual, $"{node.DisplayText}\nID: {node.NodeId}\nPath: {node.PathId}\nAt: ({node.X:F1}, {node.Y:F1}, {node.Z:F1})");
+        
+        // Tag for identification
+        node_visual.Tag = node;
+        
+        return node_visual;
+    }
+    
+    private List<Control> CreatePathLineVisuals(PathVisualizationObject path)
+    {
+        var visuals = new List<Control>();
+        
+        if (path.Nodes.Count < 2) return visuals;
+        
+        // Create lines connecting consecutive nodes
+        for (int i = 0; i < path.Nodes.Count - 1; i++)
+        {
+            var fromNode = path.Nodes[i];
+            var toNode = path.Nodes[i + 1];
+            
+            // Convert coordinates
+            var fromX = 10000.0 + (fromNode.X * 0.25);
+            var fromY = 10000.0 - (fromNode.Y * 0.25);
+            var toX = 10000.0 + (toNode.X * 0.25);
+            var toY = 10000.0 - (toNode.Y * 0.25);
+            
+            // Create line
+            var line = new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Avalonia.Point(fromX, fromY),
+                EndPoint = new Avalonia.Point(toX, toY),
+                Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)), // Yellow path lines
+                StrokeThickness = 2,
+                Opacity = 0.8
+            };
+            
+            // Add tooltip
+            ToolTip.SetTip(line, $"{path.Name}\nSegment {i + 1} of {path.Nodes.Count - 1}\nFrom: {fromNode.DisplayText}\nTo: {toNode.DisplayText}");
+            
+            // Tag for identification
+            line.Tag = path;
+            
+            visuals.Add(line);
+        }
+        
+        return visuals;
     }
 
     private Control? CreateNifMeshVisual(NifMeshVisualizationObject mesh)
@@ -1326,6 +1703,23 @@ public class ZoneEditorViewModel : ViewModelBase
         
         return "Object";
     }
+    
+    private string DetermineSpawnType(SpawnObjectInfo spawn)
+    {
+        var name = spawn.m_zoneTag?.ToLower() ?? "";
+        
+        // Basic spawn type detection
+        if (name.Contains("mob") || name.Contains("enemy") || name.Contains("creature"))
+            return "Mob";
+        if (name.Contains("npc") || name.Contains("character"))
+            return "NPC";
+        if (name.Contains("boss") || name.Contains("elite"))
+            return "Boss";
+        if (name.Contains("pet") || name.Contains("minion"))
+            return "Pet";
+            
+        return "Unknown";
+    }
 
     private bool IsVolume(CoreObjectInfo obj)
     {
@@ -1466,4 +1860,50 @@ public class NifMeshVisualizationObject
     public string DisplayText => $"{Name} (NIF Mesh)";
     public string GeometryInfo => $"Vertices: {VertexCount}, Triangles: {TriangleCount}";
     public bool HasValidGeometry => Vertices2D.Count > 0;
+}
+
+public class SpawnVisualizationObject
+{
+    public string Name { get; set; } = string.Empty;
+    public ulong SpawnId { get; set; }
+    public ulong TemplateId { get; set; }
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float Z { get; set; }
+    public float Scale { get; set; } = 1.0f;
+    public byte SpawnChance { get; set; } // Percentage chance to spawn (0-100)
+    public string SpawnType { get; set; } = string.Empty;
+    public List<ulong> PathIds { get; set; } = new(); // Paths this spawn uses
+    
+    public string DisplayText => $"{Name} (Spawn)";
+    public string CoordinateText => $"({X:F1}, {Y:F1}, {Z:F1})";
+    public string PathInfo => PathIds.Count > 0 ? $"Paths: {string.Join(", ", PathIds)}" : "No paths";
+}
+
+public class NodeVisualizationObject
+{
+    public ulong NodeId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float Z { get; set; }
+    public ulong PathId { get; set; } // Which path this node belongs to
+    public int NodeIndex { get; set; } // Order in the path
+    
+    public string DisplayText => $"Node {NodeIndex} ({Name})";
+    public string CoordinateText => $"({X:F1}, {Y:F1}, {Z:F1})";
+}
+
+public class PathVisualizationObject
+{
+    public ulong PathId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public List<NodeVisualizationObject> Nodes { get; set; } = new();
+    public List<ulong> SpawnIds { get; set; } = new(); // Spawns that use this path
+    public string PathType { get; set; } = "Unknown";
+    
+    public string DisplayText => $"{Name} (Path)";
+    public string NodeInfo => $"Nodes: {Nodes.Count}";
+    public string SpawnInfo => SpawnIds.Count > 0 ? $"Used by {SpawnIds.Count} spawn(s)" : "Unused path";
+    public bool HasNodes => Nodes.Count > 0;
 }

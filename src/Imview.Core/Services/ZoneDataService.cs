@@ -39,6 +39,9 @@ public class ZoneDataService
 {
     private const string ZoneDataFileName = "gamedata.bin";
     private const string CollisionDataFileName = "collision.bcd";
+    private const string SpawnDataFileName = "spawnData.xml";
+    private const string PathDataFileName = "pathData.xml";
+    private const string NodeDataFileName = "pathNodeData.bin";
     private const string AccessPassFileName = "AccessPass.xml";
     private readonly ClientFileService _clientFileService;
     private readonly RootWadService _rootWadService;
@@ -51,7 +54,7 @@ public class ZoneDataService
         _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
     
-    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile)> LoadZoneDataAsync(string zoneName)
+    public async Task<(WizZoneData? ZoneData, Bcd? CollisionData, NifFile? SceneFile, SpawnManager? SpawnData, PathTemplateList? PathData, NodeTemplateList? NodeData)> LoadZoneDataAsync(string zoneName)
     {
         try
         {
@@ -87,7 +90,7 @@ public class ZoneDataService
             var gameDataBytes = gameDataFile.Value.ToArray();
             
             WizZoneData? zoneData = null;
-            if (!bindSerializer.Deserialize<WizZoneData>(gameDataBytes, out zoneData))
+            if (!bindSerializer.Deserialize<WizZoneData>(gameDataBytes, 1, out zoneData))
             {
                 throw new InvalidOperationException($"Failed to deserialize zone data from '{ZoneDataFileName}' in '{zoneWadName}'");
             }
@@ -147,7 +150,109 @@ public class ZoneDataService
                 Console.WriteLine($"No gamebryoSceneFileName specified in zone data or zone data is null");
             }
             
-            return (zoneData, collisionData, sceneFile);
+            // Load spawn data (optional - similar to collision data)
+            SpawnManager? spawnData = null;
+            var spawnFile = zoneArchive.OpenFile(SpawnDataFileName);
+            if (spawnFile != null)
+            {
+                try
+                {
+                    var spawnDataBytes = spawnFile.Value.ToArray();
+                    if (!bindSerializer.Deserialize<SpawnManager>(spawnDataBytes, 1, out spawnData))
+                    {
+                        Console.WriteLine($"Warning: Failed to deserialize spawn data from '{SpawnDataFileName}'");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Loaded spawn data with {spawnData.m_spawners?.Count ?? 0} spawn objects from '{SpawnDataFileName}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Failed to parse spawn data from '{SpawnDataFileName}': {ex.Message}");
+                    // Continue without spawn data - it's not critical
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No '{SpawnDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have spawn data");
+            }
+            
+            // Load path data (optional)
+            PathTemplateList? pathData = null;
+            var pathFile = zoneArchive.OpenFile(PathDataFileName);
+            if (pathFile != null)
+            {
+                try
+                {
+                    var pathDataBytes = pathFile.Value.ToArray();
+                    if (!bindSerializer.Deserialize<PathTemplateList>(pathDataBytes, 1, out pathData))
+                    {
+                        Console.WriteLine($"Warning: Failed to deserialize path data from '{PathDataFileName}'");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Loaded path data with {pathData.m_pathList?.Count ?? 0} path templates from '{PathDataFileName}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Failed to parse path data from '{PathDataFileName}': {ex.Message}");
+                    // Continue without path data - it's not critical
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No '{PathDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have path data");
+            }
+            
+            // Load node data (optional)
+            NodeTemplateList? nodeData = null;
+            Console.WriteLine($"Looking for node data file: '{NodeDataFileName}' in zone WAD '{zoneWadName}'");
+            var nodeFile = zoneArchive.OpenFile(NodeDataFileName);
+            if (nodeFile != null)
+            {
+                Console.WriteLine($"Found '{NodeDataFileName}' file, size: {nodeFile.Value.Length} bytes");
+                try
+                {
+                    var nodeDataBytes = nodeFile.Value.ToArray();
+                    Console.WriteLine($"Attempting to deserialize node data with BindSerializer (exact Imlight config)...");
+                    if (!bindSerializer.Deserialize<NodeTemplateList>(nodeDataBytes, 1, out nodeData))
+                    {
+                        Console.WriteLine($"ERROR: Failed to deserialize node data from '{NodeDataFileName}' - deserializer returned false");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"SUCCESS: Loaded node data with {nodeData?.m_nodeList?.Count ?? 0} node objects from '{NodeDataFileName}'");
+                        Console.WriteLine($"NodeData is null: {nodeData == null}");
+                        Console.WriteLine($"NodeData.m_nodeList is null: {nodeData?.m_nodeList == null}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"ERROR: Exception while parsing node data from '{NodeDataFileName}': {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    // Continue without node data - it's not critical
+                }
+            }
+            else
+            {
+                Console.WriteLine($"ERROR: '{NodeDataFileName}' not found in zone WAD '{zoneWadName}'");
+                
+                // List all files in the WAD for debugging
+                Console.WriteLine($"Files available in zone WAD '{zoneWadName}':");
+                var allFiles = zoneArchive.Files.Keys;
+                foreach (var file in allFiles.Take(20)) // Limit to first 20 files to avoid spam
+                {
+                    Console.WriteLine($"  - {file}");
+                }
+                if (allFiles.Count() > 20)
+                {
+                    Console.WriteLine($"  ... and {allFiles.Count() - 20} more files");
+                }
+            }
+            
+            return (zoneData, collisionData, sceneFile, spawnData, pathData, nodeData);
         }
         catch (Exception ex)
         {

@@ -189,6 +189,18 @@
                                      FontSize="10"
                                      Foreground="#FFFF00"
                                      Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding SpawnVisualizationObjects.Count, StringFormat='Spawns: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#FF8C00"
+                                     Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding PathVisualizationObjects.Count, StringFormat='Paths: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#FFFF00"
+                                     Margin="5,0,5,5"/>
+                            <TextBlock Text="{Binding NodeVisualizationObjects.Count, StringFormat='Nodes: {0}'}"
+                                     FontSize="10"
+                                     Foreground="#00FF00"
+                                     Margin="5,0,5,5"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -233,6 +245,29 @@
                                 <CheckBox Content="Show NIF Geometry"
                                         IsChecked="{Binding ShowNifGeometry}"
                                         Foreground="#FFFF00"
+                                        Margin="10,0,0,0"/>
+                            </StackPanel>
+                            
+                            <!-- Spawn and Path Filters -->
+                            <StackPanel Spacing="8">
+<TextBlock Text="Mob Spawns &amp; Paths" 
+                                         FontWeight="Bold" 
+                                         FontSize="14"
+                                         Foreground="#FF8C00"/>
+                                
+                                <CheckBox Content="Show Spawn Points"
+                                        IsChecked="{Binding ShowSpawns}"
+                                        Foreground="#FF8C00"
+                                        Margin="10,0,0,0"/>
+                                        
+                                <CheckBox Content="Show Mob Paths"
+                                        IsChecked="{Binding ShowPaths}"
+                                        Foreground="#FFFF00"
+                                        Margin="10,0,0,0"/>
+                                        
+                                <CheckBox Content="Show Path Nodes"
+                                        IsChecked="{Binding ShowNodes}"
+                                        Foreground="#00FF00"
                                         Margin="10,0,0,0"/>
                             </StackPanel>
                             
