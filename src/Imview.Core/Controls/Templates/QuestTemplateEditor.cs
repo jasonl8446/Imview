@@ -39,6 +39,7 @@ using Imview.Core.Services;
 using Avalonia.VisualTree;
 using Avalonia.ReactiveUI;
 using Imview.Core.Views;
+using Imview.Core.Controls.Results;
 
 namespace Imview.Core.Controls.Templates;
 
@@ -69,6 +70,10 @@ public partial class QuestTemplateEditor : UserControl {
     private readonly IGoalEditorFactory _goalEditorFactory;
     private readonly IRequirementEditorFactory _requirementEditorFactory;
 
+    // Results collections
+    private readonly ObservableCollection<Result> _startResults;
+    private readonly ObservableCollection<Result> _endResults;
+
     // UI Controls
     private Avalonia.Controls.Button _questTitleButton;
     private TextBlock _questTitleResolvedText;
@@ -92,6 +97,10 @@ public partial class QuestTemplateEditor : UserControl {
     private Avalonia.Controls.Button _prepRequirementsButton;
     private Avalonia.Controls.Button _pruneRequirementsButton;
 
+    // Results Controls
+    private ListBox _startResultsList;
+    private ListBox _endResultsList;
+
     // Parameter-less constructor for design-time support
     public QuestTemplateEditor() : this(null, null) { }
 
@@ -113,6 +122,14 @@ public partial class QuestTemplateEditor : UserControl {
             (_template.m_goalLogic ?? []).Select(logic => new GoalCompleteLogicWrapper(logic))
         );
 
+        // Initialize results collections
+        _startResults = new ObservableCollection<Result>(
+            _template.m_startResults?.m_results ?? new List<Result>()
+        );
+        _endResults = new ObservableCollection<Result>(
+            _template.m_endResults?.m_results ?? new List<Result>()
+        );
+
         // Initialize non-nullable fields
         _questTitleButton = new Avalonia.Controls.Button();
         _questTitleResolvedText = new TextBlock();
@@ -130,6 +147,42 @@ public partial class QuestTemplateEditor : UserControl {
         _mainRequirementsButton = new Avalonia.Controls.Button();
         _prepRequirementsButton = new Avalonia.Controls.Button();
         _pruneRequirementsButton = new Avalonia.Controls.Button();
+        _startResultsList = new ListBox {
+            ItemsSource = _startResults,
+            ItemTemplate = new FuncDataTemplate<Result>((result, _) => {
+                if (result == null) return null;
+                return new TextBlock { 
+                    Text = ResultEditorFactory.GetResultDisplayName(result),
+                    TextWrapping = TextWrapping.Wrap
+                };
+            }),
+            Height = 150
+        };
+        
+        _endResultsList = new ListBox {
+            ItemsSource = _endResults,
+            ItemTemplate = new FuncDataTemplate<Result>((result, _) => {
+                if (result == null) return null;
+                return new TextBlock { 
+                    Text = ResultEditorFactory.GetResultDisplayName(result),
+                    TextWrapping = TextWrapping.Wrap
+                };
+            }),
+            Height = 150
+        };
+
+        // Add double-click handlers for results lists
+        _startResultsList.DoubleTapped += (s, e) => {
+            if (_startResultsList.SelectedItem is Result result) {
+                _ = EditResult(result, _startResults);
+            }
+        };
+        
+        _endResultsList.DoubleTapped += (s, e) => {
+            if (_endResultsList.SelectedItem is Result result) {
+                _ = EditResult(result, _endResults);
+            }
+        };
 
         InitializeComponent();
         InitializeValues();
@@ -149,6 +202,7 @@ public partial class QuestTemplateEditor : UserControl {
         mainPanel.Children.Add(CreateScriptSection());
         mainPanel.Children.Add(CreateFlagsSection());
         mainPanel.Children.Add(CreateRequirementsSection());
+        mainPanel.Children.Add(CreateResultsSection());
         mainPanel.Children.Add(CreateGoalsSection());
         mainPanel.Children.Add(CreateGoalLogicSection());
         mainPanel.Children.Add(CreateActionButtons());
@@ -284,6 +338,29 @@ public partial class QuestTemplateEditor : UserControl {
         };
 
         _goalLogicsList.DoubleTapped += GoalLogicsList_DoubleTapped;
+
+        // Initialize results lists
+        _startResultsList = new ListBox {
+            ItemsSource = _startResults,
+            Height = EditorConstants.DEFAULT_LIST_HEIGHT
+        };
+
+        _endResultsList = new ListBox {
+            ItemsSource = _endResults,
+            Height = EditorConstants.DEFAULT_LIST_HEIGHT
+        };
+
+        _startResultsList.DoubleTapped += async (s, e) => {
+            if (_startResultsList.SelectedItem is Result selectedResult) {
+                await EditResult(selectedResult, _startResults);
+            }
+        };
+
+        _endResultsList.DoubleTapped += async (s, e) => {
+            if (_endResultsList.SelectedItem is Result selectedResult) {
+                await EditResult(selectedResult, _endResults);
+            }
+        };
     }
 
     private Control CreateQuestTitlePanel() {
@@ -453,6 +530,69 @@ public partial class QuestTemplateEditor : UserControl {
         };
 
         return CreateGroupBox("Quest Requirements", content);
+    }
+
+    private Control CreateResultsSection() {
+        var infoPanel = new StackPanel {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 5),
+            Children = {
+                new TextBlock {
+                    Text = "Define results that are triggered when the quest starts or ends. Double-click to edit existing results.",
+                    Foreground = Brushes.LightGray,
+                    FontStyle = FontStyle.Italic,
+                    TextWrapping = TextWrapping.Wrap
+                }
+            }
+        };
+
+        var startResultsPanel = CreateResultsPanel("Start Results", _startResultsList, 
+            () => AddNewResult(_startResults),
+            () => RemoveSelectedResult(_startResultsList, _startResults));
+
+        var endResultsPanel = CreateResultsPanel("End Results", _endResultsList,
+            () => AddNewResult(_endResults),
+            () => RemoveSelectedResult(_endResultsList, _endResults));
+
+        var content = new StackPanel {
+            Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
+            Children = {
+                infoPanel,
+                startResultsPanel,
+                endResultsPanel
+            }
+        };
+
+        return CreateGroupBox("Quest Results", content);
+    }
+
+    private Control CreateResultsPanel(string title, ListBox listBox, Func<Task> addAction, System.Action removeAction) {
+        var buttonPanel = new StackPanel {
+            Orientation = Orientation.Horizontal,
+            Spacing = 5,
+            Margin = new Thickness(0, 0, 0, 5),
+            Children = {
+                new Avalonia.Controls.Button { Content = "Add Result", Command = ReactiveCommand.CreateFromTask(addAction) },
+                new Avalonia.Controls.Button { Content = "Remove Result", Command = ReactiveCommand.Create(removeAction) }
+            }
+        };
+
+        var panel = new DockPanel {
+            LastChildFill = true,
+            Children = {
+                buttonPanel,
+                listBox
+            }
+        };
+        DockPanel.SetDock(buttonPanel, Dock.Top);
+
+        return new StackPanel {
+            Spacing = 5,
+            Children = {
+                new TextBlock { Text = title, FontWeight = FontWeight.SemiBold },
+                panel
+            }
+        };
     }
 
     private Control CreateGoalsSection() {
@@ -753,6 +893,10 @@ public partial class QuestTemplateEditor : UserControl {
         _template.m_questRepeat = (_questRepeatBox.IsChecked ?? false) ? 1 : 0;
         _template.m_outdated = _outdatedBox.IsChecked ?? false;
 
+        // Save quest results.
+        _template.m_startResults = new ResultList { m_results = _startResults.ToList() };
+        _template.m_endResults = new ResultList { m_results = _endResults.ToList() };
+
         // Save quest goals.
         _template.m_goals = _goals.Select(wrapper => wrapper.Goal).ToList();
 
@@ -817,7 +961,63 @@ public partial class QuestTemplateEditor : UserControl {
             _goalLogics.Add(new GoalCompleteLogicWrapper(logic));
         }
 
+        // Populate results collections
+        _startResults.Clear();
+        _endResults.Clear();
+        foreach (var result in _template.m_startResults?.m_results ?? []) {
+            _startResults.Add(result);
+        }
+        foreach (var result in _template.m_endResults?.m_results ?? []) {
+            _endResults.Add(result);
+        }
+
         InitializeValues();
+    }
+
+    private async Task EditResult(Result result, ObservableCollection<Result> resultsList) {
+        var editor = ResultEditorFactory.CreateEditor(result);
+        if (editor == null) {
+            MessageService
+                .Info($"No specific editor available for {result.GetType().Name}. Using generic editor.")
+                .Send();
+            
+            var genericEditor = new ResultTemplateEditor(result);
+            var genericParentWindow = GetParentWindow();
+            await genericEditor.ShowDialog(genericParentWindow);
+
+            var genericEditedResult = await genericEditor.GetResultAsync();
+            if (genericEditedResult != null) {
+                var index = resultsList.IndexOf(result);
+                resultsList[index] = genericEditedResult;
+            }
+            return;
+        }
+        
+        var parentWindow = GetParentWindow();
+        await editor.ShowDialog(parentWindow);
+
+        var editedResult = await ResultEditorFactory.GetResultFromEditor(editor);
+        if (editedResult != null) {
+            var index = resultsList.IndexOf(result);
+            resultsList[index] = editedResult;
+        }
+    }
+
+    private async Task AddNewResult(ObservableCollection<Result> resultsList) {
+        var selectionDialog = new ResultTypeSelectionDialog();
+        var parentWindow = GetParentWindow();
+        await selectionDialog.ShowDialog(parentWindow);
+
+        var result = await selectionDialog.GetResultAsync();
+        if (result != null) {
+            resultsList.Add(result);
+        }
+    }
+
+    private void RemoveSelectedResult(ListBox listBox, ObservableCollection<Result> resultsList) {
+        if (listBox.SelectedItem is Result selectedResult) {
+            resultsList.Remove(selectedResult);
+        }
     }
 
 }

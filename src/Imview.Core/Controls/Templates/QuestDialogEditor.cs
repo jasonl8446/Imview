@@ -387,6 +387,7 @@ public partial class QuestDialogEditor : UserControl {
 /// Wrapper class for dialog entries to make UI binding easier
 /// </summary>
 public class DialogEntryWrapper {
+    // Basic Properties
     public string PersonaName { get; set; } = "";
     public string DialogKey { get; set; } = "";
     public string SoundFile { get; set; } = "";
@@ -396,4 +397,51 @@ public class DialogEntryWrapper {
     public string Action { get; set; } = "";
     public string NameOverride { get; set; } = "";
     public string GuiDisplay { get; set; } = "";
+    
+    // Extended Properties
+    public string DialogEvent { get; set; } = "";
+    public float Duration { get; set; }
+    public float Delay { get; set; }
+    public float InterpolationDuration { get; set; }
+    
+    // Camera Properties
+    public float CameraOffsetX { get; set; }
+    public float CameraOffsetY { get; set; }
+    public float CameraOffsetZ { get; set; }
+    public float Pitch { get; set; }
+    public float Yaw { get; set; }
+    public float Roll { get; set; }
+    public string CameraShakeType { get; set; } = "";
+    public float CameraShakeDuration { get; set; }
+    public float CameraShakeAmplitude { get; set; }
+    public bool BypassCameraOnReview { get; set; }
+    public string CameraZoneName { get; set; } = "";
+    public string CameraFadeType { get; set; } = "";
+    public float CameraFadeTime { get; set; }
+    
+    // Animation Properties  
+    public string IdleAnimation { get; set; } = "";
+    public float NpcYawOffsetInDegrees { get; set; }
+    public bool AllowPlayerToMove { get; set; }
+    
+    // Audio Properties
+    public string SoundEffectFile { get; set; } = "";
+    public string MusicFile { get; set; } = "";
+    public bool NonStackableMusic { get; set; }
+    public bool NonRepeatableMusic { get; set; }
+    public bool PlayMusicAtSFXVolume { get; set; }
+    public float SoundEffectDelay { get; set; }
+    public float MusicDelay { get; set; }
+    public float MusicFadeTime { get; set; }
+    
+    // Behavior Flags
+    public bool DontReleaseCameraAtExit { get; set; }
+    public bool DisableBackButton { get; set; }
+    public bool EnableExitButton { get; set; }
+    public bool FadeOutCamera { get; set; }
+    public bool SnapCameraToPlayerAtExit { get; set; }
+    public float SpamTime { get; set; }
+    public bool PlaySoundIfSpamming { get; set; }
+    public bool PlayMusicIfSpamming { get; set; }
+    public bool DisplayButtonsOnTimedDialog { get; set; }
 }
