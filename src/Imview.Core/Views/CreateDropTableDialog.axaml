@@ -1,0 +1,86 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="400"
+        x:Class="Imview.Core.Views.CreateDropTableDialog"
+        Title="Create New Drop Table"
+        Width="450"
+        Height="400"
+        WindowStartupLocation="CenterOwner"
+        CanResize="false"
+        Background="#1E1E1E">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="Create New Drop Table"
+                      FontSize="18"
+                      FontWeight="Bold"
+                      Foreground="White"/>
+            <TextBlock Text="Enter the details for your new drop table. Note: The table name cannot be changed after creation."
+                      FontSize="12"
+                      Foreground="#CCCCCC"
+                      TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Form -->
+        <StackPanel Grid.Row="1" Spacing="15" Margin="0,0,0,20">
+            <StackPanel Spacing="5">
+                <TextBlock Text="Table Name*" 
+                          Foreground="White" 
+                          FontWeight="Medium"/>
+                <TextBox x:Name="NameTextBox"
+                        Background="#333333"
+                        Foreground="White"
+                        BorderBrush="#555555"
+                        Watermark="Enter a unique table name..."
+                        MaxLength="50"/>
+                <TextBlock Text="⚠️ This name cannot be changed after creation"
+                          FontSize="11"
+                          Foreground="#FF9999"
+                          FontStyle="Italic"/>
+            </StackPanel>
+
+            <StackPanel Spacing="5">
+                <TextBlock Text="Description" 
+                          Foreground="White" 
+                          FontWeight="Medium"/>
+                <TextBox x:Name="DescriptionTextBox"
+                        Background="#333333"
+                        Foreground="White"
+                        BorderBrush="#555555"
+                        Watermark="Optional description..."
+                        AcceptsReturn="true"
+                        TextWrapping="Wrap"
+                        Height="80"
+                        MaxLength="500"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" 
+                   Orientation="Horizontal" 
+                   HorizontalAlignment="Right" 
+                   Spacing="10"
+                   Margin="0,20,0,0">
+            <Button x:Name="CancelButton"
+                   Content="Cancel"
+                   Padding="15,8"
+                   Background="#555555"
+                   Foreground="White"
+                   BorderBrush="Transparent"/>
+            <Button x:Name="CreateButton"
+                   Content="Create Table"
+                   Padding="15,8"
+                   Classes="accent"
+                   IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

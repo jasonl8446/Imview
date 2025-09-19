@@ -98,11 +98,19 @@
                         <Rectangle Height="1" 
                                  Fill="#555555" 
                                  HorizontalAlignment="Stretch"/>
-                        <TextBlock Text="Coming soon..."
-                                 FontStyle="Italic"
-                                 Foreground="#AAAAAA"
-                                 HorizontalAlignment="Left"
-                                 Margin="0,20,0,0"/>
+                        
+                        <!-- Horizontal Button Layout -->
+                        <WrapPanel Orientation="Horizontal" 
+                                 HorizontalAlignment="Left">
+                            <Button Content="Drop Table Editor"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[0].FirstButtonCommand}"
+                                    Width="150"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"
+                                    Classes="accent"/>
+                        </WrapPanel>
                     </StackPanel>
                 </Border>
                 

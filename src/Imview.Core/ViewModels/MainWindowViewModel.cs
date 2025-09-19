@@ -364,4 +364,29 @@ public class MainWindowViewModel : ViewModelBase {
         }
     }
 
+    /// <summary>
+    /// Opens the Drop Table Editor in a new tab.
+    /// </summary>
+    public async void ShowDropTableEditor() {
+        // Check if database is configured first
+        var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(_mainWindow);
+        
+        if (!isConfigured) {
+            MessageService.Info("Database configuration required to edit drop tables.")
+                .WithDuration(TimeSpan.FromSeconds(3))
+                .Send();
+            return;
+        }
+
+        // Check if drop table editor tab already exists
+        var existingTab = TabManager.FindTabByContent<DropTableEditorViewModel>();
+        if (existingTab != null) {
+            TabManager.SelectTab(existingTab);
+            return;
+        }
+
+        var tab = TabManager.AddTab("Drop Table Editor", new DropTableEditorViewModel(this));
+        TabManager.SelectTab(tab);
+    }
+
 }
