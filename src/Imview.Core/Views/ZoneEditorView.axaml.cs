@@ -35,6 +35,7 @@ public partial class ZoneEditorView : UserControl
     {
         InitializeComponent();
         Loaded += OnLoaded;
+        GotFocus += OnGotFocus;
         
         // Enable keyboard focus
         Focusable = true;
@@ -81,6 +82,12 @@ public partial class ZoneEditorView : UserControl
         
         // Set focus to enable keyboard input
         Focus();
+
+        // Refresh drop table existence on load
+        if (DataContext is ZoneEditorViewModel vm)
+        {
+            _ = vm.RefreshDropTableCacheAsync();
+        }
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -120,6 +127,15 @@ public partial class ZoneEditorView : UserControl
                 viewModel.ZoomOutCommand.Execute(null);
                 e.Handled = true;
                 break;
+        }
+    }
+
+    private async void OnGotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (DataContext is ZoneEditorViewModel vm)
+        {
+            // Refresh drop table existence when tab regains focus
+            await vm.RefreshDropTableCacheAsync();
         }
     }
 

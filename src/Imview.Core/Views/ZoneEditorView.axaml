@@ -630,42 +630,76 @@
                                     </Grid>
                                 </Button>
                                 
-                                <!-- Paths &amp; Spawns List -->
-                                <ListBox ItemsSource="{Binding PathVisualizationObjects}" Margin="0" Name="PathsList"
-                                         Background="Transparent" BorderThickness="0" SelectionMode="Single"
-                                         SelectedItem="{Binding SelectedPath, Mode=TwoWay}">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="Transparent" Padding="2,1" Margin="0" Cursor="Hand">
+                                <!-- Paths &amp; Nodes Tree -->
+                                <TreeView ItemsSource="{Binding PathVisualizationObjects}" Margin="0" Name="PathsTree"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          SelectedItem="{Binding SelectedHierarchyItem, Mode=TwoWay}">
+                                    <TreeView.DataTemplates>
+                                        <!-- Path template with children (nodes + spawns) -->
+                                        <TreeDataTemplate DataType="{x:Type vm:PathVisualizationObject}" ItemsSource="{Binding CombinedChildren}">
+                                            <Border Background="Transparent" Padding="2,1">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="16" />
                                                         <ColumnDefinition Width="12" />
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="1" Text="→" Foreground="#FF8C00" FontSize="8" VerticalAlignment="Center"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="#FF8C00" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                                                    <TextBlock Grid.Column="3" Text="{Binding NodeInfo}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="0" Text="→" Foreground="#FF8C00" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#FF8C00" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding NodeInfo}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
                                                 </Grid>
                                             </Border>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                    <ListBox.Styles>
-                                        <Style Selector="ListBoxItem">
+                                        </TreeDataTemplate>
+                                        
+                                        <!-- Node template (leaf) -->
+                                        <TreeDataTemplate DataType="{x:Type vm:NodeVisualizationObject}">
+                                            <Border Background="Transparent" Padding="2,1" Margin="-6,0,0,0">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="•" Foreground="#00FF00" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding DisplayText}" Foreground="#00FF00" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding CoordinateText}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </TreeDataTemplate>
+
+                                        <!-- Spawn template (leaf) -->
+                                        <TreeDataTemplate DataType="{x:Type vm:SpawnVisualizationObject}">
+                                            <Border Background="Transparent" Padding="2,1" Margin="-6,0,0,0">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="C" Foreground="#FFA500" FontSize="8" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#FFA500" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding CreatureType}" Foreground="#888888" FontSize="8" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </TreeDataTemplate>
+                                    </TreeView.DataTemplates>
+                                    <TreeView.Styles>
+                                        <Style Selector="TreeViewItem">
                                             <Setter Property="Padding" Value="0"/>
                                             <Setter Property="Margin" Value="0"/>
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="MinHeight" Value="0"/>
                                         </Style>
-                                        <Style Selector="ListBoxItem:selected">
+                                        <Style Selector="TreeViewItem:selected">
                                             <Setter Property="Background" Value="#4F3F1F"/>
                                         </Style>
-                                        <Style Selector="ListBoxItem:pointerover">
+                                        <Style Selector="TreeViewItem:pointerover">
                                             <Setter Property="Background" Value="#3A2A1A"/>
                                         </Style>
-                                    </ListBox.Styles>
-                                </ListBox>
+                                    </TreeView.Styles>
+                                </TreeView>
                             </StackPanel>
                             
                             <!-- NIF Geometry -->
@@ -1233,7 +1267,7 @@
                                                      Foreground="#FF6B35" Margin="0,0,0,8"/>
                                             
                                             <!-- Loot Tables List -->
-                                            <ItemsControl ItemsSource="{Binding SelectedTemplateLootTables}">
+                                            <ItemsControl ItemsSource="{Binding SelectedTemplateLootTableItems}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#FF6B35" BorderThickness="1">
@@ -1241,51 +1275,30 @@
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="*" />
                                                                     <ColumnDefinition Width="Auto" />
-                                                                    <ColumnDefinition Width="Auto" />
                                                                 </Grid.ColumnDefinitions>
                                                                 
                                                                 <!-- Loot Table Name -->
                                                                 <TextBlock Grid.Column="0" 
-                                                                         Text="{Binding}" 
+                                                                         Text="{Binding Name}" 
                                                                          FontSize="10" 
                                                                          FontWeight="Bold"
                                                                          Foreground="#FF6B35" 
                                                                          VerticalAlignment="Center"
                                                                          Margin="0,0,8,0"/>
                                                                 
-                                                                <!-- View Button -->
+                                                                <!-- Open/Create Button depending on existence -->
                                                                 <Button Grid.Column="1" 
-                                                                        Content="View" 
-                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).ViewDropTableCommand}"
-                                                                        CommandParameter="{Binding}"
+                                                                        Content="{Binding Label}"
+                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).OpenOrCreateDropTableCommand}"
+                                                                        CommandParameter="{Binding Name}"
                                                                         Height="24" 
-                                                                        Width="50"
+                                                                        Width="70"
                                                                         FontSize="9"
                                                                         Background="#4CAF50"
-                                                                        Foreground="White"
-                                                                        Margin="0,0,4,0"
-                                                                        ToolTip.Tip="Open existing drop table in editor">
+                                                                        Foreground="White">
                                                                     <Button.Styles>
                                                                         <Style Selector="Button:pointerover">
                                                                             <Setter Property="Background" Value="#45A049"/>
-                                                                        </Style>
-                                                                    </Button.Styles>
-                                                                </Button>
-                                                                
-                                                                <!-- Create Button -->
-                                                                <Button Grid.Column="2" 
-                                                                        Content="Create" 
-                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).CreateDropTableCommand}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Height="24" 
-                                                                        Width="55"
-                                                                        FontSize="9"
-                                                                        Background="#FF9800"
-                                                                        Foreground="White"
-                                                                        ToolTip.Tip="Create new drop table with this name">
-                                                                    <Button.Styles>
-                                                                        <Style Selector="Button:pointerover">
-                                                                            <Setter Property="Background" Value="#F57C00"/>
                                                                         </Style>
                                                                     </Button.Styles>
                                                                 </Button>
@@ -1680,6 +1693,295 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Path Object Properties -->
+                            <StackPanel IsVisible="{Binding HasSelectedPath}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="Path Object" Foreground="#FF8C00" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" 
+                                          Margin="0,2">
+                                        <!-- Name -->
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding SelectedPathName}" Grid.Row="0" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                        
+                                        <!-- Path ID -->
+                                        <TextBlock Text="ID:" Grid.Row="1" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedPathId}" Grid.Row="1" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Type -->
+                                        <TextBlock Text="Type:" Grid.Row="2" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedPathType}" Grid.Row="2" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Node Count -->
+                                        <TextBlock Text="Nodes:" Grid.Row="3" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedPathNodeCount}" Grid.Row="3" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Spawn Count -->
+                                        <TextBlock Text="Spawns:" Grid.Row="4" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedPathSpawnCount}" Grid.Row="4" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                    </Grid>
+                                    
+                                    <!-- All path properties via reflection -->
+                                    <TextBlock Text="All Path Properties:" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,8,0,4"/>
+                                    <Border Background="#1E1E1E" BorderBrush="#555" BorderThickness="1" CornerRadius="2" Padding="4" MaxHeight="160">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding SelectedPathAllProperties}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid ColumnDefinitions="Auto,*" Margin="0,1">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="#AAAAAA" FontSize="8" Margin="0,0,8,0"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="#FFFFFF" FontSize="8" TextWrapping="Wrap"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Node Properties -->
+                            <StackPanel IsVisible="{Binding HasSelectedNode}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="Waypoint (Node)" Foreground="#00FF00" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,2">
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" Foreground="#CCCCCC" FontSize="9" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding SelectedNodeName}" Grid.Row="0" Grid.Column="1" Foreground="White" FontSize="9"/>
+
+                                        <TextBlock Text="ID:" Grid.Row="1" Grid.Column="0" Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedNodeId}" Grid.Row="1" Grid.Column="1" Foreground="White" FontSize="9"/>
+
+                                        <TextBlock Text="Path:" Grid.Row="2" Grid.Column="0" Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedNodePath}" Grid.Row="2" Grid.Column="1" Foreground="White" FontSize="9"/>
+
+                                        <TextBlock Text="Location:" Grid.Row="3" Grid.Column="0" Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedNodeLocation}" Grid.Row="3" Grid.Column="1" Foreground="White" FontSize="9"/>
+                                    </Grid>
+
+                                    <!-- All node properties via reflection -->
+                                    <TextBlock Text="All Node Properties:" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,8,0,4"/>
+                                    <Border Background="#1E1E1E" BorderBrush="#555" BorderThickness="1" CornerRadius="2" Padding="4" MaxHeight="160">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding SelectedNodeAllProperties}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid ColumnDefinitions="Auto,*" Margin="0,1">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="#AAAAAA" FontSize="8" Margin="0,0,8,0"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="#FFFFFF" FontSize="8" TextWrapping="Wrap"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Spawn Object Properties -->
+                            <StackPanel IsVisible="{Binding HasSelectedSpawn}" Margin="0">
+                                <!-- Header -->
+                                <Border Background="#393939" Padding="4,2" Margin="0">
+                                    <TextBlock Text="Spawn Object" Foreground="#FF8C00" FontSize="10" FontWeight="Bold"/>
+                                </Border>
+                                
+                                <!-- Properties -->
+                                <StackPanel Margin="4,2">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" 
+                                          Margin="0,2">
+                                        <!-- Name -->
+                                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnName}" Grid.Row="0" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                        
+                                        <!-- Spawn ID -->
+                                        <TextBlock Text="ID:" Grid.Row="1" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnId}" Grid.Row="1" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Template ID -->
+                                        <TextBlock Text="Template:" Grid.Row="2" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnTemplateId}" Grid.Row="2" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Type -->
+                                        <TextBlock Text="Type:" Grid.Row="3" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnType}" Grid.Row="3" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Path -->
+                                        <TextBlock Text="Path:" Grid.Row="4" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnPath}" Grid.Row="4" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Location -->
+                                        <TextBlock Text="Location:" Grid.Row="5" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnLocation}" Grid.Row="5" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                        
+                                        <!-- Spawn Chance -->
+                                        <TextBlock Text="Chance:" Grid.Row="6" Grid.Column="0" 
+                                                 Foreground="#CCCCCC" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,8,0"/>
+                                        <TextBlock Text="{Binding SelectedSpawnChance}" Grid.Row="6" Grid.Column="1" 
+                                                 Foreground="White" FontSize="9" 
+                                                 VerticalAlignment="Center" Margin="0,2,0,0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Spawn Template Properties (similar to Core Object Template) -->
+                            <StackPanel IsVisible="{Binding HasSelectedSpawn}" Margin="0">
+                                <!-- Loaded Template -->
+                                <StackPanel IsVisible="{Binding SelectedSpawnTemplate, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                    <!-- Header -->
+                                    <Border Background="#393939" Padding="4,2" Margin="0">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Template" Foreground="#FFD700" FontSize="10" FontWeight="Bold"/>
+                                            <!-- Optional: show class name if available -->
+                                            <TextBlock Text="{Binding SelectedSpawnTemplateClassName}" 
+                                                     Foreground="#CCCCCC" FontSize="9" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Template Properties -->
+                                    <StackPanel Margin="4,2">
+                                        <TextBlock Text="Template loaded for spawn" 
+                                                 FontSize="9" 
+                                                 Foreground="#90EE90" 
+                                                 Margin="0,0,0,4"/>
+                                        
+                                        <!-- If it's a GameObjectTemplate, show key fields -->
+                                        <StackPanel IsVisible="{Binding SelectedSpawnGameObjectTemplate, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,2">
+                                                <!-- Template ID (already shown above, but safe to repeat context) -->
+                                                <TextBlock Text="Template ID:" Grid.Row="0" Grid.Column="0" 
+                                                         Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                                <TextBox Text="{Binding SelectedSpawnTemplateId}" 
+                                                       Grid.Row="0" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                                
+                                                <!-- Display Name / Object Name / Description (raw locale keys) -->
+                                                <TextBlock Text="Object Name:" Grid.Row="1" Grid.Column="0" 
+                                                         Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                                <TextBox Text="{Binding SelectedSpawnTemplateObjectName}" 
+                                                       Grid.Row="1" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                                
+                                                <TextBlock Text="Display Name:" Grid.Row="2" Grid.Column="0" 
+                                                         Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                                <TextBox Text="{Binding SelectedSpawnTemplateDisplayName}" 
+                                                       Grid.Row="2" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                                
+                                                <TextBlock Text="Description:" Grid.Row="3" Grid.Column="0" 
+                                                         Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                                <TextBox Text="{Binding SelectedSpawnTemplateDescription}" 
+                                                       Grid.Row="3" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                                
+                                                <TextBlock Text="Primary School:" Grid.Row="4" Grid.Column="0" 
+                                                         Foreground="#CCCCCC" FontSize="9" Margin="0,2,8,2" VerticalAlignment="Center"/>
+                                                <TextBox Text="{Binding SelectedSpawnTemplatePrimarySchool}" 
+                                                       Grid.Row="4" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <!-- Loot Tables for Spawn Template -->
+                                        <StackPanel Margin="0,8,0,0" IsVisible="{Binding HasSpawnLootTables}">
+                                            <TextBlock Text="{Binding SelectedSpawnTemplateLootTables.Count, StringFormat='Loot Tables ({0}):'}" FontSize="11" FontWeight="Bold" 
+                                                     Foreground="#FF6B35" Margin="0,0,0,8"/>
+                                            
+                                            <ItemsControl ItemsSource="{Binding SelectedSpawnTemplateLootTableItems}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#FF6B35" BorderThickness="1">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                
+                                                                <!-- Loot Table Name -->
+                                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="10" FontWeight="Bold" Foreground="#FF6B35" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                
+                                                                <!-- Open/Create Button depending on existence -->
+                                                                <Button Grid.Column="1" Content="{Binding Label}" 
+                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).OpenOrCreateDropTableCommand}"
+                                                                        CommandParameter="{Binding Name}"
+                                                                        Height="24" Width="70" FontSize="9" Background="#4CAF50" Foreground="White">
+                                                                    <Button.Styles>
+                                                                        <Style Selector="Button:pointerover">
+                                                                            <Setter Property="Background" Value="#45A049"/>
+                                                                        </Style>
+                                                                    </Button.Styles>
+                                                                </Button>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            
+                                            <TextBlock Text="Use the buttons to view or create drop tables in the Drop Table Editor." 
+                                                     FontSize="8" Foreground="#888888" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Loading Message while SelectedSpawnTemplate is null -->
+                                <StackPanel IsVisible="{Binding SelectedSpawnTemplate, Converter={x:Static ObjectConverters.IsNull}}">
+                                    <Border Background="#393939" Padding="4,2" Margin="0">
+                                        <TextBlock Text="Template" Foreground="#FFD700" FontSize="10" FontWeight="Bold"/>
+                                    </Border>
+                                    <StackPanel Margin="4,2">
+                                        <TextBlock Text="Loading template..." FontSize="9" Foreground="#FFA500" Margin="0,0,0,2"/>
+                                        <TextBlock Text="Template data will appear here once loaded from Root.wad" FontSize="8" Foreground="#888888" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>

@@ -152,7 +152,7 @@ public class ZoneDataService
                 Console.WriteLine($"No gamebryoSceneFileName specified in zone data or zone data is null");
             }
             
-            // Load spawn data (optional - similar to collision data)
+            // Load spawn data (critical for creature path visualization)
             SpawnManager? spawnData = null;
             var spawnFile = zoneArchive.OpenFile(SpawnDataFileName);
             if (spawnFile != null)
@@ -160,24 +160,72 @@ public class ZoneDataService
                 try
                 {
                     var spawnDataBytes = spawnFile.Value.ToArray();
+                    Console.WriteLine($"Found '{SpawnDataFileName}' file, size: {spawnDataBytes.Length} bytes");
+                    
                     if (!bindSerializer.Deserialize<SpawnManager>(spawnDataBytes, 1, out spawnData))
                     {
-                        Console.WriteLine($"Warning: Failed to deserialize spawn data from '{SpawnDataFileName}'");
+                        Console.WriteLine($"ERROR: Failed to deserialize spawn data from '{SpawnDataFileName}' - trying alternative methods");
+                        
+                        // Try alternative deserialization strategies
+                        var altSerializer = new BindSerializer();
+                        if (altSerializer.Deserialize<SpawnManager>(spawnDataBytes, out spawnData))
+                        {
+                            Console.WriteLine($"SUCCESS: Alternative deserialization worked for spawn data");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"CRITICAL: All spawn deserialization methods failed");
+                            spawnData = null;
+                        }
+                    }
+                    
+                    if (spawnData?.m_spawners != null)
+                    {
+                        Console.WriteLine($"SUCCESS: Loaded {spawnData.m_spawners.Count} spawn objects from '{SpawnDataFileName}'");
+                        
+                        // Analyze spawn data structure for debugging
+                        int totalSpawnItems = 0;
+                        int spawnsWithPaths = 0;
+                        
+                        foreach (var spawner in spawnData.m_spawners.Take(5)) // Sample first 5 for debugging
+                        {
+                            if (spawner?.m_spawnList != null)
+                            {
+                                totalSpawnItems += spawner.m_spawnList.Count;
+                                
+                                foreach (var spawnItem in spawner.m_spawnList.Take(3)) // Sample first 3 per spawner
+                                {
+                                    if (spawnItem?.m_objectInfo != null)
+                                    {
+                                        var objInfo = spawnItem.m_objectInfo;
+                                        Console.WriteLine($"  SpawnItem: ID={objInfo.m_nObjectID}, PathID={objInfo.m_pathID}, ZoneTag='{objInfo.m_zoneTag}', Location=({objInfo.m_location.X:F2}, {objInfo.m_location.Y:F2}, {objInfo.m_location.Z:F2})");
+                                        if (objInfo.m_pathID != 0)
+                                        {
+                                            spawnsWithPaths++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Console.WriteLine($"Spawn analysis: {totalSpawnItems} total spawn items, {spawnsWithPaths} have non-zero path IDs");
                     }
                     else
                     {
-                        Console.WriteLine($"Loaded spawn data with {spawnData.m_spawners?.Count ?? 0} spawn objects from '{SpawnDataFileName}'");
+                        Console.WriteLine($"WARNING: SpawnManager loaded but m_spawners is null or empty");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Warning: Failed to parse spawn data from '{SpawnDataFileName}': {ex.Message}");
-                    // Continue without spawn data - it's not critical
+                    Console.WriteLine($"CRITICAL ERROR: Exception while parsing spawn data from '{SpawnDataFileName}': {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    spawnData = null;
                 }
             }
             else
             {
-                Console.WriteLine($"No '{SpawnDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have spawn data");
+                Console.WriteLine($"WARNING: '{SpawnDataFileName}' not found in zone WAD '{zoneWadName}'");
+                Console.WriteLine("This will result in 0 spawn creatures being displayed");
             }
             
             // Load path data (optional)
@@ -208,9 +256,9 @@ public class ZoneDataService
                 Console.WriteLine($"No '{PathDataFileName}' found in zone WAD '{zoneWadName}' - zone may not have path data");
             }
             
-            // Load node data (optional)
+            // Load node data (critical for path visualization)
             NodeTemplateList? nodeData = null;
-            Console.WriteLine($"Looking for node data file: '{NodeDataFileName}' in zone WAD '{zoneWadName}'");
+            Console.WriteLine($"Loading node data from '{NodeDataFileName}' in zone WAD '{zoneWadName}'");
             var nodeFile = zoneArchive.OpenFile(NodeDataFileName);
             if (nodeFile != null)
             {
@@ -218,39 +266,122 @@ public class ZoneDataService
                 try
                 {
                     var nodeDataBytes = nodeFile.Value.ToArray();
-                    Console.WriteLine($"Attempting to deserialize node data with BindSerializer (exact Imlight config)...");
-                    if (!bindSerializer.Deserialize<NodeTemplateList>(nodeDataBytes, 1, out nodeData))
+                    Console.WriteLine($"Raw node data: {nodeDataBytes.Length} bytes");
+                    Console.WriteLine($"First 16 bytes (hex): {BitConverter.ToString(nodeDataBytes.Take(16).ToArray())}");
+                    
+                    // Try multiple deserialization strategies
+                    bool deserializeSuccess = false;
+                    
+                    // Strategy 1: Standard deserialization with version 1
+                    Console.WriteLine("Attempting deserialization strategy 1: BindSerializer with version 1");
+                    if (bindSerializer.Deserialize<NodeTemplateList>(nodeDataBytes, 1, out nodeData))
                     {
-                        Console.WriteLine($"ERROR: Failed to deserialize node data from '{NodeDataFileName}' - deserializer returned false");
+                        deserializeSuccess = true;
+                        Console.WriteLine($"Strategy 1 SUCCESS: {nodeData?.m_nodeList?.Count ?? 0} nodes");
+                    }
+                    
+                    // Strategy 2: Try without version parameter if strategy 1 failed
+                    if (!deserializeSuccess)
+                    {
+                        Console.WriteLine("Strategy 1 failed, attempting strategy 2: BindSerializer with default version");
+                        try
+                        {
+                            var freshSerializer = new BindSerializer();
+                            if (freshSerializer.Deserialize<NodeTemplateList>(nodeDataBytes, (Imcodec.ObjectProperty.PropertyFlags)0, out nodeData))
+                            {
+                                deserializeSuccess = true;
+                                Console.WriteLine($"Strategy 2 SUCCESS: {nodeData?.m_nodeList?.Count ?? 0} nodes");
+                            }
+                        }
+                        catch (Exception ex2)
+                        {
+                            Console.WriteLine($"Strategy 2 FAILED: {ex2.Message}");
+                        }
+                    }
+                    
+                    // Strategy 3: Try different version numbers
+                    if (!deserializeSuccess)
+                    {
+                        Console.WriteLine("Attempting strategy 3: trying different version numbers");
+                        for (int version = 0; version <= 3; version++)
+                        {
+                            try
+                            {
+                                var versionSerializer = new BindSerializer();
+                                if (versionSerializer.Deserialize<NodeTemplateList>(nodeDataBytes, (Imcodec.ObjectProperty.PropertyFlags)version, out nodeData))
+                                {
+                                    deserializeSuccess = true;
+                                    Console.WriteLine($"Strategy 3 SUCCESS with version {version}: {nodeData?.m_nodeList?.Count ?? 0} nodes");
+                                    break;
+                                }
+                            }
+                            catch (Exception ex3)
+                            {
+                                Console.WriteLine($"Strategy 3 version {version} failed: {ex3.Message}");
+                            }
+                        }
+                    }
+                    
+                    if (!deserializeSuccess)
+                    {
+                        Console.WriteLine($"ERROR: All deserialization strategies failed for '{NodeDataFileName}'");
+                        Console.WriteLine("This will result in 0 nodes being displayed in the zone editor");
+                        nodeData = null;
                     }
                     else
                     {
-                        Console.WriteLine($"SUCCESS: Loaded node data with {nodeData?.m_nodeList?.Count ?? 0} node objects from '{NodeDataFileName}'");
-                        Console.WriteLine($"NodeData is null: {nodeData == null}");
-                        Console.WriteLine($"NodeData.m_nodeList is null: {nodeData?.m_nodeList == null}");
+                        Console.WriteLine($"FINAL SUCCESS: Loaded {nodeData?.m_nodeList?.Count ?? 0} node objects from '{NodeDataFileName}'");
+                        if (nodeData?.m_nodeList != null)
+                        {
+                            Console.WriteLine($"Sample node data (first 3 nodes):");
+                            for (int i = 0; i < Math.Min(3, nodeData.m_nodeList.Count); i++)
+                            {
+                                var node = nodeData.m_nodeList[i];
+                                if (node != null)
+                                {
+                                    Console.WriteLine($"  Node {i}: ID={node.m_id}, Location=({node.m_location.X:F2}, {node.m_location.Y:F2}, {node.m_location.Z:F2})");
+                                }
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"ERROR: Exception while parsing node data from '{NodeDataFileName}': {ex.Message}");
+                    Console.WriteLine($"CRITICAL ERROR: Exception while parsing node data from '{NodeDataFileName}': {ex.Message}");
                     Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                    // Continue without node data - it's not critical
+                    nodeData = null;
                 }
             }
             else
             {
-                Console.WriteLine($"ERROR: '{NodeDataFileName}' not found in zone WAD '{zoneWadName}'");
+                Console.WriteLine($"WARNING: '{NodeDataFileName}' not found in zone WAD '{zoneWadName}'");
+                Console.WriteLine("This will result in 0 nodes being displayed - paths will not be visualizable");
                 
                 // List all files in the WAD for debugging
-                Console.WriteLine($"Files available in zone WAD '{zoneWadName}':");
-                var allFiles = zoneArchive.Files.Keys;
-                foreach (var file in allFiles.Take(20)) // Limit to first 20 files to avoid spam
+                Console.WriteLine($"Available files in zone WAD '{zoneWadName}':");
+                var allFiles = zoneArchive.Files.Keys.ToList();
+                foreach (var file in allFiles.Take(20))
                 {
                     Console.WriteLine($"  - {file}");
                 }
-                if (allFiles.Count() > 20)
+                if (allFiles.Count > 20)
                 {
-                    Console.WriteLine($"  ... and {allFiles.Count() - 20} more files");
+                    Console.WriteLine($"  ... and {allFiles.Count - 20} more files");
+                }
+                
+                // Look for alternative node file names
+                var possibleNodeFiles = allFiles.Where(f => 
+                    f.Contains("node", StringComparison.OrdinalIgnoreCase) ||
+                    f.Contains("path", StringComparison.OrdinalIgnoreCase) ||
+                    f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList();
+                
+                if (possibleNodeFiles.Any())
+                {
+                    Console.WriteLine("Possible alternative node/path files found:");
+                    foreach (var file in possibleNodeFiles)
+                    {
+                        Console.WriteLine($"  - {file}");
+                    }
                 }
             }
             

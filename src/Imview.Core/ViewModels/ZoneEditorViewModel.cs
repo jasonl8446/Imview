@@ -63,6 +63,8 @@ public class ZoneEditorViewModel : ViewModelBase
     private NifMeshVisualizationObject? _selectedMesh = null;
     private VolumeVisualizationObject? _selectedVolume = null;
     private TriggerVisualizationObject? _selectedTrigger = null;
+    private SpawnVisualizationObject? _selectedSpawn = null;
+    private PropertyClass? _selectedSpawnTemplate = null;
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
     private NifFile? _currentSceneFile = null;
@@ -125,6 +127,7 @@ public class ZoneEditorViewModel : ViewModelBase
         EditNpcSpellInventoryCommand = ReactiveCommand.Create(EditNpcSpellInventory);
         ViewDropTableCommand = ReactiveCommand.Create<string>(ViewDropTable);
         CreateDropTableCommand = ReactiveCommand.Create<string>(CreateDropTable);
+        OpenOrCreateDropTableCommand = ReactiveCommand.Create<string>(OpenOrCreateDropTable);
         
         // Initialize viewport commands
         ZoomInCommand = ReactiveCommand.Create(ZoomIn);
@@ -266,6 +269,10 @@ public class ZoneEditorViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(SelectedTemplateObjectNameLocaleId));
             this.RaisePropertyChanged(nameof(SelectedTemplateLootTables));
             this.RaisePropertyChanged(nameof(HasLootTables));
+            this.RaisePropertyChanged(nameof(SelectedTemplateLootTableItems));
+            
+            // Ensure drop table cache is loaded so labels can reflect existence
+            _ = EnsureDropTableCacheAsync();
         }
     }
     
@@ -394,6 +401,25 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
     
+    // Loot table items with existence info (for UI)
+    public ObservableCollection<LootTableItem> SelectedTemplateLootTableItems
+    {
+        get
+        {
+            var items = new ObservableCollection<LootTableItem>();
+            var names = SelectedTemplateLootTables;
+            if (names != null)
+            {
+                foreach (var name in names)
+                {
+                    var exists = _existingDropTableNames.Contains(name);
+                    items.Add(new LootTableItem(name, exists));
+                }
+            }
+            return items;
+        }
+    }
+    
     /// <summary>
     /// Gets whether the selected template has loot tables.
     /// </summary>
@@ -439,11 +465,49 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedMesh = null;
                 SelectedVolume = null;
                 SelectedTrigger = null;
+                SelectedSpawn = null;
+                SelectedNode = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedPath));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
             NotifySelectionChanged();
+        }
+    }
+
+    public NodeVisualizationObject? SelectedNode { get; set; }
+
+    // A generic binding target for TreeView selection in the hierarchy
+    public object? SelectedHierarchyItem
+    {
+        get => null;
+        set
+        {
+            // Route selection to specific properties based on type
+            if (value is PathVisualizationObject path)
+            {
+                // Use the existing selection helper to ensure proper notifications
+                SelectPath(path);
+            }
+            else if (value is NodeVisualizationObject node)
+            {
+                SelectedNode = node;
+                // Clear others
+                SelectedPath = null;
+                SelectedObject = null;
+                SelectedCollision = null;
+                SelectedMesh = null;
+                SelectedVolume = null;
+                SelectedTrigger = null;
+                SelectedSpawn = null;
+                // Notify full selection change to refresh panels
+                NotifySelectionChanged();
+            }
+            else if (value is SpawnVisualizationObject spawn)
+            {
+                // Use helper to set selection and trigger template load + notifications
+                SelectSpawn(spawn);
+            }
         }
     }
 
@@ -493,6 +557,54 @@ public class ZoneEditorViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
             this.RaisePropertyChanged(nameof(SelectedVolumeEnterTriggers));
             this.RaisePropertyChanged(nameof(SelectedVolumeExitTriggers));
+            NotifySelectionChanged();
+        }
+    }
+
+    public SpawnVisualizationObject? SelectedSpawn
+    {
+        get => _selectedSpawn;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedSpawn, value);
+            
+            if (value != null)
+            {
+                SelectedObject = null;
+                SelectedCollision = null;
+                SelectedPath = null;
+                SelectedMesh = null;
+                SelectedVolume = null;
+                SelectedTrigger = null;
+                
+                // Clear any previous spawn template immediately so UI shows loading state
+                SelectedSpawnTemplate = null;
+                var selectedSpawnId = value.SpawnId;
+                var templateId = value.TemplateId;
+                
+                // Load template for the selected spawn
+                _ = Task.Run(async () =>
+                {
+                    var template = await LoadSpawnTemplateAsync(templateId);
+                    // Switch back to UI thread to update bindings safely
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        // Only apply if selection hasn't changed
+                        if (SelectedSpawn != null && SelectedSpawn.SpawnId == selectedSpawnId)
+                        {
+                            SelectedSpawnTemplate = template;
+                        }
+                    }, Avalonia.Threading.DispatcherPriority.Background);
+                });
+            }
+            else
+            {
+                // When deselecting spawns, ensure template section is cleared
+                SelectedSpawnTemplate = null;
+            }
+
+            this.RaisePropertyChanged(nameof(HasSelectedSpawn));
+            this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
             NotifySelectionChanged();
         }
     }
@@ -688,7 +800,117 @@ public class ZoneEditorViewModel : ViewModelBase
     public bool HasSelectedMesh => SelectedMesh != null;
     public bool HasSelectedVolume => SelectedVolume != null;
     public bool HasSelectedTrigger => SelectedTrigger != null;
-    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh || HasSelectedVolume || HasSelectedTrigger;
+    public bool HasSelectedSpawn => SelectedSpawn != null;
+    public bool HasSelectedNode => SelectedNode != null;
+    public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh || HasSelectedVolume || HasSelectedTrigger || HasSelectedSpawn || HasSelectedNode;
+    
+    // Path Details Properties for Properties Panel
+    public string SelectedPathName => SelectedPath?.Name ?? "No Path Selected";
+    public string SelectedPathId => SelectedPath != null ? $"Path ID: {SelectedPath.PathId}" : "";
+    public string SelectedPathType => SelectedPath?.PathType ?? "";
+    public string SelectedPathNodeCount => SelectedPath != null ? $"Nodes: {SelectedPath.Nodes.Count}" : "";
+    public string SelectedPathSpawnCount => SelectedPath != null ? GetPathSpawnCount(SelectedPath) : "";
+    public string SelectedPathDescription => SelectedPath != null ? GetPathDetailedDescription(SelectedPath) : "";
+    public ObservableCollection<NodeVisualizationObject> SelectedPathNodes => 
+        SelectedPath?.Nodes != null ? new ObservableCollection<NodeVisualizationObject>(SelectedPath.Nodes) : new ObservableCollection<NodeVisualizationObject>();
+    public ObservableCollection<SpawnVisualizationObject> SelectedPathSpawns =>
+        SelectedPath != null ? new ObservableCollection<SpawnVisualizationObject>(GetSpawnsForPath(SelectedPath)) : new ObservableCollection<SpawnVisualizationObject>();
+    
+    // All Path Properties via reflection (similar to node)
+    public List<NodePropertyItem> SelectedPathAllProperties
+    {
+        get
+        {
+            var list = new List<NodePropertyItem>();
+            var obj = SelectedPath?.OriginalPathObject;
+            if (obj == null) return list;
+            try
+            {
+                var type = obj.GetType();
+                list.Add(new NodePropertyItem { Name = "Type", Value = type.Name });
+                foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                {
+                    if (!prop.CanRead) continue;
+                    var val = prop.GetValue(obj);
+                    string str = FormatNodePropertyValue(val);
+                    list.Add(new NodePropertyItem { Name = prop.Name, Value = str });
+                }
+            }
+            catch (Exception ex)
+            {
+                list.Add(new NodePropertyItem { Name = "Error", Value = ex.Message });
+            }
+            return list;
+        }
+    }
+    
+    // Spawn Details Properties for Properties Panel
+    public PropertyClass? SelectedSpawnTemplate
+    {
+        get => _selectedSpawnTemplate;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedSpawnTemplate, value);
+            
+            // Notify dependent properties so the UI updates when the template finishes loading
+            this.RaisePropertyChanged(nameof(SelectedSpawnGameObjectTemplate));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateClassName));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateIcon));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLevel));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplatePrimarySchool));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateObjectName));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateDisplayName));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateDescription));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLootTables));
+            this.RaisePropertyChanged(nameof(HasSpawnLootTables));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLootTableItems));
+            
+            // Ensure drop table cache is loaded so labels can reflect existence
+            _ = EnsureDropTableCacheAsync();
+        }
+    }
+    public string SelectedSpawnName => SelectedSpawn?.Name ?? "No Spawn Selected";
+    public string SelectedSpawnId => SelectedSpawn != null ? $"Spawn ID: {SelectedSpawn.SpawnId}" : "";
+    public string SelectedSpawnTemplateId => SelectedSpawn != null ? $"Template ID: {SelectedSpawn.TemplateId}" : "";
+    public string SelectedSpawnType => SelectedSpawn?.CreatureType ?? "";
+    public string SelectedSpawnPath => SelectedSpawn != null && SelectedSpawn.PathId != 0 ? $"Path ID: {SelectedSpawn.PathId}" : "No Path";
+    public string SelectedSpawnLocation => SelectedSpawn != null ? $"Position: ({SelectedSpawn.X:F1}, {SelectedSpawn.Y:F1}, {SelectedSpawn.Z:F1})" : "";
+    public string SelectedSpawnChance => SelectedSpawn != null ? $"Spawn Chance: {SelectedSpawn.SpawnChance}%" : "";
+    
+    // Template properties for spawn (reuse existing template display logic)
+    public GameObjectTemplate? SelectedSpawnGameObjectTemplate => SelectedSpawnTemplate as GameObjectTemplate;
+    
+    // Safe computed properties for spawn template details
+    public string? SelectedSpawnTemplateClassName => GetTemplateProperty(SelectedSpawnTemplate, "m_className");
+    public string? SelectedSpawnTemplateIcon => GetTemplateProperty(SelectedSpawnTemplate, "m_icon");
+    public string? SelectedSpawnTemplateLevel => GetTemplateProperty(SelectedSpawnTemplate, "m_level");
+    public string? SelectedSpawnTemplatePrimarySchool => GetTemplateProperty(SelectedSpawnTemplate, "m_primarySchool");
+    public string? SelectedSpawnTemplateObjectName => GetTemplateProperty(SelectedSpawnTemplate, "m_objectName");
+    public string? SelectedSpawnTemplateDisplayName => GetTemplateProperty(SelectedSpawnTemplate, "m_displayName");
+    public string? SelectedSpawnTemplateDescription => GetTemplateProperty(SelectedSpawnTemplate, "m_description");
+    
+    // Spawn template loot tables (same pattern as zone objects)
+    public List<string>? SelectedSpawnTemplateLootTables => GetLootTablesFromTemplate(SelectedSpawnTemplate);
+    public bool HasSpawnLootTables => SelectedSpawnTemplateLootTables?.Count > 0;
+    
+    // Loot table items with existence info for spawn templates
+    public ObservableCollection<LootTableItem> SelectedSpawnTemplateLootTableItems
+    {
+        get
+        {
+            var items = new ObservableCollection<LootTableItem>();
+            var names = SelectedSpawnTemplateLootTables;
+            if (names != null)
+            {
+                foreach (var name in names)
+                {
+                    var exists = _existingDropTableNames.Contains(name);
+                    items.Add(new LootTableItem(name, exists));
+                }
+            }
+            return items;
+        }
+    }
     
     /// <summary>
     /// Gets whether the selected object is an NPC (has NPC flag)
@@ -903,6 +1125,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand EditNpcSpellInventoryCommand { get; }
     public ICommand ViewDropTableCommand { get; }
     public ICommand CreateDropTableCommand { get; }
+    public ICommand OpenOrCreateDropTableCommand { get; }
     
     // Viewport commands
     public ICommand ZoomInCommand { get; }
@@ -912,6 +1135,68 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand PanDownCommand { get; }
     public ICommand PanLeftCommand { get; }
     public ICommand PanRightCommand { get; }
+    
+    // Node details for Properties panel
+    public string SelectedNodeName => SelectedNode != null ? $"Node {SelectedNode.NodeIndex}" : "No Node Selected";
+    public string SelectedNodeId => SelectedNode != null ? $"Node ID: {SelectedNode.NodeId}" : string.Empty;
+    public string SelectedNodePath => SelectedNode != null && SelectedNode.PathId != 0 ? $"Path ID: {SelectedNode.PathId}" : "Unlinked";
+    public string SelectedNodeIndex => SelectedNode != null ? $"Index: {SelectedNode.NodeIndex}" : string.Empty;
+    public string SelectedNodeLocation => SelectedNode != null ? $"Position: ({SelectedNode.X:F1}, {SelectedNode.Y:F1}, {SelectedNode.Z:F1})" : string.Empty;
+
+    public List<NodePropertyItem> SelectedNodeAllProperties
+    {
+        get
+        {
+            var list = new List<NodePropertyItem>();
+            var obj = SelectedNode?.OriginalNodeObject;
+            if (obj == null) return list;
+            try
+            {
+                var type = obj.GetType();
+                list.Add(new NodePropertyItem { Name = "Type", Value = type.Name });
+                foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                {
+                    if (!prop.CanRead) continue;
+                    var val = prop.GetValue(obj);
+                    string str = FormatNodePropertyValue(val);
+                    list.Add(new NodePropertyItem { Name = prop.Name, Value = str });
+                }
+            }
+            catch (Exception ex)
+            {
+                list.Add(new NodePropertyItem { Name = "Error", Value = ex.Message });
+            }
+            return list;
+        }
+    }
+
+    private string FormatNodePropertyValue(object? val)
+    {
+        if (val == null) return "<null>";
+        try
+        {
+            var t = val.GetType();
+            var fullName = t.FullName ?? string.Empty;
+            
+            // Special-case Imcodec.Types.GID to display the Full value
+            if (fullName == "Imcodec.Types.GID")
+            {
+                var fullProp = t.GetProperty("Full", BindingFlags.Public | BindingFlags.Instance);
+                if (fullProp != null)
+                {
+                    var fullVal = fullProp.GetValue(val);
+                    return fullVal?.ToString() ?? "<null>";
+                }
+            }
+            
+            // Fallback to ToString()
+            return val.ToString() ?? "<null>";
+        }
+        catch
+        {
+            return val.ToString() ?? "<null>";
+        }
+    }
     
     public void SetZoneObjectCanvas(Canvas canvas)
     {
@@ -1440,93 +1725,229 @@ public class ZoneEditorViewModel : ViewModelBase
         
         await Task.Run(() =>
         {
-            Console.WriteLine($"PopulatePathData called with:");
-            Console.WriteLine($"  - Spawn data: {(spawnData != null ? $"{spawnData.m_spawners?.Count ?? 0} spawners" : "null")}");
-            Console.WriteLine($"  - Path data: {(pathData != null ? $"{pathData.m_pathList?.Count ?? 0} paths" : "null")}");
-            Console.WriteLine($"  - Node data: {(nodeData != null ? $"{nodeData.m_nodeList?.Count ?? 0} nodes" : "null")}");
+            Console.WriteLine("=== ROBUST PATH DATA PROCESSING ===");
+            Console.WriteLine($"Input data status:");
+            Console.WriteLine($"  - Spawn data: {(spawnData?.m_spawners != null ? $"{spawnData.m_spawners.Count} spawners" : "null")}");
+            Console.WriteLine($"  - Path data: {(pathData?.m_pathList != null ? $"{pathData.m_pathList.Count} paths" : "null")}");
+            Console.WriteLine($"  - Node data: {(nodeData?.m_nodeList != null ? $"{nodeData.m_nodeList.Count} nodes" : "null")}");
             
-            // Process nodes first since paths reference them
+            // STEP 1: Process nodes first since everything references them
             Dictionary<ulong, NodeVisualizationObject> nodeMap = new();
-            if (nodeData?.m_nodeList != null)
+            if (nodeData?.m_nodeList != null && nodeData.m_nodeList.Count > 0)
             {
-                Console.WriteLine($"Node data contains {nodeData.m_nodeList.Count} node entries");
+                Console.WriteLine($"STEP 1: Processing {nodeData.m_nodeList.Count} nodes...");
                 
+                int validNodes = 0;
                 foreach (var nodeObj in nodeData.m_nodeList)
                 {
                     if (nodeObj != null)
                     {
-                        Console.WriteLine($"Processing node: ID={nodeObj.m_id}, Location=({nodeObj.m_location.X}, {nodeObj.m_location.Y}, {nodeObj.m_location.Z})");
-                        
-                        var nodeVis = new NodeVisualizationObject
+                        try
                         {
-                            NodeId = (ulong)nodeObj.m_id,
-                            Name = $"Node_{nodeObj.m_id}", // NodeObject doesn't have m_zoneTag
-                            X = nodeObj.m_location.X,
-                            Y = nodeObj.m_location.Y,
-                            Z = nodeObj.m_location.Z
-                        };
-                        
-                        tempNodes.Add(nodeVis);
-                        nodeMap[nodeVis.NodeId] = nodeVis;
-                    }
-                    else
-                    {
-                        Console.WriteLine("Found null node object in node list");
+                            var nodeVis = new NodeVisualizationObject
+                            {
+                                NodeId = (ulong)nodeObj.m_id,
+                                Name = $"Node_{nodeObj.m_id}",
+                                X = nodeObj.m_location.X,
+                                Y = nodeObj.m_location.Y,
+                                Z = nodeObj.m_location.Z,
+                                PathId = 0, // Will be set when processing paths
+                                NodeIndex = -1, // Will be set when processing paths
+                                OriginalNodeObject = nodeObj
+                            };
+                            
+                            tempNodes.Add(nodeVis);
+                            nodeMap[(ulong)nodeObj.m_id] = nodeVis;
+                            validNodes++;
+                            
+                            if (validNodes <= 5) // Log first 5 for debugging
+                            {
+                                Console.WriteLine($"  Node {validNodes}: ID={nodeObj.m_id}, Pos=({nodeObj.m_location.X:F1}, {nodeObj.m_location.Y:F1}, {nodeObj.m_location.Z:F1})");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  ERROR processing node {nodeObj.m_id}: {ex.Message}");
+                        }
                     }
                 }
-                Console.WriteLine($"Processed {tempNodes.Count} nodes from {nodeData.m_nodeList.Count} entries");
+                Console.WriteLine($"STEP 1 COMPLETE: Processed {validNodes} valid nodes out of {nodeData.m_nodeList.Count} total");
             }
             else
             {
-                Console.WriteLine("Node data is null or m_nodeList is null");
+                Console.WriteLine("STEP 1 SKIPPED: No valid node data available");
             }
             
-            // Process paths and connect them to nodes
+            // STEP 2: Process paths and link them to nodes
             Dictionary<ulong, PathVisualizationObject> pathMap = new();
-            if (pathData?.m_pathList != null)
+            if (pathData?.m_pathList != null && pathData.m_pathList.Count > 0)
             {
+                Console.WriteLine($"STEP 2: Processing {pathData.m_pathList.Count} paths...");
+                
+                int validPaths = 0;
+                int pathsWithNodes = 0;
                 foreach (var pathTemplate in pathData.m_pathList)
                 {
                     if (pathTemplate != null)
                     {
-                        var pathVis = new PathVisualizationObject
+                        try
                         {
-                            PathId = (ulong)pathTemplate.m_id,
-                            Name = pathTemplate.m_name ?? $"Path_{pathTemplate.m_id}",
-                            PathType = "Mob Path"
-                        };
-                        
-                        // Connect nodes to this path
-                        if (pathTemplate.m_nodeIDs != null)
-                        {
-                            var pathNodes = new List<NodeVisualizationObject>();
-                            for (int i = 0; i < pathTemplate.m_nodeIDs.Count; i++)
+                            var pathVis = new PathVisualizationObject
                             {
-                                var nodeId = (ulong)pathTemplate.m_nodeIDs[i];
-                                if (nodeMap.TryGetValue(nodeId, out var node))
+                                PathId = (ulong)pathTemplate.m_id,
+                                Name = !string.IsNullOrEmpty(pathTemplate.m_name) ? pathTemplate.m_name : $"Path_{pathTemplate.m_id}",
+                                PathType = "Creature Path",
+                                Nodes = new List<NodeVisualizationObject>(),
+                                OriginalPathObject = pathTemplate
+                            };
+                            
+                            // Link nodes to this path
+                            if (pathTemplate.m_nodeIDs != null && pathTemplate.m_nodeIDs.Count > 0)
+                            {
+                                var linkedNodes = new List<NodeVisualizationObject>();
+                                for (int i = 0; i < pathTemplate.m_nodeIDs.Count; i++)
                                 {
-                                    node.PathId = pathVis.PathId;
-                                    node.NodeIndex = i;
-                                    pathNodes.Add(node);
+                                    var nodeId = (ulong)pathTemplate.m_nodeIDs[i];
+                                    if (nodeMap.TryGetValue(nodeId, out var node))
+                                    {
+                                        // Update node with path information
+                                        node.PathId = pathVis.PathId;
+                                        node.NodeIndex = i;
+                                        linkedNodes.Add(node);
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine($"  WARNING: Path {pathTemplate.m_id} references missing node {nodeId}");
+                                    }
+                                }
+                                pathVis.Nodes = linkedNodes;
+                                
+                                if (linkedNodes.Count > 0)
+                                {
+                                    pathsWithNodes++;
+                                    if (validPaths < 3) // Log first few for debugging
+                                    {
+                                        Console.WriteLine($"  Path {pathTemplate.m_id}: '{pathVis.Name}' with {linkedNodes.Count} nodes");
+                                    }
                                 }
                             }
-                            pathVis.Nodes = pathNodes;
+                            
+                            tempPaths.Add(pathVis);
+                            pathMap[(ulong)pathTemplate.m_id] = pathVis;
+                            validPaths++;
                         }
-                        
-                        tempPaths.Add(pathVis);
-                        pathMap[pathVis.PathId] = pathVis;
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  ERROR processing path {pathTemplate.m_id}: {ex.Message}");
+                        }
                     }
                 }
-                Console.WriteLine($"Processed {tempPaths.Count} paths");
+                Console.WriteLine($"STEP 2 COMPLETE: Processed {validPaths} paths, {pathsWithNodes} have linked nodes");
+            }
+            else
+            {
+                Console.WriteLine("STEP 2 SKIPPED: No valid path data available");
             }
             
-            // Skip spawn processing since spawn data doesn't contain location info
-            // Spawns are just metadata about what creatures use paths - the physical locations are the nodes
+            // STEP 3: Process spawn data and link to paths
+            if (spawnData?.m_spawners != null && spawnData.m_spawners.Count > 0)
+            {
+                Console.WriteLine($"STEP 3: Processing spawn data from {spawnData.m_spawners.Count} spawners...");
+                
+                int totalSpawnItems = 0;
+                int spawnsWithPaths = 0;
+                int spawnsWithValidPaths = 0;
+                
+                foreach (var spawner in spawnData.m_spawners)
+                {
+                    if (spawner?.m_spawnList != null)
+                    {
+                        foreach (var spawnItem in spawner.m_spawnList)
+                        {
+                            if (spawnItem?.m_objectInfo != null)
+                            {
+                                totalSpawnItems++;
+                                
+                                try
+                                {
+                                    var objInfo = spawnItem.m_objectInfo;
+                                    
+                                    // Create spawn visualization object
+                                    var spawnVis = new SpawnVisualizationObject
+                                    {
+                                        SpawnId = objInfo.m_nObjectID,
+                                        TemplateId = objInfo.m_templateID.Full, // Extract template ID from SpawnObjectInfo
+                                        Name = !string.IsNullOrEmpty(objInfo.m_zoneTag) ? objInfo.m_zoneTag : 
+                                               !string.IsNullOrEmpty(objInfo.m_overrideName) ? objInfo.m_overrideName : 
+                                               $"Spawn_{objInfo.m_nObjectID}",
+                                        X = objInfo.m_location.X,
+                                        Y = objInfo.m_location.Y,
+                                        Z = objInfo.m_location.Z,
+                                        PathId = (ulong)objInfo.m_pathID,
+                                        CreatureType = "Loading...", // Will be updated when template loads
+                                        SpawnChance = spawnItem.m_percentChance
+                                    };
+                                    
+                                    // Check if this spawn has a valid path
+                                    if (objInfo.m_pathID != 0)
+                                    {
+                                        spawnsWithPaths++;
+                                        if (pathMap.ContainsKey((ulong)objInfo.m_pathID))
+                                        {
+                                            spawnsWithValidPaths++;
+                                            // Attach this spawn under the path for hierarchy display
+                                            pathMap[(ulong)objInfo.m_pathID].Spawns.Add(spawnVis);
+                                            if (spawnsWithValidPaths <= 5) // Log first few
+                                            {
+                                                Console.WriteLine($"  Spawn '{spawnVis.Name}': Pos=({spawnVis.X:F1}, {spawnVis.Y:F1}), PathID={objInfo.m_pathID}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine($"  WARNING: Spawn '{spawnVis.Name}' references missing path {objInfo.m_pathID}");
+                                        }
+                                    }
+                                    
+                                    tempSpawns.Add(spawnVis);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"  ERROR processing spawn item: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Console.WriteLine($"STEP 3 COMPLETE: Processed {totalSpawnItems} spawn items");
+                Console.WriteLine($"  - {spawnsWithPaths} have non-zero path IDs");
+                Console.WriteLine($"  - {spawnsWithValidPaths} reference valid existing paths");
+            }
+            else
+            {
+                Console.WriteLine("STEP 3 SKIPPED: No valid spawn data available");
+            }
             
-            Console.WriteLine($"Path data processing complete. Spawns: {tempSpawns.Count}, Paths: {tempPaths.Count}, Nodes: {tempNodes.Count}");
+            Console.WriteLine("=== PROCESSING SUMMARY ===");
+            Console.WriteLine($"Final counts: {tempSpawns.Count} spawns, {tempPaths.Count} paths, {tempNodes.Count} nodes");
+            
+            // Validation checks
+            if (tempPaths.Count > 0 && tempNodes.Count == 0)
+            {
+                Console.WriteLine("WARNING: Found paths but no nodes - paths will not be visualizable!");
+            }
+            if (tempNodes.Count > 0 && tempPaths.Count == 0)
+            {
+                Console.WriteLine("WARNING: Found nodes but no paths - nodes will appear disconnected!");
+            }
+            if (tempSpawns.Count == 0 && (tempPaths.Count > 0 || tempNodes.Count > 0))
+            {
+                Console.WriteLine("INFO: No spawn creatures found, but path/node data exists");
+            }
         });
         
         // Update UI collections on UI thread
+        Console.WriteLine("Updating UI collections...");
         foreach (var item in tempSpawns)
             SpawnVisualizationObjects.Add(item);
             
@@ -1536,10 +1957,16 @@ public class ZoneEditorViewModel : ViewModelBase
         foreach (var item in tempNodes)
             NodeVisualizationObjects.Add(item);
             
-        Console.WriteLine($"Path UI collections updated. Final counts: Spawns: {SpawnVisualizationObjects.Count}, Paths: {PathVisualizationObjects.Count}, Nodes: {NodeVisualizationObjects.Count}");
+        Console.WriteLine($"UI collections updated. Final counts: Spawns: {SpawnVisualizationObjects.Count}, Paths: {PathVisualizationObjects.Count}, Nodes: {NodeVisualizationObjects.Count}");
         
-        // Create path visuals now that we have path data
+        // Create path visuals now that we have all data
         CreatePathVisuals();
+        
+        // Load templates for spawns asynchronously (don't await to avoid blocking UI)
+        if (SpawnVisualizationObjects.Count > 0)
+        {
+            _ = Task.Run(async () => await LoadSpawnTemplatesAsync());
+        }
     }
 
     private async Task PopulateVolumeData(WizZoneVolumes volumeData)
@@ -1942,13 +2369,13 @@ public class ZoneEditorViewModel : ViewModelBase
             visual.IsVisible = ShowSpawns;
         }
         
-        // Update path visibility (path lines)
-        var pathVisuals = _zoneObjectCanvas.Children
+        // Update path visibility (path lines and arrows)
+        var pathLineVisuals = _zoneObjectCanvas.Children
             .OfType<Control>()
-            .Where(c => c.Tag is PathVisualizationObject)
+            .Where(c => c.Tag is PathLineTag)
             .ToList();
             
-        foreach (var visual in pathVisuals)
+        foreach (var visual in pathLineVisuals)
         {
             visual.IsVisible = ShowPaths;
         }
@@ -2048,76 +2475,465 @@ public class ZoneEditorViewModel : ViewModelBase
     {
         if (_zoneObjectCanvas == null)
         {
-            Console.WriteLine("Canvas not set, cannot create path visuals");
+            Console.WriteLine("ERROR: Canvas not set, cannot create path visuals");
             return;
         }
         
-        Console.WriteLine($"Creating path visuals for {SpawnVisualizationObjects.Count} spawns, {PathVisualizationObjects.Count} paths, {NodeVisualizationObjects.Count} nodes");
-        Console.WriteLine($"Canvas is null: {_zoneObjectCanvas == null}, ShowSpawns: {ShowSpawns}, ShowPaths: {ShowPaths}, ShowNodes: {ShowNodes}");
+        Console.WriteLine("=== CREATING ROBUST PATH VISUALIZATIONS ===");
+        Console.WriteLine($"Data counts: {SpawnVisualizationObjects.Count} spawns, {PathVisualizationObjects.Count} paths, {NodeVisualizationObjects.Count} nodes");
+        Console.WriteLine($"Visibility flags: Spawns={ShowSpawns}, Paths={ShowPaths}, Nodes={ShowNodes}");
         
-        // Create spawn visuals
-        foreach (var spawn in SpawnVisualizationObjects)
-        {
-            try
-            {
-                var visual = CreateSpawnVisual(spawn);
-                if (visual != null)
-                {
-                    visual.IsVisible = ShowSpawns;
-                    _zoneObjectCanvas.Children.Add(visual);
-                    Console.WriteLine($"Added spawn visual for '{spawn.Name}' to canvas (visible: {visual.IsVisible})");
-                }
-                else
-                {
-                    Console.WriteLine($"Failed to create visual for spawn '{spawn.Name}'");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating spawn visual for '{spawn.Name}': {ex.Message}");
-            }
-        }
+        int visualsCreated = 0;
+        int visualsSkipped = 0;
         
-        // Create node visuals
-        foreach (var node in NodeVisualizationObjects)
+        // STEP 1: Create individual node visuals (as circles)
+        if (ShowNodes && NodeVisualizationObjects.Count > 0)
         {
-            try
+            Console.WriteLine($"STEP 1: Creating {NodeVisualizationObjects.Count} node visuals...");
+            
+            foreach (var node in NodeVisualizationObjects)
             {
-                var visual = CreateNodeVisual(node);
-                if (visual != null)
+                try
                 {
-                    visual.IsVisible = ShowNodes;
-                    _zoneObjectCanvas.Children.Add(visual);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating node visual for '{node.Name}': {ex.Message}");
-            }
-        }
-        
-        // Create path visuals (lines connecting nodes)
-        foreach (var path in PathVisualizationObjects)
-        {
-            try
-            {
-                if (path.HasNodes)
-                {
-                    var visuals = CreatePathLineVisuals(path);
-                    foreach (var visual in visuals)
+                    var nodeVisual = CreateEnhancedNodeVisual(node);
+                    if (nodeVisual != null)
                     {
-                        visual.IsVisible = ShowPaths;
-                        _zoneObjectCanvas.Children.Add(visual);
+                        _zoneObjectCanvas.Children.Add(nodeVisual);
+                        visualsCreated++;
+                    }
+                    else
+                    {
+                        visualsSkipped++;
                     }
                 }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"ERROR creating node visual for '{node.Name}': {ex.Message}");
+                    visualsSkipped++;
+                }
             }
-            catch (Exception ex)
+            Console.WriteLine($"STEP 1 COMPLETE: Created {visualsCreated} node visuals, skipped {visualsSkipped}");
+        }
+        else
+        {
+            Console.WriteLine($"STEP 1 SKIPPED: ShowNodes={ShowNodes}, NodeCount={NodeVisualizationObjects.Count}");
+        }
+        
+        // STEP 2: Create path line visuals (connecting nodes with arrows)
+        if (ShowPaths && PathVisualizationObjects.Count > 0)
+        {
+            Console.WriteLine($"STEP 2: Creating path line visuals for {PathVisualizationObjects.Count} paths...");
+            
+            int pathsWithVisuals = 0;
+            int totalLineSegments = 0;
+            
+            foreach (var path in PathVisualizationObjects)
             {
-                Console.WriteLine($"Error creating path visuals for '{path.Name}': {ex.Message}");
+                try
+                {
+                    if (path.Nodes != null && path.Nodes.Count >= 2)
+                    {
+                        var pathVisuals = CreateEnhancedPathLineVisuals(path);
+                        foreach (var visual in pathVisuals)
+                        {
+                            _zoneObjectCanvas.Children.Add(visual);
+                            totalLineSegments++;
+                        }
+                        pathsWithVisuals++;
+                        
+                        if (pathsWithVisuals <= 3) // Log first few for debugging
+                        {
+                            Console.WriteLine($"  Path '{path.Name}': {path.Nodes.Count} nodes, {pathVisuals.Count} line segments");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  Skipping path '{path.Name}': {path.Nodes?.Count ?? 0} nodes (need at least 2)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"ERROR creating path visuals for '{path.Name}': {ex.Message}");
+                }
+            }
+            Console.WriteLine($"STEP 2 COMPLETE: Created visuals for {pathsWithVisuals} paths with {totalLineSegments} line segments");
+        }
+        else
+        {
+            Console.WriteLine($"STEP 2 SKIPPED: ShowPaths={ShowPaths}, PathCount={PathVisualizationObjects.Count}");
+        }
+        
+        // STEP 3: Create spawn creature visuals (as larger colored shapes)
+        if (ShowSpawns && SpawnVisualizationObjects.Count > 0)
+        {
+            Console.WriteLine($"STEP 3: Creating {SpawnVisualizationObjects.Count} spawn visuals...");
+            
+            int spawnsCreated = 0;
+            int spawnsWithPaths = 0;
+            
+            foreach (var spawn in SpawnVisualizationObjects)
+            {
+                try
+                {
+                    var spawnVisual = CreateEnhancedSpawnVisual(spawn);
+                    if (spawnVisual != null)
+                    {
+                        _zoneObjectCanvas.Children.Add(spawnVisual);
+                        spawnsCreated++;
+                        
+                        if (spawn.PathId != 0)
+                        {
+                            spawnsWithPaths++;
+                        }
+                        
+                        if (spawnsCreated <= 5) // Log first few for debugging
+                        {
+                            Console.WriteLine($"  Spawn '{spawn.Name}': Pos=({spawn.X:F1}, {spawn.Y:F1}), PathID={spawn.PathId}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"ERROR creating spawn visual for '{spawn.Name}': {ex.Message}");
+                }
+            }
+            Console.WriteLine($"STEP 3 COMPLETE: Created {spawnsCreated} spawn visuals, {spawnsWithPaths} have path associations");
+        }
+        else
+        {
+            Console.WriteLine($"STEP 3 SKIPPED: ShowSpawns={ShowSpawns}, SpawnCount={SpawnVisualizationObjects.Count}");
+        }
+        
+        Console.WriteLine("=== VISUALIZATION SUMMARY ===");
+        Console.WriteLine($"Total canvas children: {_zoneObjectCanvas.Children.Count}");
+        Console.WriteLine($"Canvas size: {_zoneObjectCanvas.Width} x {_zoneObjectCanvas.Height}");
+        
+        // Additional debugging for empty visualizations
+        if (_zoneObjectCanvas.Children.Count == 0)
+        {
+            Console.WriteLine("WARNING: No visual elements were added to canvas!");
+            Console.WriteLine("This could be due to:");
+            Console.WriteLine("  - All visibility flags are false");
+            Console.WriteLine("  - All data collections are empty");
+            Console.WriteLine("  - Coordinate transformation issues");
+            Console.WriteLine("  - Canvas positioning problems");
+        }
+    }
+
+    // Enhanced visual creation methods for robust 2D path visualization
+    private Control? CreateEnhancedNodeVisual(NodeVisualizationObject node)
+    {
+        // Convert 3D world coordinates to 2D canvas coordinates
+        var canvasX = 10000.0 + (node.X * 0.25);
+        var canvasY = 10000.0 - (node.Y * 0.25); // Flip Y axis for proper display
+        
+        // Create node visual as a colored circle with better styling
+        var nodeColor = node.PathId != 0 ? Avalonia.Media.Color.FromRgb(0, 255, 0) : Avalonia.Media.Color.FromRgb(128, 128, 128); // Green if part of path, gray if orphaned
+        var nodeSize = node.PathId != 0 ? 8.0 : 6.0; // Larger if part of path
+        
+        var nodeVisual = new Ellipse
+        {
+            Width = nodeSize,
+            Height = nodeSize,
+            Fill = new SolidColorBrush(nodeColor),
+            Stroke = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 255)), // White border
+            StrokeThickness = 1,
+            IsHitTestVisible = true,
+            Tag = node // Set tag for filtering
+        };
+        
+        // Add tooltip with node information
+        ToolTip.SetTip(nodeVisual, $"Node {node.NodeId}\nPath: {node.PathId}\nPosition: ({node.X:F1}, {node.Y:F1}, {node.Z:F1})\nIndex: {node.NodeIndex}");
+        
+        // Add click handler to select the path this node belongs to
+        nodeVisual.PointerPressed += (sender, e) =>
+        {
+            if (e.GetCurrentPoint((Control)sender).Properties.IsLeftButtonPressed)
+            {
+                // Find the path this node belongs to
+                var pathObj = PathVisualizationObjects.FirstOrDefault(p => p.PathId == node.PathId);
+                if (pathObj != null)
+                {
+                    SelectPath(pathObj);
+                    Console.WriteLine($"Selected path {pathObj.Name} via node {node.NodeId}");
+                }
+                e.Handled = true;
+            }
+        };
+        
+        // Position on canvas (center the circle)
+        Canvas.SetLeft(nodeVisual, canvasX - nodeSize / 2);
+        Canvas.SetTop(nodeVisual, canvasY - nodeSize / 2);
+        // Canvas.SetZIndex(nodeVisual, 3); // ZIndex not available in this context
+        
+        return nodeVisual;
+    }
+    
+    private Control? CreateEnhancedSpawnVisual(SpawnVisualizationObject spawn)
+    {
+        // Convert 3D world coordinates to 2D canvas coordinates
+        var canvasX = 10000.0 + (spawn.X * 0.25);
+        var canvasY = 10000.0 - (spawn.Y * 0.25); // Flip Y axis for proper display
+        
+        // Create spawn visual as a larger, more prominent shape
+        var spawnColor = spawn.PathId != 0 ? Avalonia.Media.Color.FromRgb(255, 140, 0) : Avalonia.Media.Color.FromRgb(255, 0, 0); // Orange if has path, red if static
+        var spawnSize = 14.0;
+        
+        // Use a diamond shape for spawns to distinguish from circular nodes
+        var spawnVisual = new Border
+        {
+            Width = spawnSize,
+            Height = spawnSize,
+            Background = new SolidColorBrush(spawnColor),
+            BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 255)),
+            BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(2),
+            IsHitTestVisible = true,
+            Tag = spawn, // Set tag for filtering
+            Child = new TextBlock
+            {
+                Text = "C", // C for Creature
+                Foreground = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 255)),
+                FontSize = 8,
+                FontWeight = FontWeight.Bold,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            }
+        };
+        
+        // Add comprehensive tooltip
+        ToolTip.SetTip(spawnVisual, $"Spawn: {spawn.Name}\nID: {spawn.SpawnId}\nPath: {spawn.PathId}\nType: {spawn.CreatureType}\nPosition: ({spawn.X:F1}, {spawn.Y:F1}, {spawn.Z:F1})");
+        
+        // Add click handler to select this spawn
+        spawnVisual.PointerPressed += (sender, e) =>
+        {
+            if (e.GetCurrentPoint((Control)sender).Properties.IsLeftButtonPressed)
+            {
+                SelectSpawn(spawn);
+                Console.WriteLine($"Selected spawn {spawn.Name}");
+                e.Handled = true;
+            }
+        };
+        
+        // Position on canvas (center the shape)
+        Canvas.SetLeft(spawnVisual, canvasX - spawnSize / 2);
+        Canvas.SetTop(spawnVisual, canvasY - spawnSize / 2);
+        // Canvas.SetZIndex(spawnVisual, 5); // ZIndex not available in this context
+        
+        return spawnVisual;
+    }
+    
+    private List<Control> CreateEnhancedPathLineVisuals(PathVisualizationObject path)
+    {
+        var visuals = new List<Control>();
+        
+        if (path.Nodes == null || path.Nodes.Count < 2) return visuals;
+        
+        // Use different colors for different paths
+        var pathColors = new[]
+        {
+            Avalonia.Media.Color.FromRgb(255, 255, 0),   // Yellow
+            Avalonia.Media.Color.FromRgb(0, 255, 255),   // Cyan  
+            Avalonia.Media.Color.FromRgb(255, 0, 255),   // Magenta
+            Avalonia.Media.Color.FromRgb(255, 165, 0),   // Orange
+            Avalonia.Media.Color.FromRgb(128, 255, 0),   // Lime
+            Avalonia.Media.Color.FromRgb(255, 20, 147),  // Deep pink
+            Avalonia.Media.Color.FromRgb(30, 144, 255),  // Dodger blue
+            Avalonia.Media.Color.FromRgb(255, 69, 0)     // Red orange
+        };
+        
+        var pathColor = pathColors[(int)(path.PathId % (ulong)pathColors.Length)];
+        
+        // Create line segments connecting consecutive nodes
+        for (int i = 0; i < path.Nodes.Count - 1; i++)
+        {
+            var fromNode = path.Nodes[i];
+            var toNode = path.Nodes[i + 1];
+            
+            // Convert coordinates
+            var fromX = 10000.0 + (fromNode.X * 0.25);
+            var fromY = 10000.0 - (fromNode.Y * 0.25);
+            var toX = 10000.0 + (toNode.X * 0.25);
+            var toY = 10000.0 - (toNode.Y * 0.25);
+            
+            // Create main path line
+            var pathLine = new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Avalonia.Point(fromX, fromY),
+                EndPoint = new Avalonia.Point(toX, toY),
+                Stroke = new SolidColorBrush(pathColor),
+                StrokeThickness = 2,
+                IsHitTestVisible = true,
+                Tag = new PathLineTag { Path = path, IsArrow = false } // Custom tag for path components
+            };
+            
+            // Add tooltip
+            ToolTip.SetTip(pathLine, $"Path: {path.Name}\nSegment {i + 1}/{path.Nodes.Count - 1}\nFrom Node {fromNode.NodeId} to Node {toNode.NodeId}");
+            
+            // Add click handler to select this path
+            pathLine.PointerPressed += (sender, e) =>
+            {
+                if (e.GetCurrentPoint((Control)sender).Properties.IsLeftButtonPressed)
+                {
+                    SelectPath(path);
+                    Console.WriteLine($"Selected path {path.Name} via path line");
+                    e.Handled = true;
+                }
+            };
+            
+            // Canvas.SetZIndex(pathLine, 2); // ZIndex not available in this context
+            visuals.Add(pathLine);
+            
+            // Create directional arrow at the end of each segment
+            var arrowVisual = CreateArrowHead(fromX, fromY, toX, toY, pathColor);
+            if (arrowVisual != null)
+            {
+                // Set the correct path reference for the arrow
+                arrowVisual.Tag = new PathLineTag { Path = path, IsArrow = true };
+                
+                // Add click handler to select this path
+                arrowVisual.PointerPressed += (sender, e) =>
+                {
+                    if (e.GetCurrentPoint((Control)sender).Properties.IsLeftButtonPressed)
+                    {
+                        SelectPath(path);
+                        Console.WriteLine($"Selected path {path.Name} via arrow");
+                        e.Handled = true;
+                    }
+                };
+                
+                // Canvas.SetZIndex(arrowVisual, 2); // ZIndex not available in this context
+                visuals.Add(arrowVisual);
             }
         }
         
-        Console.WriteLine($"Created path visuals on canvas. Total children in canvas: {_zoneObjectCanvas?.Children.Count ?? 0}");
+        return visuals;
+    }
+    
+    private Control? CreateArrowHead(double fromX, double fromY, double toX, double toY, Avalonia.Media.Color color)
+    {
+        // Calculate arrow direction
+        var dx = toX - fromX;
+        var dy = toY - fromY;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        
+        if (length < 0.1) return null; // Too short to create meaningful arrow
+        
+        // Normalize direction
+        dx /= length;
+        dy /= length;
+        
+        // Arrow parameters
+        var arrowLength = 8.0;
+        var arrowAngle = Math.PI / 6; // 30 degrees
+        
+        // Calculate arrow head points
+        var arrowX = toX - dx * arrowLength;
+        var arrowY = toY - dy * arrowLength;
+        
+        var perpX = -dy; // Perpendicular vector
+        var perpY = dx;
+        
+        var arrowLeft = new Avalonia.Point(
+            arrowX + perpX * arrowLength * Math.Sin(arrowAngle),
+            arrowY + perpY * arrowLength * Math.Sin(arrowAngle)
+        );
+        
+        var arrowRight = new Avalonia.Point(
+            arrowX - perpX * arrowLength * Math.Sin(arrowAngle),
+            arrowY - perpY * arrowLength * Math.Sin(arrowAngle)
+        );
+        
+        // Create arrow head as a polygon
+        var arrow = new Polygon
+        {
+            Points = new List<Avalonia.Point> { new Avalonia.Point(toX, toY), arrowLeft, arrowRight },
+            Fill = new SolidColorBrush(color),
+            Stroke = new SolidColorBrush(color),
+            StrokeThickness = 1,
+            Tag = new PathLineTag { Path = null, IsArrow = true } // Will be set by caller
+        };
+        
+        return arrow;
+    }
+    
+    // Helper methods for path details
+    private string GetPathSpawnCount(PathVisualizationObject path)
+    {
+        var spawnsOnPath = GetSpawnsForPath(path);
+        var count = spawnsOnPath.Count;
+        return count > 0 ? $"Spawns: {count}" : "No spawns";
+    }
+    
+    private List<SpawnVisualizationObject> GetSpawnsForPath(PathVisualizationObject path)
+    {
+        return SpawnVisualizationObjects.Where(spawn => spawn.PathId == path.PathId).ToList();
+    }
+    
+    private string GetPathDetailedDescription(PathVisualizationObject path)
+    {
+        var nodes = path.Nodes;
+        var spawns = GetSpawnsForPath(path);
+        var description = new List<string>();
+        
+        description.Add($"Path '{path.Name}' (ID: {path.PathId})");
+        description.Add($"Type: {path.PathType}");
+        
+        if (nodes.Count > 0)
+        {
+            description.Add($"Route: {nodes.Count} waypoints");
+            var totalDistance = CalculatePathDistance(nodes);
+            description.Add($"Total distance: {totalDistance:F1} units");
+            
+            // Show first and last nodes
+            if (nodes.Count >= 2)
+            {
+                var firstNode = nodes.First();
+                var lastNode = nodes.Last();
+                description.Add($"Start: ({firstNode.X:F1}, {firstNode.Y:F1}, {firstNode.Z:F1})");
+                description.Add($"End: ({lastNode.X:F1}, {lastNode.Y:F1}, {lastNode.Z:F1})");
+            }
+        }
+        else
+        {
+            description.Add("No waypoints defined");
+        }
+        
+        if (spawns.Count > 0)
+        {
+            description.Add($"Used by {spawns.Count} creature(s):");
+            foreach (var spawn in spawns.Take(5)) // Show first 5 spawns
+            {
+                description.Add($"  • {spawn.Name} ({spawn.CreatureType})");
+            }
+            if (spawns.Count > 5)
+            {
+                description.Add($"  ... and {spawns.Count - 5} more");
+            }
+        }
+        else
+        {
+            description.Add("Not used by any creatures");
+        }
+        
+        return string.Join("\n", description);
+    }
+    
+    private float CalculatePathDistance(List<NodeVisualizationObject> nodes)
+    {
+        if (nodes.Count < 2) return 0;
+        
+        float totalDistance = 0;
+        for (int i = 0; i < nodes.Count - 1; i++)
+        {
+            var from = nodes[i];
+            var to = nodes[i + 1];
+            var dx = to.X - from.X;
+            var dy = to.Y - from.Y;
+            var dz = to.Z - from.Z;
+            totalDistance += (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+        return totalDistance;
     }
     
     private void CreateVolumeVisuals()
@@ -2859,6 +3675,13 @@ public class ZoneEditorViewModel : ViewModelBase
         NotifySelectionChanged();
     }
     
+    private void SelectSpawn(SpawnVisualizationObject spawn)
+    {
+        ClearAllSelections();
+        SelectedSpawn = spawn;
+        NotifySelectionChanged();
+    }
+    
     private void ClearAllSelections()
     {
         SelectedObject = null;
@@ -2869,6 +3692,38 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectedMesh = null;
         SelectedVolume = null;
         SelectedTrigger = null;
+        SelectedSpawn = null;
+        SelectedSpawnTemplate = null;
+        SelectedNode = null;
+    }
+    
+    // Drop table existence cache
+    private HashSet<string> _existingDropTableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private bool _dropTableCacheLoaded = false;
+    
+    private async Task EnsureDropTableCacheAsync()
+    {
+        if (_dropTableCacheLoaded) return;
+        await RefreshDropTableCacheAsync();
+    }
+
+    public async Task RefreshDropTableCacheAsync()
+    {
+        try
+        {
+            var dropTableService = new DropTableService();
+            var all = await dropTableService.GetAllDropTablesAsync();
+            _existingDropTableNames = new HashSet<string>(all.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
+            _dropTableCacheLoaded = true;
+            
+            // Refresh UI for loot table item lists
+            this.RaisePropertyChanged(nameof(SelectedTemplateLootTableItems));
+            this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLootTableItems));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to refresh drop table cache: {ex.Message}");
+        }
     }
     
     private void NotifySelectionChanged()
@@ -2880,7 +3735,51 @@ public class ZoneEditorViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(HasSelectedMesh));
         this.RaisePropertyChanged(nameof(HasSelectedVolume));
         this.RaisePropertyChanged(nameof(HasSelectedTrigger));
+        this.RaisePropertyChanged(nameof(HasSelectedSpawn));
+        this.RaisePropertyChanged(nameof(HasSelectedNode));
         this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+        
+        // Notify path detail properties when path selection changes
+        this.RaisePropertyChanged(nameof(SelectedPathName));
+        this.RaisePropertyChanged(nameof(SelectedPathId));
+        this.RaisePropertyChanged(nameof(SelectedPathType));
+        this.RaisePropertyChanged(nameof(SelectedPathNodeCount));
+        this.RaisePropertyChanged(nameof(SelectedPathSpawnCount));
+        this.RaisePropertyChanged(nameof(SelectedPathDescription));
+        this.RaisePropertyChanged(nameof(SelectedPathNodes));
+        this.RaisePropertyChanged(nameof(SelectedPathSpawns));
+        this.RaisePropertyChanged(nameof(SelectedPathAllProperties));
+        
+        // Node selection details
+        this.RaisePropertyChanged(nameof(SelectedNodeName));
+        this.RaisePropertyChanged(nameof(SelectedNodeId));
+        this.RaisePropertyChanged(nameof(SelectedNodePath));
+        this.RaisePropertyChanged(nameof(SelectedNodeIndex));
+        this.RaisePropertyChanged(nameof(SelectedNodeLocation));
+        this.RaisePropertyChanged(nameof(SelectedNodeAllProperties));
+        
+        // Notify spawn detail properties when spawn selection changes
+        this.RaisePropertyChanged(nameof(SelectedSpawnName));
+        this.RaisePropertyChanged(nameof(SelectedSpawnId));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateId));
+        this.RaisePropertyChanged(nameof(SelectedSpawnType));
+        this.RaisePropertyChanged(nameof(SelectedSpawnPath));
+        this.RaisePropertyChanged(nameof(SelectedSpawnLocation));
+        this.RaisePropertyChanged(nameof(SelectedSpawnChance));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplate));
+        this.RaisePropertyChanged(nameof(SelectedSpawnGameObjectTemplate));
+        
+        // Notify spawn template detail properties
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateClassName));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateIcon));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLevel));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplatePrimarySchool));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateObjectName));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateDisplayName));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateDescription));
+        this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLootTables));
+        this.RaisePropertyChanged(nameof(HasSpawnLootTables));
+        
         this.RaisePropertyChanged(nameof(LocationX));
         this.RaisePropertyChanged(nameof(LocationY));
         this.RaisePropertyChanged(nameof(LocationZ));
@@ -2892,6 +3791,9 @@ public class ZoneEditorViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(CurrentLocationZ));
         this.RaisePropertyChanged(nameof(CurrentScale));
         this.RaisePropertyChanged(nameof(SelectedTemplate));
+
+        // Refresh drop table existence on any selection change
+        _ = RefreshDropTableCacheAsync();
     }
     
     /// <summary>
@@ -2972,6 +3874,183 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Loads a template for a spawn using its template ID
+    /// </summary>
+    /// <param name="templateId">The template ID from the spawn data</param>
+    /// <returns>The loaded template, or null if not found or failed to load</returns>
+    private async Task<PropertyClass?> LoadSpawnTemplateAsync(ulong templateId)
+    {
+        try
+        {
+            // First, ensure template manifest is loaded
+            var manifestService = TemplateManifestService.Instance;
+            if (!manifestService.IsLoaded)
+            {
+                var templateManifestData = await RootWadService.Instance.GetFileAsync("TemplateManifest.xml");
+                if (templateManifestData == null || !templateManifestData.HasValue)
+                {
+                    Console.WriteLine("Failed to load TemplateManifest.xml from Root.wad");
+                    return null;
+                }
+                
+                if (!manifestService.LoadFromFileData(templateManifestData.Value))
+                {
+                    Console.WriteLine("Failed to parse TemplateManifest.xml");
+                    return null;
+                }
+            }
+            
+            // Find the template location by template ID
+            var templateLocations = manifestService.GetAllTemplateLocations();
+            var templateLocation = templateLocations.FirstOrDefault(t => t.m_id == templateId);
+            
+            if (templateLocation == null)
+            {
+                Console.WriteLine($"Spawn template with ID {templateId} not found in manifest");
+                return null;
+            }
+            
+            Console.WriteLine($"Loading spawn template: {templateLocation.m_filename} for template ID {templateId}");
+            
+            // Load the template file from Root.wad
+            var templateData = await RootWadService.Instance.GetFileAsync(templateLocation.m_filename);
+            if (templateData == null || !templateData.HasValue)
+            {
+                Console.WriteLine($"Failed to load template file '{templateLocation.m_filename}' from Root.wad");
+                return null;
+            }
+            
+            // Use the same BindSerializer instance and configuration as zone data loading
+            var bindSerializer = new BindSerializer();
+            var templateDataBytes = templateData.Value.ToArray();
+            
+            // Try GameObjectTemplate first, then fallback to PropertyClass
+            if (bindSerializer.Deserialize<GameObjectTemplate>(templateDataBytes, 1, out var gameObjectTemplate) && gameObjectTemplate != null)
+            {
+                Console.WriteLine($"Successfully loaded spawn GameObjectTemplate: {templateLocation.m_filename}");
+                return gameObjectTemplate;
+            }
+            
+            if (bindSerializer.Deserialize<PropertyClass>(templateDataBytes, 1, out var template) && template != null)
+            {
+                Console.WriteLine($"Successfully loaded spawn template as PropertyClass: {templateLocation.m_filename}");
+                return template;
+            }
+            
+            Console.WriteLine($"Failed to deserialize spawn template from '{templateLocation.m_filename}'");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading spawn template ID {templateId}: {ex.Message}");
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// Loads templates for all spawns asynchronously and updates their CreatureType
+    /// </summary>
+    private async Task LoadSpawnTemplatesAsync()
+    {
+        if (SpawnVisualizationObjects.Count == 0)
+            return;
+            
+        Console.WriteLine($"Loading templates for {SpawnVisualizationObjects.Count} spawns...");
+        
+        var loadedCount = 0;
+        var failedCount = 0;
+        
+        foreach (var spawn in SpawnVisualizationObjects)
+        {
+            try
+            {
+                var template = await LoadSpawnTemplateAsync(spawn.TemplateId);
+                if (template != null)
+                {
+                    // Store the template and derive display properties for per-spawn UI
+                    spawn.Template = template;
+                    spawn.CreatureType = DetermineCreatureType(template);
+                    
+                    // Populate template-derived fields for binding
+                    spawn.TemplateClassName = GetTemplateProperty(template, "m_className");
+                    spawn.TemplateIcon = GetTemplateProperty(template, "m_icon");
+                    spawn.TemplateLevel = GetTemplateProperty(template, "m_level");
+                    spawn.TemplatePrimarySchool = GetTemplateProperty(template, "m_primarySchool");
+                    spawn.TemplateObjectName = GetTemplateProperty(template, "m_objectName");
+                    spawn.TemplateDisplayName = GetTemplateProperty(template, "m_displayName");
+                    spawn.TemplateDescription = GetTemplateProperty(template, "m_description");
+                    
+                    // Loot tables
+                    spawn.LootTables = GetLootTablesFromTemplate(template);
+                    
+                    loadedCount++;
+                    
+                    if (loadedCount <= 5) // Log first few for debugging
+                    {
+                        Console.WriteLine($"  Loaded template for '{spawn.Name}': {spawn.CreatureType}");
+                    }
+                }
+                else
+                {
+                    spawn.Template = null;
+                    spawn.CreatureType = "Unknown Template";
+                    spawn.LootTables = null;
+                    failedCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading template for spawn '{spawn.Name}': {ex.Message}");
+                spawn.Template = null;
+                spawn.CreatureType = "Load Error";
+                spawn.LootTables = null;
+                failedCount++;
+            }
+        }
+        
+        Console.WriteLine($"Spawn template loading complete: {loadedCount} loaded, {failedCount} failed");
+        
+        // Notify UI that spawn data has been updated
+        this.RaisePropertyChanged(nameof(SpawnVisualizationObjects));
+        this.RaisePropertyChanged(nameof(SelectedPathSpawns));
+        this.RaisePropertyChanged(nameof(SelectedPathDescription));
+    }
+    
+    /// <summary>
+    /// Determines the creature type from a loaded template
+    /// </summary>
+    private string DetermineCreatureType(PropertyClass template)
+    {
+        // Try to get a meaningful creature type from the template
+        // This follows similar logic to zone objects
+        
+        if (template is GameObjectTemplate gameObjectTemplate)
+        {
+            // Check for specific creature properties
+            var displayName = gameObjectTemplate.m_displayName?.ToString() ?? "";
+            var objectName = gameObjectTemplate.m_objectName?.ToString() ?? "";
+            
+            if (!string.IsNullOrEmpty(displayName))
+                return $"Creature: {displayName}";
+            else if (!string.IsNullOrEmpty(objectName))
+                return $"Creature: {objectName}";
+            else
+                return "Creature";
+        }
+        
+        // For other template types, try to infer from class name
+        var templateType = template.GetType().Name;
+        if (templateType.Contains("NPC", StringComparison.OrdinalIgnoreCase))
+            return "NPC";
+        else if (templateType.Contains("Creature", StringComparison.OrdinalIgnoreCase))
+            return "Creature";
+        else if (templateType.Contains("Monster", StringComparison.OrdinalIgnoreCase))
+            return "Monster";
+        else
+            return templateType.Replace("Template", "").Replace("Object", "");
+    }
+
     private string DetermineObjectType(CoreObjectInfo obj)
     {
         var name = obj.m_zoneTag?.ToLower() ?? "";
@@ -3006,6 +4085,30 @@ public class ZoneEditorViewModel : ViewModelBase
             return "Pet";
             
         return "Unknown";
+    }
+    
+    /// <summary>
+    /// Safely gets a property value from a template using reflection
+    /// </summary>
+    private string? GetTemplateProperty(PropertyClass? template, string propertyName)
+    {
+        if (template == null) return null;
+        
+        try
+        {
+            var property = template.GetType().GetProperty(propertyName);
+            if (property != null)
+            {
+                var value = property.GetValue(template);
+                return value?.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to get property '{propertyName}' from template: {ex.Message}");
+        }
+        
+        return null;
     }
 
     private bool IsVolume(CoreObjectInfo obj)
@@ -3624,6 +4727,72 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
     
+    private async void OpenOrCreateDropTable(string dropTableName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dropTableName))
+            {
+                MessageService.Error("Drop table name is empty.").Send();
+                return;
+            }
+            
+            // Ensure DB configured
+            var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(_mainViewModel.GetMainWindow());
+            if (!isConfigured)
+            {
+                MessageService.Info("Database configuration required to open or create drop tables.")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+                return;
+            }
+            
+            var dropTableService = new DropTableService();
+            var existing = await dropTableService.GetDropTableAsync(dropTableName);
+            
+            // Open editor tab
+            var tabManager = _mainViewModel.TabManager;
+            var existingTab = tabManager.FindTabByContent<DropTableEditorViewModel>();
+            DropTableEditorViewModel vm;
+            if (existingTab != null)
+            {
+                tabManager.SelectTab(existingTab);
+                vm = (DropTableEditorViewModel)existingTab.Content;
+            }
+            else
+            {
+                vm = new DropTableEditorViewModel(_mainViewModel);
+                var tab = tabManager.AddTab("Drop Table Editor", vm);
+                tabManager.SelectTab(tab);
+            }
+            
+            await Task.Delay(300);
+            
+            if (existing != null)
+            {
+                // Select existing table
+                var target = vm.DropTables.FirstOrDefault(t => t.Name.Equals(dropTableName, StringComparison.OrdinalIgnoreCase));
+                if (target != null)
+                {
+                    vm.SelectedDropTable = target;
+                    MessageService.Info($"Opened existing drop table '{dropTableName}'.").Send();
+                }
+                else
+                {
+                    MessageService.Info($"Drop table '{dropTableName}' exists. Use search to locate it.").Send();
+                }
+            }
+            else
+            {
+                MessageService.Info($"Drop table '{dropTableName}' was not found. Use 'Create New Table' in the editor to create it.").Send();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Error opening or creating drop table '{dropTableName}': {ex.Message}").Send();
+        }
+    }
+    
     /// <summary>
     /// Debug method to test spell inventory system - remove this in production
     /// </summary>
@@ -3761,7 +4930,25 @@ public class SpawnVisualizationObject
     public float Scale { get; set; } = 1.0f;
     public byte SpawnChance { get; set; } // Percentage chance to spawn (0-100)
     public string SpawnType { get; set; } = string.Empty;
+    public ulong PathId { get; set; } // Which path this spawn follows
+    public string CreatureType { get; set; } = string.Empty; // Type of creature spawned
     public List<ulong> PathIds { get; set; } = new(); // Paths this spawn uses
+
+    // Loaded template for this spawn (set asynchronously)
+    public PropertyClass? Template { get; set; }
+
+    // Template-derived display properties
+    public string? TemplateClassName { get; set; }
+    public string? TemplateIcon { get; set; }
+    public string? TemplateLevel { get; set; }
+    public string? TemplatePrimarySchool { get; set; }
+    public string? TemplateObjectName { get; set; }
+    public string? TemplateDisplayName { get; set; }
+    public string? TemplateDescription { get; set; }
+
+    // Loot tables extracted from template
+    public List<string>? LootTables { get; set; }
+    public bool HasLootTables => LootTables?.Count > 0;
     
     public string DisplayText => $"{Name} (Spawn)";
     public string CoordinateText => $"({X:F1}, {Y:F1}, {Z:F1})";
@@ -3777,6 +4964,9 @@ public class NodeVisualizationObject
     public float Z { get; set; }
     public ulong PathId { get; set; } // Which path this node belongs to
     public int NodeIndex { get; set; } // Order in the path
+
+    // Reference to the original deserialized node object for deep inspection
+    public object? OriginalNodeObject { get; set; }
     
     public string DisplayText => $"Node {NodeIndex} ({Name})";
     public string CoordinateText => $"({X:F1}, {Y:F1}, {Z:F1})";
@@ -3787,13 +4977,46 @@ public class PathVisualizationObject
     public ulong PathId { get; set; }
     public string Name { get; set; } = string.Empty;
     public List<NodeVisualizationObject> Nodes { get; set; } = new();
+    public List<SpawnVisualizationObject> Spawns { get; set; } = new();
     public List<ulong> SpawnIds { get; set; } = new(); // Spawns that use this path
     public string PathType { get; set; } = "Unknown";
+
+    // Reference to the original deserialized path object for deep inspection
+    public object? OriginalPathObject { get; set; }
     
     public string DisplayText => $"{Name} (Path)";
     public string NodeInfo => $"Nodes: {Nodes.Count}";
     public string SpawnInfo => SpawnIds.Count > 0 ? $"Used by {SpawnIds.Count} spawn(s)" : "Unused path";
     public bool HasNodes => Nodes.Count > 0;
+
+    // For tree view: nodes first, then spawns
+    public List<object> CombinedChildren => Nodes.Cast<object>().Concat(Spawns).ToList();
+}
+
+public class LootTableItem
+{
+    public string Name { get; }
+    public bool Exists { get; }
+    public string Label => Exists ? "View" : "Create";
+    
+    public LootTableItem(string name, bool exists)
+    {
+        Name = name;
+        Exists = exists;
+    }
+}
+
+public class NodePropertyItem
+{
+    public string Name { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+}
+
+// Helper class for identifying path line components in the visual tree
+public class PathLineTag
+{
+    public PathVisualizationObject? Path { get; set; }
+    public bool IsArrow { get; set; }
 }
 
 /// <summary>
