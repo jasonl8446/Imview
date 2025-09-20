@@ -21,6 +21,7 @@ modification, are permitted provided that the following conditions are met:
 using System.Collections.Generic;
 using System.Linq;
 using Imcodec.ObjectProperty.TypeCache;
+using Imview.Core.ViewModels;
 
 namespace Imview.Core.Models;
 
@@ -43,6 +44,7 @@ public class TriggerVisualizationObject
     public string TriggerType { get; set; } = string.Empty;
     public string Zone { get; set; } = string.Empty;
     public Trigger OriginalTrigger { get; set; } = null!;
+    public List<ObjectFlag> Flags { get; set; } = new();
     
     /// <summary>
     /// Gets all events combined for UI display

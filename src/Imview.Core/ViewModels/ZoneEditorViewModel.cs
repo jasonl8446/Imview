@@ -1036,6 +1036,22 @@ public class ZoneEditorViewModel : ViewModelBase
                 
                 foreach (var obj in validObjects)
                 {
+                    // Load template for this object to detect flags
+                    GameObjectTemplate? template = null;
+                    try
+                    {
+                        // Load template synchronously (we're already in a background task)
+                        var templateTask = LoadTemplateAsync(obj);
+                        template = templateTask.GetAwaiter().GetResult() as GameObjectTemplate;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to load template for object {obj.m_zoneTag}: {ex.Message}");
+                    }
+
+                    // Detect flags for this object
+                    var flags = ObjectFlagService.DetectFlags(template, obj);
+                    
                     // Add to general objects list
                     var zoneObjectItem = new ZoneObjectItem
                     {
@@ -1047,7 +1063,7 @@ public class ZoneEditorViewModel : ViewModelBase
                     };
                     tempZoneObjects.Add(zoneObjectItem);
 
-                    // Add to visualization
+                    // Add to visualization with flags
                     var visualObj = new ZoneVisualizationObject
                     {
                         Name = zoneObjectItem.Name,
@@ -1056,13 +1072,15 @@ public class ZoneEditorViewModel : ViewModelBase
                         Y = obj.m_location.Y,
                         Z = obj.m_location.Z,
                         Scale = obj.m_fScale,
-                        TemplateID = (ulong)obj.m_templateID
+                        TemplateID = (ulong)obj.m_templateID,
+                        Flags = flags
                     };
                     
-                    // Debug: Log object coordinates
+                    // Debug: Log object coordinates and flags
                     if (tempVisualizationObjects.Count < 10) // Only log first 10 objects to avoid spam
                     {
-                        Console.WriteLine($"Object: {visualObj.Name} at ({visualObj.X:F1}, {visualObj.Y:F1}, {visualObj.Z:F1}) - Type: {visualObj.Type}");
+                        var flagsText = flags.Count > 0 ? $" [Flags: {string.Join(", ", flags.Select(f => f.Letter))}]" : "";
+                        Console.WriteLine($"Object: {visualObj.Name} at ({visualObj.X:F1}, {visualObj.Y:F1}, {visualObj.Z:F1}) - Type: {visualObj.Type}{flagsText}");
                     }
                     
                     tempVisualizationObjects.Add(visualObj);
@@ -1411,6 +1429,10 @@ public class ZoneEditorViewModel : ViewModelBase
                     if (trigger != null)
                     {
                         var triggerVis = new TriggerVisualizationObject(trigger);
+                        
+                        // Detect and apply flags for the trigger
+                        triggerVis.Flags = ObjectFlagService.DetectTriggerFlags(trigger);
+                        
                         tempTriggerObjects.Add(triggerVis);
                         
                         // Debug: Log first few trigger objects
@@ -2942,6 +2964,7 @@ public class ZoneVisualizationObject
     public float Y { get; set; }
     public float Z { get; set; }
     public float Scale { get; set; } = 1.0f;
+    public List<ObjectFlag> Flags { get; set; } = new();
     
     public string DisplayText => $"{Name} ({Type})";
     public string CoordinateText => $"({X:F1}, {Y:F1}, {Z:F1})";
@@ -3038,6 +3061,165 @@ public class PathVisualizationObject
     public string NodeInfo => $"Nodes: {Nodes.Count}";
     public string SpawnInfo => SpawnIds.Count > 0 ? $"Used by {SpawnIds.Count} spawn(s)" : "Unused path";
     public bool HasNodes => Nodes.Count > 0;
+}
+
+/// <summary>
+/// Represents a flag that can be displayed next to objects in the scene hierarchy
+/// </summary>
+public class ObjectFlag
+{
+    public string FlagType { get; set; } = string.Empty;
+    public string Letter { get; set; } = "?";
+    public string Color { get; set; } = "#CCCCCC"; // Default gray
+    public string ToolTip { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Creates a flag for NPC objects
+    /// </summary>
+    public static ObjectFlag CreateNpcFlag()
+    {
+        return new ObjectFlag
+        {
+            FlagType = "NPC",
+            Letter = "N",
+            Color = "#4CAF50", // Green
+            ToolTip = "Non-Player Character (has NPCBehaviorTemplate)"
+        };
+    }
+    
+    /// <summary>
+    /// Creates a flag for Shopkeeper objects
+    /// </summary>
+    public static ObjectFlag CreateShopkeeperFlag()
+    {
+        return new ObjectFlag
+        {
+            FlagType = "Shopkeeper",
+            Letter = "$",
+            Color = "#FFD700", // Gold
+            ToolTip = "Shopkeeper"
+        };
+    }
+    
+    /// <summary>
+    /// Creates a flag for Professor objects
+    /// </summary>
+    public static ObjectFlag CreateProfessorFlag()
+    {
+        return new ObjectFlag
+        {
+            FlagType = "Professor",
+            Letter = "P",
+            Color = "#2196F3", // Blue
+            ToolTip = "Professor/Teacher/Trainer"
+        };
+    }
+    
+    /// <summary>
+    /// Creates a flag for Teleporter objects
+    /// </summary>
+    public static ObjectFlag CreateTeleporterFlag()
+    {
+        return new ObjectFlag
+        {
+            FlagType = "Teleporter",
+            Letter = "T",
+            Color = "#9C27B0", // Purple
+            ToolTip = "Trigger with teleport functionality (has ResTeleport result)"
+        };
+    }
+}
+
+/// <summary>
+/// Service for detecting and assigning flags to zone objects based on their templates
+/// </summary>
+public class ObjectFlagService
+{
+    /// <summary>
+    /// Analyzes a GameObjectTemplate and determines what flags should be applied
+    /// </summary>
+    /// <param name="template">The GameObjectTemplate to analyze</param>
+    /// <param name="coreObject">The CoreObjectInfo for fallback name-based detection</param>
+    /// <returns>List of flags that should be applied to this object</returns>
+    public static List<ObjectFlag> DetectFlags(GameObjectTemplate? template, CoreObjectInfo coreObject)
+    {
+        var flags = new List<ObjectFlag>();
+
+        if (template != null)
+        {
+            // Check for NPCBehaviorTemplate in behaviors
+            if (HasNpcBehaviorTemplate(template))
+            {
+                flags.Add(ObjectFlag.CreateNpcFlag());
+            }
+        }
+
+        // Fallback to name-based detection for additional flags
+        var name = coreObject.m_zoneTag?.ToLower() ?? "";
+        
+        // Add shopkeeper flag if name suggests it's a shopkeeper
+        if (name.Contains("shop"))
+        {
+            flags.Add(ObjectFlag.CreateShopkeeperFlag());
+        }
+        
+        // Add professor flag if name suggests it's a professor/teacher
+        if (name.Contains("professor") || name.Contains("teacher") || name.Contains("trainer") || name.Contains("instructor"))
+        {
+            flags.Add(ObjectFlag.CreateProfessorFlag());
+        }
+        
+        // Note: Teleporter flags are now only assigned based on actual ResTeleport results in triggers
+        // Name-based teleporter detection was removed to avoid false positives on zone objects
+
+        return flags;
+    }
+
+    /// <summary>
+    /// Analyzes a trigger and determines what flags should be applied
+    /// </summary>
+    /// <param name="trigger">The trigger to analyze</param>
+    /// <returns>List of flags that should be applied to this trigger</returns>
+    public static List<ObjectFlag> DetectTriggerFlags(Trigger trigger)
+    {
+        var flags = new List<ObjectFlag>();
+
+        if (trigger.m_results?.m_results != null)
+        {
+            // Check for ResTeleport results
+            foreach (var result in trigger.m_results.m_results)
+            {
+                if (result is ResTeleport)
+                {
+                    flags.Add(ObjectFlag.CreateTeleporterFlag());
+                    break; // Only add the flag once even if multiple teleport results exist
+                }
+            }
+        }
+
+        return flags;
+    }
+
+    /// <summary>
+    /// Checks if a GameObjectTemplate has an NPCBehaviorTemplate behavior
+    /// </summary>
+    /// <param name="template">The template to check</param>
+    /// <returns>True if the template has NPCBehaviorTemplate, false otherwise</returns>
+    private static bool HasNpcBehaviorTemplate(GameObjectTemplate template)
+    {
+        if (template.m_behaviors == null)
+            return false;
+
+        foreach (var behavior in template.m_behaviors)
+        {
+            if (behavior != null && behavior.GetType().Name == "NPCBehaviorTemplate")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 public class BehaviorWrapper
