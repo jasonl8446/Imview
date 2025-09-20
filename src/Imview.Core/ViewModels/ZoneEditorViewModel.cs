@@ -46,6 +46,7 @@ using Imview.PacketReader.Services;
 using Imview.Core.Database;
 using Imview.Core.Database.Services;
 using Imview.Core.Controls;
+using Imcodec.IO;
 
 namespace Imview.Core.ViewModels;
 
@@ -122,6 +123,8 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectZoneCommand = ReactiveCommand.Create(SelectZone);
         EditNpcInventoryCommand = ReactiveCommand.Create(EditNpcInventory);
         EditNpcSpellInventoryCommand = ReactiveCommand.Create(EditNpcSpellInventory);
+        ViewDropTableCommand = ReactiveCommand.Create<string>(ViewDropTable);
+        CreateDropTableCommand = ReactiveCommand.Create<string>(CreateDropTable);
         
         // Initialize viewport commands
         ZoomInCommand = ReactiveCommand.Create(ZoomIn);
@@ -261,6 +264,8 @@ public class ZoneEditorViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(SelectedTemplateDescriptionLocaleId));
             this.RaisePropertyChanged(nameof(SelectedTemplateObjectNameResolved));
             this.RaisePropertyChanged(nameof(SelectedTemplateObjectNameLocaleId));
+            this.RaisePropertyChanged(nameof(SelectedTemplateLootTables));
+            this.RaisePropertyChanged(nameof(HasLootTables));
         }
     }
     
@@ -376,6 +381,23 @@ public class ZoneEditorViewModel : ViewModelBase
             return behaviors;
         }
     }
+    
+    /// <summary>
+    /// Gets the loot tables from the selected template if it has an m_lootTable property.
+    /// Returns null if no template is selected or the template doesn't have loot tables.
+    /// </summary>
+    public List<string>? SelectedTemplateLootTables
+    {
+        get
+        {
+            return GetLootTablesFromTemplate(SelectedTemplate);
+        }
+    }
+    
+    /// <summary>
+    /// Gets whether the selected template has loot tables.
+    /// </summary>
+    public bool HasLootTables => SelectedTemplateLootTables?.Count > 0;
 
     public CollisionVisualizationObject? SelectedCollision
     {
@@ -879,6 +901,8 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand SelectZoneCommand { get; }
     public ICommand EditNpcInventoryCommand { get; }
     public ICommand EditNpcSpellInventoryCommand { get; }
+    public ICommand ViewDropTableCommand { get; }
+    public ICommand CreateDropTableCommand { get; }
     
     // Viewport commands
     public ICommand ZoomInCommand { get; }
@@ -3398,6 +3422,205 @@ public class ZoneEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             Console.WriteLine($"[ERROR] Failed to update professor flag for NPC {templateId}: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Gets the loot tables from a template if it has an m_lootTable property.
+    /// Uses reflection to detect and read the property dynamically.
+    /// </summary>
+    /// <param name="template">The template to inspect</param>
+    /// <returns>List of loot table names, or null if no loot tables found</returns>
+    private List<string>? GetLootTablesFromTemplate(PropertyClass? template)
+    {
+        if (template == null)
+            return null;
+            
+        try
+        {
+            // Use reflection to find m_lootTable property
+            var lootTableProperty = template.GetType().GetProperty("m_lootTable", BindingFlags.Public | BindingFlags.Instance);
+            
+            if (lootTableProperty == null)
+                return null;
+                
+            // Get the value
+            var lootTableValue = lootTableProperty.GetValue(template);
+            
+            if (lootTableValue == null)
+                return null;
+                
+            // Check if it's a list of ByteString (as seen in generated code)
+            if (lootTableValue is IEnumerable<object> lootTableList)
+            {
+                var lootTableNames = new List<string>();
+                
+                foreach (var item in lootTableList)
+                {
+                    if (item != null)
+                    {
+                        // Convert to string - ByteString should have ToString() method
+                        var tableName = item.ToString();
+                        if (!string.IsNullOrWhiteSpace(tableName))
+                        {
+                            lootTableNames.Add(tableName);
+                        }
+                    }
+                }
+                
+                return lootTableNames.Count > 0 ? lootTableNames : null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DEBUG] Error getting loot tables from template: {ex.Message}");
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Command handler to view an existing drop table in the drop table editor.
+    /// </summary>
+    /// <param name="dropTableName">The name of the drop table to view</param>
+    private async void ViewDropTable(string dropTableName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dropTableName))
+            {
+                MessageService.Error("Drop table name is empty.").Send();
+                return;
+            }
+            
+            Console.WriteLine($"[DEBUG] Opening drop table editor for: {dropTableName}");
+            
+            // Check if database is configured first (same pattern as MainWindowViewModel)
+            var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(_mainViewModel.GetMainWindow());
+            
+            if (!isConfigured)
+            {
+                MessageService.Info("Database configuration required to edit drop tables.")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+                return;
+            }
+            
+            // Check if drop table editor tab already exists, otherwise create one
+            var tabManager = _mainViewModel.TabManager;
+            var existingTab = tabManager.FindTabByContent<DropTableEditorViewModel>();
+            
+            DropTableEditorViewModel dropTableEditorViewModel;
+            
+            if (existingTab != null)
+            {
+                // Select the existing tab
+                tabManager.SelectTab(existingTab);
+                dropTableEditorViewModel = (DropTableEditorViewModel)existingTab.Content;
+            }
+            else
+            {
+                // Create a new drop table editor tab
+                dropTableEditorViewModel = new DropTableEditorViewModel(_mainViewModel);
+                var tab = tabManager.AddTab("Drop Table Editor", dropTableEditorViewModel);
+                tabManager.SelectTab(tab);
+            }
+            
+            // Now try to select the specific drop table in the editor
+            // We need to wait for the drop tables to load first
+            await Task.Delay(500); // Give the editor time to load
+            
+            var targetTable = dropTableEditorViewModel.DropTables.FirstOrDefault(t => t.Name == dropTableName);
+            if (targetTable != null)
+            {
+                dropTableEditorViewModel.SelectedDropTable = targetTable;
+                MessageService.Info($"Opened drop table '{dropTableName}' in editor.").Send();
+            }
+            else
+            {
+                MessageService.Error($"Drop table '{dropTableName}' not found. It may not exist or failed to load.").Send();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Error opening drop table '{dropTableName}': {ex.Message}").Send();
+            Console.WriteLine($"[ERROR] ViewDropTable failed: {ex}");
+        }
+    }
+    
+    /// <summary>
+    /// Command handler to create a new drop table with the given name.
+    /// </summary>
+    /// <param name="dropTableName">The name of the drop table to create</param>
+    private async void CreateDropTable(string dropTableName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dropTableName))
+            {
+                MessageService.Error("Drop table name is empty.").Send();
+                return;
+            }
+            
+            Console.WriteLine($"[DEBUG] Creating new drop table: {dropTableName}");
+            
+            // Check if database is configured first (same pattern as MainWindowViewModel)
+            var isConfigured = await DatabaseConfigService.EnsureDatabaseConfiguredAsync(_mainViewModel.GetMainWindow());
+            
+            if (!isConfigured)
+            {
+                MessageService.Info("Database configuration required to create drop tables.")
+                    .WithDuration(TimeSpan.FromSeconds(3))
+                    .Send();
+                return;
+            }
+            
+            // Check if drop table editor tab already exists, otherwise create one
+            var tabManager = _mainViewModel.TabManager;
+            var existingTab = tabManager.FindTabByContent<DropTableEditorViewModel>();
+            
+            DropTableEditorViewModel dropTableEditorViewModel;
+            
+            if (existingTab != null)
+            {
+                // Select the existing tab
+                tabManager.SelectTab(existingTab);
+                dropTableEditorViewModel = (DropTableEditorViewModel)existingTab.Content;
+            }
+            else
+            {
+                // Create a new drop table editor tab
+                dropTableEditorViewModel = new DropTableEditorViewModel(_mainViewModel);
+                var tab = tabManager.AddTab("Drop Table Editor", dropTableEditorViewModel);
+                tabManager.SelectTab(tab);
+            }
+            
+            // Check if drop table already exists
+            var dropTableService = new DropTableService();
+            var existingTables = await dropTableService.GetAllDropTablesAsync();
+            var existingTable = existingTables.FirstOrDefault(t => t.Name.Equals(dropTableName, StringComparison.OrdinalIgnoreCase));
+            
+            if (existingTable != null)
+            {
+                // Select the existing table
+                await Task.Delay(500); // Give the editor time to load
+                var targetTable = dropTableEditorViewModel.DropTables.FirstOrDefault(t => t.Name == dropTableName);
+                if (targetTable != null)
+                {
+                    dropTableEditorViewModel.SelectedDropTable = targetTable;
+                    MessageService.Info($"Drop table '{dropTableName}' already exists. Opened existing table in editor.").Send();
+                }
+                return;
+            }
+            
+            // Create new drop table via the DropTableEditorViewModel
+            // Trigger the create table dialog which will handle the creation
+            MessageService.Info($"Opening drop table editor to create '{dropTableName}'. Use 'Create New Table' to create it.").Send();
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Error creating drop table '{dropTableName}': {ex.Message}").Send();
+            Console.WriteLine($"[ERROR] CreateDropTable failed: {ex}");
         }
     }
     

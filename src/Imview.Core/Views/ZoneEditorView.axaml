@@ -1226,6 +1226,82 @@
                                                      FontStyle="Italic"
                                                      Margin="0,4,0,0"/>
                                         </StackPanel>
+                                        
+                                        <!-- Loot Tables -->
+                                        <StackPanel Margin="0,8,0,0" IsVisible="{Binding HasLootTables}">
+                                            <TextBlock Text="{Binding SelectedTemplateLootTables.Count, StringFormat='Loot Tables ({0}):'}" FontSize="11" FontWeight="Bold" 
+                                                     Foreground="#FF6B35" Margin="0,0,0,8"/>
+                                            
+                                            <!-- Loot Tables List -->
+                                            <ItemsControl ItemsSource="{Binding SelectedTemplateLootTables}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#FF6B35" BorderThickness="1">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                
+                                                                <!-- Loot Table Name -->
+                                                                <TextBlock Grid.Column="0" 
+                                                                         Text="{Binding}" 
+                                                                         FontSize="10" 
+                                                                         FontWeight="Bold"
+                                                                         Foreground="#FF6B35" 
+                                                                         VerticalAlignment="Center"
+                                                                         Margin="0,0,8,0"/>
+                                                                
+                                                                <!-- View Button -->
+                                                                <Button Grid.Column="1" 
+                                                                        Content="View" 
+                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).ViewDropTableCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Height="24" 
+                                                                        Width="50"
+                                                                        FontSize="9"
+                                                                        Background="#4CAF50"
+                                                                        Foreground="White"
+                                                                        Margin="0,0,4,0"
+                                                                        ToolTip.Tip="Open existing drop table in editor">
+                                                                    <Button.Styles>
+                                                                        <Style Selector="Button:pointerover">
+                                                                            <Setter Property="Background" Value="#45A049"/>
+                                                                        </Style>
+                                                                    </Button.Styles>
+                                                                </Button>
+                                                                
+                                                                <!-- Create Button -->
+                                                                <Button Grid.Column="2" 
+                                                                        Content="Create" 
+                                                                        Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).CreateDropTableCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Height="24" 
+                                                                        Width="55"
+                                                                        FontSize="9"
+                                                                        Background="#FF9800"
+                                                                        Foreground="White"
+                                                                        ToolTip.Tip="Create new drop table with this name">
+                                                                    <Button.Styles>
+                                                                        <Style Selector="Button:pointerover">
+                                                                            <Setter Property="Background" Value="#F57C00"/>
+                                                                        </Style>
+                                                                    </Button.Styles>
+                                                                </Button>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            
+                                            <TextBlock Text="Loot tables listed in the template's m_lootTable property. Use the buttons to view or create drop tables in the Drop Table Editor." 
+                                                     FontSize="8" 
+                                                     Foreground="#888888" 
+                                                     FontStyle="Italic"
+                                                     TextWrapping="Wrap"
+                                                     Margin="0,4,0,0"/>
+                                        </StackPanel>
                                     </StackPanel>
                                     
                                     <!-- Non-GameObjectTemplate fallback -->
