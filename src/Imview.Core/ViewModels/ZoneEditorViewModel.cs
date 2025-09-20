@@ -43,6 +43,9 @@ using Imcodec.BCD;
 using BcdGeomParams = Imcodec.BCD.GeomParams;
 using WizardTea.Core;
 using Imview.PacketReader.Services;
+using Imview.Core.Database;
+using Imview.Core.Database.Services;
+using Imview.Core.Controls;
 
 namespace Imview.Core.ViewModels;
 
@@ -117,6 +120,8 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectRelatedTriggerCommand = ReactiveCommand.Create<TriggerVisualizationObject>(SelectRelatedTrigger);
         SelectRelatedVolumeCommand = ReactiveCommand.Create<VolumeVisualizationObject>(SelectRelatedVolume);
         SelectZoneCommand = ReactiveCommand.Create(SelectZone);
+        EditNpcInventoryCommand = ReactiveCommand.Create(EditNpcInventory);
+        EditNpcSpellInventoryCommand = ReactiveCommand.Create(EditNpcSpellInventory);
         
         // Initialize viewport commands
         ZoomInCommand = ReactiveCommand.Create(ZoomIn);
@@ -130,6 +135,7 @@ public class ZoneEditorViewModel : ViewModelBase
         Zones = new ObservableCollection<string>();
         ZoneObjects = new ObservableCollection<ZoneObjectItem>();
         Shopkeepers = new ObservableCollection<ShopkeeperItem>();
+        Professors = new ObservableCollection<ProfessorItem>();
         ZoneTransfers = new ObservableCollection<ZoneTransferItem>();
         ZoneVisualizationObjects = new ObservableCollection<ZoneVisualizationObject>();
         CollisionVisualizationObjects = new ObservableCollection<CollisionVisualizationObject>();
@@ -158,6 +164,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ObservableCollection<string> Zones { get; }
     public ObservableCollection<ZoneObjectItem> ZoneObjects { get; }
     public ObservableCollection<ShopkeeperItem> Shopkeepers { get; }
+    public ObservableCollection<ProfessorItem> Professors { get; }
     public ObservableCollection<ZoneTransferItem> ZoneTransfers { get; }
     public ObservableCollection<ZoneVisualizationObject> ZoneVisualizationObjects { get; }
     public ObservableCollection<CollisionVisualizationObject> CollisionVisualizationObjects { get; }
@@ -208,6 +215,7 @@ public class ZoneEditorViewModel : ViewModelBase
             // Notify property changes
             this.RaisePropertyChanged(nameof(HasSelectedObject));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(IsSelectedObjectNpc));
             NotifySelectionChanged();
             
             // Update visual selection in the viewport
@@ -661,6 +669,18 @@ public class ZoneEditorViewModel : ViewModelBase
     public bool HasSelectedAnyObject => HasSelectedObject || HasSelectedCollision || HasSelectedPath || HasSelectedMesh || HasSelectedVolume || HasSelectedTrigger;
     
     /// <summary>
+    /// Gets whether the selected object is an NPC (has NPC flag)
+    /// </summary>
+    public bool IsSelectedObjectNpc
+    {
+        get
+        {
+            if (SelectedObject?.Flags == null) return false;
+            return SelectedObject.Flags.Any(flag => flag.FlagType == "NPC");
+        }
+    }
+    
+    /// <summary>
     /// Gets triggers that are related to the currently selected volume's enter events
     /// </summary>
     public List<TriggerVisualizationObject> SelectedVolumeEnterTriggers
@@ -857,6 +877,8 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand SelectVolumeCommand { get; }
     public ICommand SelectTriggerCommand { get; }
     public ICommand SelectZoneCommand { get; }
+    public ICommand EditNpcInventoryCommand { get; }
+    public ICommand EditNpcSpellInventoryCommand { get; }
     
     // Viewport commands
     public ICommand ZoomInCommand { get; }
@@ -1013,6 +1035,132 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
 
+    private async void EditNpcInventory()
+    {
+        try
+        {
+            if (SelectedObject == null || SelectedCoreObject == null)
+            {
+                MessageService.Error("No NPC selected. Please select an NPC object first.").Send();
+                return;
+            }
+
+            if (!IsSelectedObjectNpc)
+            {
+                MessageService.Error("Selected object is not an NPC. Please select an object with the NPC flag.").Send();
+                return;
+            }
+
+            // Check database connection
+            if (WorldDatabase.Instance.Store == null)
+            {
+                MessageService.Error("Database connection not available. Please ensure your certificate is configured and the database is accessible.").Send();
+                return;
+            }
+
+            var templateId = (ulong)SelectedCoreObject.m_templateID;
+            var npcName = SelectedCoreObject.m_zoneTag ?? $"NPC_{templateId}";
+
+            // Load existing inventory data
+            MessageService.Info("Loading NPC inventory data...").Send();
+            var existingInventory = await NpcInventoryService.GetNpcInventoryAsync(templateId);
+
+            // Create and show the inventory editor
+            var editor = new Controls.NpcInventoryEditor(templateId, npcName, existingInventory);
+            
+            // Find the main window as owner
+            var mainWindow = Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop 
+                ? desktop.MainWindow 
+                : null;
+                
+            if (mainWindow != null)
+            {
+                await editor.ShowDialog(mainWindow);
+            }
+            else
+            {
+                // Fallback - show as regular window if no main window available
+                editor.Show();
+            }
+            
+            // Show success message if saved
+            if (editor.WasSaved)
+            {
+                MessageService.Info($"NPC inventory for {npcName} has been updated in the database.").Send();
+                
+                // Update shopkeeper flag for this NPC
+                await UpdateShopkeeperFlagForNpc(templateId);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to open NPC inventory editor: {ex.Message}").Send();
+        }
+    }
+
+    private async void EditNpcSpellInventory()
+    {
+        try
+        {
+            if (SelectedObject == null || SelectedCoreObject == null)
+            {
+                MessageService.Error("No NPC selected. Please select an NPC object first.").Send();
+                return;
+            }
+
+            if (!IsSelectedObjectNpc)
+            {
+                MessageService.Error("Selected object is not an NPC. Please select an object with the NPC flag.").Send();
+                return;
+            }
+
+            // Check database connection
+            if (WorldDatabase.Instance.Store == null)
+            {
+                MessageService.Error("Database connection not available. Please ensure your certificate is configured and the database is accessible.").Send();
+                return;
+            }
+
+            var templateId = (ulong)SelectedCoreObject.m_templateID;
+            var npcName = SelectedCoreObject.m_zoneTag ?? $"NPC_{templateId}";
+
+            // Load existing spell inventory data
+            MessageService.Info("Loading NPC spell inventory data...").Send();
+            var existingSpellInventory = await NpcSpellInventoryService.GetNpcSpellInventoryAsync(templateId);
+
+            // Create and show the spell inventory editor
+            var editor = new Controls.NpcSpellInventoryEditor(templateId, npcName, existingSpellInventory);
+            
+            // Find the main window as owner
+            var mainWindow = Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop 
+                ? desktop.MainWindow 
+                : null;
+                
+            if (mainWindow != null)
+            {
+                await editor.ShowDialog(mainWindow);
+            }
+            else
+            {
+                // Fallback - show as regular window if no main window available
+                editor.Show();
+            }
+            
+            // Show success message if saved
+            if (editor.WasSaved)
+            {
+                MessageService.Info($"NPC spell inventory for {npcName} has been updated in the database.").Send();
+                
+                // Update professor flag for this NPC
+                await UpdateProfessorFlagForNpc(templateId);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to open NPC spell inventory editor: {ex.Message}").Send();
+        }
+    }
+
     private async Task PopulateZoneData(WizZoneData zoneData)
     {
         // Process zone data on background thread, but update UI collections on UI thread
@@ -1084,18 +1232,6 @@ public class ZoneEditorViewModel : ViewModelBase
                     }
                     
                     tempVisualizationObjects.Add(visualObj);
-
-                    // Add to shopkeepers if applicable
-                    if (IsShopkeeper(obj))
-                    {
-                        var shopkeeper = new ShopkeeperItem
-                        {
-                            Name = obj.m_zoneTag ?? "Unknown Shopkeeper",
-                            TemplateID = (ulong)obj.m_templateID,
-                            InventoryCount = 0 // Would need to query database for actual count
-                        };
-                        tempShopkeepers.Add(shopkeeper);
-                    }
                 }
             }
 
@@ -1114,7 +1250,8 @@ public class ZoneEditorViewModel : ViewModelBase
         
         // Clear existing data
         ZoneObjects.Clear();
-        Shopkeepers.Clear();
+        Shopkeepers.Clear(); // Will be populated by database-driven logic
+        Professors.Clear(); // Will be populated by database-driven logic
         ZoneTransfers.Clear();
         ZoneVisualizationObjects.Clear();
         CollisionVisualizationObjects.Clear();
@@ -1129,9 +1266,6 @@ public class ZoneEditorViewModel : ViewModelBase
         foreach (var item in tempZoneObjects)
             ZoneObjects.Add(item);
             
-        foreach (var item in tempShopkeepers)
-            Shopkeepers.Add(item);
-            
         foreach (var item in tempZoneTransfers)
             ZoneTransfers.Add(item);
             
@@ -1141,10 +1275,19 @@ public class ZoneEditorViewModel : ViewModelBase
         Console.WriteLine($"UI collections updated. Final counts:");
         Console.WriteLine($"  ZoneVisualizationObjects: {ZoneVisualizationObjects.Count}");
         Console.WriteLine($"  ZoneObjects: {ZoneObjects.Count}");
-        Console.WriteLine($"  Shopkeepers: {Shopkeepers.Count}");
         
         // Now create visual objects on the canvas
         CreateVisualObjects();
+        
+        // Update shopkeeper flags based on database inventory data
+        // This must be done after ZoneVisualizationObjects is populated
+        await UpdateShopkeeperFlagsFromDatabase();
+        
+        // Update professor flags based on database spell inventory data
+        await UpdateProfessorFlagsFromDatabase();
+        
+        // DEBUG: Test the spell inventory system
+        await TestSpellInventorySystem();
     }
 
     private async Task PopulateCollisionData(Bcd collisionData)
@@ -2812,10 +2955,7 @@ public class ZoneEditorViewModel : ViewModelBase
         // Use Dragon tool logic: Check if it's a volume/trigger first
         if (IsVolume(obj)) return "Volume";
         
-        // Check for shopkeepers using Dragon NPC tool logic
-        if (IsShopkeeper(obj)) return "Shopkeeper"; 
-        
-        // Check for professors (similar to shopkeeper detection)
+        // Check for professors
         if (IsProfessor(obj)) return "Professor";
         
         // Check for generic NPCs
@@ -2856,12 +2996,6 @@ public class ZoneEditorViewModel : ViewModelBase
                name.Contains("portal");
     }
 
-    private bool IsShopkeeper(CoreObjectInfo obj)
-    {
-        // Following Dragon NPC tool logic from FindShopSuspectObjects
-        var name = obj.m_zoneTag?.ToLower() ?? "";
-        return name.Contains("shop") || name.Contains("npc");
-    }
 
     private bool IsProfessor(CoreObjectInfo obj)
     {
@@ -2875,9 +3009,8 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool IsNPC(CoreObjectInfo obj)
     {
         var name = obj.m_zoneTag?.ToLower() ?? "";
-        // Generic NPC detection - any object with a character-like name that isn't a shopkeeper/professor
+        // Generic NPC detection - any object with a character-like name that isn't a professor
         return !string.IsNullOrEmpty(name) && 
-               !IsShopkeeper(obj) && 
                !IsProfessor(obj) && 
                !IsVolume(obj) &&
                (name.Contains("character") || 
@@ -2944,6 +3077,376 @@ public class ZoneEditorViewModel : ViewModelBase
             _ => "?"
         };
     }
+    
+    /// <summary>
+    /// Updates shopkeeper flags for all NPCs in the zone based on database inventory data
+    /// </summary>
+    /// <returns>Task representing the async operation</returns>
+    private async Task UpdateShopkeeperFlagsFromDatabase()
+    {
+        try
+        {
+            Console.WriteLine("[DEBUG] Starting shopkeeper flag update from database...");
+            
+            // Get all NPC template IDs that have inventory data
+            var npcTemplatesWithInventories = await NpcInventoryService.GetNpcTemplateIdsWithInventoriesAsync();
+            
+            if (npcTemplatesWithInventories.Count == 0)
+            {
+                Console.WriteLine("[DEBUG] No NPC inventories found in database");
+                return;
+            }
+            
+            Console.WriteLine($"[DEBUG] Found {npcTemplatesWithInventories.Count} NPCs with inventory data");
+            
+            // Update flags for visualization objects
+            var updatedCount = 0;
+            foreach (var visualObj in ZoneVisualizationObjects)
+            {
+                // Check if this object is an NPC (has NPC flag)
+                var hasNpcFlag = visualObj.Flags.Any(f => f.FlagType == "NPC");
+                if (hasNpcFlag)
+                {
+                    // Check if this NPC has inventory data
+                    var hasInventory = npcTemplatesWithInventories.Contains(visualObj.TemplateID);
+                    var hasShopkeeperFlag = visualObj.Flags.Any(f => f.FlagType == "Shopkeeper");
+                    
+                    if (hasInventory && !hasShopkeeperFlag)
+                    {
+                        // Add shopkeeper flag
+                        visualObj.Flags.Add(ObjectFlag.CreateShopkeeperFlag());
+                        updatedCount++;
+                        Console.WriteLine($"[DEBUG] Added shopkeeper flag to NPC {visualObj.Name} (Template ID: {visualObj.TemplateID})");
+                    }
+                    else if (!hasInventory && hasShopkeeperFlag)
+                    {
+                        // Remove shopkeeper flag (inventory was deleted)
+                        visualObj.Flags.RemoveAll(f => f.FlagType == "Shopkeeper");
+                        updatedCount++;
+                        Console.WriteLine($"[DEBUG] Removed shopkeeper flag from NPC {visualObj.Name} (Template ID: {visualObj.TemplateID})");
+                    }
+                }
+            }
+            
+            Console.WriteLine($"[DEBUG] Updated shopkeeper flags for {updatedCount} objects");
+            
+            // Refresh shopkeepers collection based on updated flags
+            await RefreshShopkeepersCollection();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to update shopkeeper flags from database: {ex.Message}");
+            Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+        }
+    }
+    
+    /// <summary>
+    /// Refreshes the Shopkeepers collection based on current flags and database inventory data
+    /// </summary>
+    /// <returns>Task representing the async operation</returns>
+    private async Task RefreshShopkeepersCollection()
+    {
+        try
+        {
+            var tempShopkeepers = new List<ShopkeeperItem>();
+            
+            // Find all objects with shopkeeper flags
+            foreach (var visualObj in ZoneVisualizationObjects)
+            {
+                var hasShopkeeperFlag = visualObj.Flags.Any(f => f.FlagType == "Shopkeeper");
+                if (hasShopkeeperFlag)
+                {
+                    // Get inventory count from database
+                    var inventory = await NpcInventoryService.GetNpcInventoryAsync(visualObj.TemplateID);
+                    var inventoryCount = inventory?.Inventory.Count ?? 0;
+                    
+                    var shopkeeper = new ShopkeeperItem
+                    {
+                        Name = visualObj.Name,
+                        TemplateID = visualObj.TemplateID,
+                        InventoryCount = inventoryCount
+                    };
+                    tempShopkeepers.Add(shopkeeper);
+                }
+            }
+            
+            // Update UI collection on UI thread
+            Shopkeepers.Clear();
+            foreach (var shopkeeper in tempShopkeepers)
+            {
+                Shopkeepers.Add(shopkeeper);
+            }
+            
+            Console.WriteLine($"[DEBUG] Refreshed shopkeepers collection with {tempShopkeepers.Count} entries");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to refresh shopkeepers collection: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Updates the shopkeeper flag for a specific NPC after inventory changes
+    /// </summary>
+    /// <param name="templateId">The template ID of the NPC to update</param>
+    /// <returns>Task representing the async operation</returns>
+    public async Task UpdateShopkeeperFlagForNpc(ulong templateId)
+    {
+        try
+        {
+            Console.WriteLine($"[DEBUG] Updating shopkeeper flag for NPC template ID: {templateId}");
+            
+            // Check if this NPC has inventory data
+            var hasInventory = await NpcInventoryService.HasNpcInventoryAsync(templateId);
+            
+            // Find the visualization object for this template ID
+            var visualObj = ZoneVisualizationObjects.FirstOrDefault(v => v.TemplateID == templateId);
+            if (visualObj == null)
+            {
+                Console.WriteLine($"[DEBUG] No visualization object found for template ID: {templateId}");
+                return;
+            }
+            
+            // Check if this object has NPC flag (only NPCs can be shopkeepers)
+            var hasNpcFlag = visualObj.Flags.Any(f => f.FlagType == "NPC");
+            if (!hasNpcFlag)
+            {
+                Console.WriteLine($"[DEBUG] Object {visualObj.Name} is not an NPC, skipping shopkeeper flag update");
+                return;
+            }
+            
+            var hasShopkeeperFlag = visualObj.Flags.Any(f => f.FlagType == "Shopkeeper");
+            
+            if (hasInventory && !hasShopkeeperFlag)
+            {
+                // Add shopkeeper flag
+                visualObj.Flags.Add(ObjectFlag.CreateShopkeeperFlag());
+                Console.WriteLine($"[DEBUG] Added shopkeeper flag to NPC {visualObj.Name}");
+            }
+            else if (!hasInventory && hasShopkeeperFlag)
+            {
+                // Remove shopkeeper flag
+                visualObj.Flags.RemoveAll(f => f.FlagType == "Shopkeeper");
+                Console.WriteLine($"[DEBUG] Removed shopkeeper flag from NPC {visualObj.Name}");
+            }
+            
+            // Refresh shopkeepers collection
+            await RefreshShopkeepersCollection();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to update shopkeeper flag for NPC {templateId}: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Updates professor flags for all NPCs in the zone based on database spell inventory data
+    /// </summary>
+    /// <returns>Task representing the async operation</returns>
+    private async Task UpdateProfessorFlagsFromDatabase()
+    {
+        try
+        {
+            Console.WriteLine("[DEBUG] Starting professor flag update from database...");
+            
+            // Get all NPC template IDs that have spell inventory data
+            var npcTemplatesWithSpellInventories = await NpcSpellInventoryService.GetNpcTemplateIdsWithSpellInventoriesAsync();
+            
+            Console.WriteLine($"[DEBUG] Retrieved {npcTemplatesWithSpellInventories.Count} template IDs with spell inventories from database");
+            if (npcTemplatesWithSpellInventories.Count == 0)
+            {
+                Console.WriteLine("[DEBUG] No NPC spell inventories found in database");
+                return;
+            }
+            
+            Console.WriteLine($"[DEBUG] Found {npcTemplatesWithSpellInventories.Count} NPCs with spell inventory data");
+            
+            // Update flags for visualization objects
+            var updatedCount = 0;
+            foreach (var visualObj in ZoneVisualizationObjects)
+            {
+                // Check if this object is an NPC (has NPC flag)
+                var hasNpcFlag = visualObj.Flags.Any(f => f.FlagType == "NPC");
+                if (hasNpcFlag)
+                {
+                    // Check if this NPC has spell inventory data
+                    var hasSpellInventory = npcTemplatesWithSpellInventories.Contains(visualObj.TemplateID);
+                    var hasProfessorFlag = visualObj.Flags.Any(f => f.FlagType == "Professor");
+                    
+                    if (hasSpellInventory && !hasProfessorFlag)
+                    {
+                        // Add professor flag
+                        visualObj.Flags.Add(ObjectFlag.CreateProfessorFlag());
+                        updatedCount++;
+                        Console.WriteLine($"[DEBUG] Added professor flag to NPC {visualObj.Name} (Template ID: {visualObj.TemplateID})");
+                    }
+                    else if (!hasSpellInventory && hasProfessorFlag)
+                    {
+                        // Remove professor flag (spell inventory was deleted)
+                        visualObj.Flags.RemoveAll(f => f.FlagType == "Professor");
+                        updatedCount++;
+                        Console.WriteLine($"[DEBUG] Removed professor flag from NPC {visualObj.Name} (Template ID: {visualObj.TemplateID})");
+                    }
+                }
+            }
+            
+            Console.WriteLine($"[DEBUG] Updated professor flags for {updatedCount} objects");
+            
+            // Refresh professors collection based on updated flags
+            await RefreshProfessorsCollection();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to update professor flags from database: {ex.Message}");
+            Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+        }
+    }
+    
+    /// <summary>
+    /// Refreshes the Professors collection based on current flags and database spell inventory data
+    /// </summary>
+    /// <returns>Task representing the async operation</returns>
+    private async Task RefreshProfessorsCollection()
+    {
+        try
+        {
+            var tempProfessors = new List<ProfessorItem>();
+            
+            // Find all objects with professor flags
+            foreach (var visualObj in ZoneVisualizationObjects)
+            {
+                var hasProfessorFlag = visualObj.Flags.Any(f => f.FlagType == "Professor");
+                if (hasProfessorFlag)
+                {
+                    // Get spell count from database
+                    var spellInventory = await NpcSpellInventoryService.GetNpcSpellInventoryAsync(visualObj.TemplateID);
+                    var spellCount = spellInventory?.Spells.Count ?? 0;
+                    
+                    var professor = new ProfessorItem
+                    {
+                        Name = visualObj.Name,
+                        TemplateID = visualObj.TemplateID,
+                        SpellCount = spellCount
+                    };
+                    tempProfessors.Add(professor);
+                }
+            }
+            
+            // Update UI collection on UI thread
+            Professors.Clear();
+            foreach (var professor in tempProfessors)
+            {
+                Professors.Add(professor);
+            }
+            
+            Console.WriteLine($"[DEBUG] Refreshed professors collection with {tempProfessors.Count} entries");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to refresh professors collection: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Updates the professor flag for a specific NPC after spell inventory changes
+    /// </summary>
+    /// <param name="templateId">The template ID of the NPC to update</param>
+    /// <returns>Task representing the async operation</returns>
+    public async Task UpdateProfessorFlagForNpc(ulong templateId)
+    {
+        try
+        {
+            Console.WriteLine($"[DEBUG] Updating professor flag for NPC template ID: {templateId}");
+            
+            // Check if this NPC has spell inventory data
+            var hasSpellInventory = await NpcSpellInventoryService.HasNpcSpellInventoryAsync(templateId);
+            
+            // Find the visualization object for this template ID
+            var visualObj = ZoneVisualizationObjects.FirstOrDefault(v => v.TemplateID == templateId);
+            if (visualObj == null)
+            {
+                Console.WriteLine($"[DEBUG] No visualization object found for template ID: {templateId}");
+                return;
+            }
+            
+            // Check if this object has NPC flag (only NPCs can be professors)
+            var hasNpcFlag = visualObj.Flags.Any(f => f.FlagType == "NPC");
+            if (!hasNpcFlag)
+            {
+                Console.WriteLine($"[DEBUG] Object {visualObj.Name} is not an NPC, skipping professor flag update");
+                return;
+            }
+            
+            var hasProfessorFlag = visualObj.Flags.Any(f => f.FlagType == "Professor");
+            
+            if (hasSpellInventory && !hasProfessorFlag)
+            {
+                // Add professor flag
+                visualObj.Flags.Add(ObjectFlag.CreateProfessorFlag());
+                Console.WriteLine($"[DEBUG] Added professor flag to NPC {visualObj.Name}");
+            }
+            else if (!hasSpellInventory && hasProfessorFlag)
+            {
+                // Remove professor flag
+                visualObj.Flags.RemoveAll(f => f.FlagType == "Professor");
+                Console.WriteLine($"[DEBUG] Removed professor flag from NPC {visualObj.Name}");
+            }
+            
+            // Refresh professors collection
+            await RefreshProfessorsCollection();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to update professor flag for NPC {templateId}: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Debug method to test spell inventory system - remove this in production
+    /// </summary>
+    public async Task TestSpellInventorySystem()
+    {
+        try
+        {
+            Console.WriteLine("[DEBUG] Testing spell inventory system...");
+            
+            // Test 1: Try to query database for any existing spell inventories
+            var allSpellInventories = await NpcSpellInventoryService.GetAllNpcSpellInventoriesAsync();
+            Console.WriteLine($"[DEBUG] Found {allSpellInventories.Count} existing spell inventories in database");
+            
+            // Test 2: Try to get template IDs with spell inventories
+            var templateIdsWithSpells = await NpcSpellInventoryService.GetNpcTemplateIdsWithSpellInventoriesAsync();
+            Console.WriteLine($"[DEBUG] Template IDs with spells: {templateIdsWithSpells.Count}");
+            
+            // Test 3: Try to create a test spell inventory
+            var testTemplateId = 12345UL;
+            var testSpellInventory = new Database.Models.NpcSpellInventory(testTemplateId);
+            testSpellInventory.Spells.Add(new Database.Models.SpellInventoryItem(170282421, 0, 50));
+            testSpellInventory.Spells.Add(new Database.Models.SpellInventoryItem(1966685517, 0, 50));
+            
+            Console.WriteLine($"[DEBUG] Attempting to save test spell inventory for template ID {testTemplateId}");
+            var saveResult = await NpcSpellInventoryService.SaveNpcSpellInventoryAsync(testSpellInventory);
+            Console.WriteLine($"[DEBUG] Save result: {saveResult}");
+            
+            if (saveResult)
+            {
+                // Test 4: Try to retrieve the saved inventory
+                var retrievedInventory = await NpcSpellInventoryService.GetNpcSpellInventoryAsync(testTemplateId);
+                Console.WriteLine($"[DEBUG] Retrieved inventory: {retrievedInventory != null}, spells count: {retrievedInventory?.Spells?.Count ?? 0}");
+                
+                // Test 5: Clean up - delete the test inventory
+                var deleteResult = await NpcSpellInventoryService.DeleteNpcSpellInventoryAsync(testTemplateId);
+                Console.WriteLine($"[DEBUG] Delete result: {deleteResult}");
+            }
+            
+            Console.WriteLine("[DEBUG] Spell inventory system test completed");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Spell inventory system test failed: {ex.Message}");
+            Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+        }
+    }
 }
 
 public class ZoneObjectItem
@@ -2975,6 +3478,13 @@ public class ShopkeeperItem
     public string Name { get; set; } = string.Empty;
     public ulong TemplateID { get; set; }
     public int InventoryCount { get; set; }
+}
+
+public class ProfessorItem
+{
+    public string Name { get; set; } = string.Empty;
+    public ulong TemplateID { get; set; }
+    public int SpellCount { get; set; }
 }
 
 public class ZoneTransferItem
@@ -3157,17 +3667,11 @@ public class ObjectFlagService
         // Fallback to name-based detection for additional flags
         var name = coreObject.m_zoneTag?.ToLower() ?? "";
         
-        // Add shopkeeper flag if name suggests it's a shopkeeper
-        if (name.Contains("shop"))
-        {
-            flags.Add(ObjectFlag.CreateShopkeeperFlag());
-        }
+        // Note: Shopkeeper flags are now only assigned based on database inventory data
+        // Name-based shopkeeper detection was removed to avoid false positives
         
-        // Add professor flag if name suggests it's a professor/teacher
-        if (name.Contains("professor") || name.Contains("teacher") || name.Contains("trainer") || name.Contains("instructor"))
-        {
-            flags.Add(ObjectFlag.CreateProfessorFlag());
-        }
+        // Note: Professor flags are now only assigned based on database spell inventory data
+        // Name-based professor detection was removed to avoid false positives
         
         // Note: Teleporter flags are now only assigned based on actual ResTeleport results in triggers
         // Name-based teleporter detection was removed to avoid false positives on zone objects
@@ -3199,6 +3703,7 @@ public class ObjectFlagService
 
         return flags;
     }
+
 
     /// <summary>
     /// Checks if a GameObjectTemplate has an NPCBehaviorTemplate behavior

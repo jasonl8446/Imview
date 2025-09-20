@@ -1186,6 +1186,46 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                         </StackPanel>
+                                        
+                                        <!-- NPC Database Actions -->
+                                        <StackPanel Margin="0,8,0,0" IsVisible="{Binding IsSelectedObjectNpc}">
+                                            <TextBlock Text="NPC Database Actions" FontSize="11" FontWeight="Bold" 
+                                                     Foreground="#4CAF50" Margin="0,0,0,8"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                <Button Content="Edit Inventory" 
+                                                        Command="{Binding EditNpcInventoryCommand}"
+                                                        Height="30" Width="120"
+                                                        Background="#4CAF50"
+                                                        Foreground="White"
+                                                        FontWeight="Bold"
+                                                        Margin="0,0,8,0"
+                                                        ToolTip.Tip="Edit this NPC's inventory in the world database">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover">
+                                                            <Setter Property="Background" Value="#45A049"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                </Button>
+                                                <Button Content="Edit Spells" 
+                                                        Command="{Binding EditNpcSpellInventoryCommand}"
+                                                        Height="30" Width="120"
+                                                        Background="#2196F3"
+                                                        Foreground="White"
+                                                        FontWeight="Bold"
+                                                        ToolTip.Tip="Edit this NPC's spell inventory in the world database">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover">
+                                                            <Setter Property="Background" Value="#1976D2"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                </Button>
+                                            </StackPanel>
+                                            <TextBlock Text="Requires database authority and connection" 
+                                                     FontSize="8" 
+                                                     Foreground="#888888" 
+                                                     FontStyle="Italic"
+                                                     Margin="0,4,0,0"/>
+                                        </StackPanel>
                                     </StackPanel>
                                     
                                     <!-- Non-GameObjectTemplate fallback -->

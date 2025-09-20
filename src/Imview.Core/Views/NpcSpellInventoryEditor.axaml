@@ -1,0 +1,203 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Imview.Core.ViewModels"
+        mc:Ignorable="d"
+        d:DesignWidth="800"
+        d:DesignHeight="600"
+        x:Class="Imview.Core.Controls.NpcSpellInventoryEditor"
+        x:DataType="vm:NpcSpellInventoryEditorViewModel"
+        Title="{Binding WindowTitle}"
+        Width="800"
+        Height="600"
+        MinWidth="600"
+        MinHeight="400"
+        WindowStartupLocation="CenterOwner"
+        Background="#2C2C2C">
+
+    <Design.DataContext>
+        <vm:NpcSpellInventoryEditorViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Database Authority Header (matching NPC inventory editor) -->
+        <Border Grid.Row="0" 
+                Background="DarkBlue" 
+                BorderBrush="LightBlue" 
+                BorderThickness="2" 
+                CornerRadius="4" 
+                Padding="10" 
+                Margin="16,16,16,10">
+            <StackPanel>
+                <TextBlock Text="DATABASE EDITING AUTHORITY" 
+                          FontWeight="Bold" 
+                          Foreground="Yellow" 
+                          HorizontalAlignment="Center" 
+                          FontSize="14" />
+                <TextBlock Text="You are authorized to edit world database NPC spell inventory data." 
+                          Foreground="White" 
+                          HorizontalAlignment="Center" 
+                          Margin="0,4,0,0" 
+                          FontSize="12" />
+                <TextBlock Text="{Binding NpcName, StringFormat='Editing: {0} (Template ID: {1})', FallbackValue='Editing: NPC'}"
+                          Foreground="LightBlue" 
+                          HorizontalAlignment="Center" 
+                          FontStyle="Italic" 
+                          Margin="0,2,0,0" 
+                          FontSize="11" />
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="16">
+            <Grid RowDefinitions="Auto,*">
+                <!-- Header section -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                    <!-- Section title -->
+                    <Border Background="#3E3E42" 
+                            BorderBrush="#525252" 
+                            BorderThickness="1" 
+                            CornerRadius="4" 
+                            Padding="8,4" 
+                            Margin="0,0,0,8">
+                        <TextBlock Text="Spell Inventory" 
+                                  FontSize="14" 
+                                  FontWeight="Bold" 
+                                  Foreground="White" 
+                                  HorizontalAlignment="Center" />
+                    </Border>
+                    
+                    <!-- Controls -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Add Spell" 
+                                Command="{Binding AddSpellCommand}"
+                                Background="#4A5568" 
+                                Foreground="White" 
+                                Padding="12,6" 
+                                BorderBrush="#6B7280" 
+                                BorderThickness="1" />
+                        
+                        <TextBlock Text="{Binding Spells.Count, StringFormat='Total Spells: {0}'}" 
+                                  VerticalAlignment="Center" 
+                                  FontWeight="SemiBold" 
+                                  Foreground="White" 
+                                  FontSize="12" />
+                        
+                        <TextBlock Text="•" 
+                                  VerticalAlignment="Center" 
+                                  Foreground="Gray" />
+                        
+                        <TextBlock Text="Unsaved Changes" 
+                                  VerticalAlignment="Center" 
+                                  Foreground="Orange"
+                                  FontWeight="SemiBold"
+                                  FontSize="12"
+                                  IsVisible="{Binding IsDirty}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Spells List -->
+                <Border Grid.Row="1" 
+                        BorderBrush="#525252" 
+                        BorderThickness="1" 
+                        Background="#2C2C2C"
+                        CornerRadius="4">
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding Spells}" Margin="8">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:SpellInventoryItemViewModel">
+                                    <Border Background="#4A4A4A" 
+                                            BorderBrush="#666666" 
+                                            BorderThickness="1" 
+                                            CornerRadius="4" 
+                                            Margin="0,0,0,8" 
+                                            Padding="12">
+                                        <Grid ColumnDefinitions="*,100,150,Auto">
+                                            <!-- Spell Template ID -->
+                                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                <TextBlock Text="Spell Template ID" 
+                                                          FontSize="12" 
+                                                          Foreground="LightBlue" 
+                                                          FontWeight="SemiBold" 
+                                                          Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding TemplateID}" 
+                                                        Watermark="e.g. 170282421"
+                                                        Width="200" 
+                                                        Background="#3A3A3A" 
+                                                        Foreground="White" 
+                                                        BorderBrush="#666666" />
+                                            </StackPanel>
+
+                                            <!-- Required Spell ID -->
+                                            <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                                <TextBlock Text="Required Spell" 
+                                                          FontSize="12" 
+                                                          Foreground="LightBlue" 
+                                                          FontWeight="SemiBold" 
+                                                          Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding RequiredSpellID}" 
+                                                        Watermark="0 = None"
+                                                        Width="120" 
+                                                        Background="#3A3A3A" 
+                                                        Foreground="White" 
+                                                        BorderBrush="#666666" />
+                                            </StackPanel>
+
+                                            <!-- Level -->
+                                            <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                                                <TextBlock Text="Level Required" 
+                                                          FontSize="12" 
+                                                          Foreground="LightBlue" 
+                                                          FontWeight="SemiBold" 
+                                                          Margin="0,0,0,4" />
+                                                <NumericUpDown Value="{Binding Level}" 
+                                                              Width="130" 
+                                                              Background="#3A3A3A" 
+                                                              Foreground="White" 
+                                                              BorderBrush="#666666" />
+                                            </StackPanel>
+
+                                            <!-- Remove Button -->
+                                            <Button Grid.Column="3"
+                                                   Content="Remove" 
+                                                   Command="{Binding $parent[ItemsControl].((vm:NpcSpellInventoryEditorViewModel)DataContext).RemoveSpellCommand}"
+                                                   CommandParameter="{Binding}"
+                                                   Background="#DC2626" 
+                                                   Foreground="White" 
+                                                   Padding="8,4"
+                                                   BorderBrush="#EF4444" 
+                                                   VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Footer Buttons -->
+        <Border Grid.Row="2" Background="#3E3E42" BorderBrush="#525252" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" 
+                       HorizontalAlignment="Right" 
+                       Margin="16,12">
+                <Button Content="Cancel" 
+                       Command="{Binding CancelCommand}"
+                       Background="#4A4A4A" 
+                       Foreground="White" 
+                       BorderBrush="#666666" 
+                       Padding="16,8" 
+                       Margin="0,0,8,0" />
+                
+                <Button Content="Save Changes" 
+                       Command="{Binding SaveCommand}"
+                       Background="#22C55E" 
+                       Foreground="White" 
+                       BorderBrush="#16A34A" 
+                       Padding="16,8" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
