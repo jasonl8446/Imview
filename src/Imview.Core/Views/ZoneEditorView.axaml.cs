@@ -71,6 +71,8 @@ public partial class ZoneEditorView : UserControl
                     viewModel.UpdateCanvasTransform();
                     // Then center the viewport
                     viewModel.InitializeViewportCenter();
+                    // Rebuild visuals to ensure they are present on re-entry
+                    viewModel.RebuildSceneVisuals();
                 }, Avalonia.Threading.DispatcherPriority.Background);
             }
         }
@@ -134,8 +136,8 @@ public partial class ZoneEditorView : UserControl
     {
         if (DataContext is ZoneEditorViewModel vm)
         {
-            // Refresh drop table existence when tab regains focus
-            await vm.RefreshDropTableCacheAsync();
+            // When tab regains focus, make sure visuals exist
+            vm.RebuildSceneVisuals();
         }
     }
 

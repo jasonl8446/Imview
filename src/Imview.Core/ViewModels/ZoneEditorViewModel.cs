@@ -65,6 +65,9 @@ public class ZoneEditorViewModel : ViewModelBase
     private TriggerVisualizationObject? _selectedTrigger = null;
     private SpawnVisualizationObject? _selectedSpawn = null;
     private PropertyClass? _selectedSpawnTemplate = null;
+
+    // Tracks selection in the Paths & Spawns tree so we can clear it when selecting elsewhere
+    private object? _selectedHierarchyItem = null;
     private WizZoneData? _currentZoneData = null;
     private Bcd? _currentCollisionData = null;
     private NifFile? _currentSceneFile = null;
@@ -125,6 +128,7 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectZoneCommand = ReactiveCommand.Create(SelectZone);
         EditNpcInventoryCommand = ReactiveCommand.Create(EditNpcInventory);
         EditNpcSpellInventoryCommand = ReactiveCommand.Create(EditNpcSpellInventory);
+        EditCreatureDeckCommand = ReactiveCommand.CreateFromTask(EditCreatureDeck);
         ViewDropTableCommand = ReactiveCommand.Create<string>(ViewDropTable);
         CreateDropTableCommand = ReactiveCommand.Create<string>(CreateDropTable);
         OpenOrCreateDropTableCommand = ReactiveCommand.Create<string>(OpenOrCreateDropTable);
@@ -441,10 +445,13 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedMesh = null;
                 SelectedVolume = null;
                 SelectedTrigger = null;
+                SelectedSpawn = null;
+                SelectedSpawnTemplate = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedCollision));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(HasSelectedSpawn)); // Add explicit notification
             NotifySelectionChanged();
         }
     }
@@ -480,33 +487,35 @@ public class ZoneEditorViewModel : ViewModelBase
     // A generic binding target for TreeView selection in the hierarchy
     public object? SelectedHierarchyItem
     {
-        get => null;
+        get => _selectedHierarchyItem;
         set
         {
-            // Route selection to specific properties based on type
-            if (value is PathVisualizationObject path)
+            if (!ReferenceEquals(_selectedHierarchyItem, value))
             {
-                // Use the existing selection helper to ensure proper notifications
-                SelectPath(path);
-            }
-            else if (value is NodeVisualizationObject node)
-            {
-                SelectedNode = node;
-                // Clear others
-                SelectedPath = null;
-                SelectedObject = null;
-                SelectedCollision = null;
-                SelectedMesh = null;
-                SelectedVolume = null;
-                SelectedTrigger = null;
-                SelectedSpawn = null;
-                // Notify full selection change to refresh panels
-                NotifySelectionChanged();
-            }
-            else if (value is SpawnVisualizationObject spawn)
-            {
-                // Use helper to set selection and trigger template load + notifications
-                SelectSpawn(spawn);
+                _selectedHierarchyItem = value;
+                // Route selection to specific properties based on type
+                if (value is PathVisualizationObject path)
+                {
+                    // Use the existing selection helper to ensure proper notifications
+                    SelectPath(path);
+                }
+                else if (value is NodeVisualizationObject node)
+                {
+                    ClearAllSelections();
+                    SelectedNode = node;
+                    // Notify full selection change to refresh panels
+                    NotifySelectionChanged();
+                }
+                else if (value is SpawnVisualizationObject spawn)
+                {
+                    // Use helper to set selection and trigger template load + notifications
+                    SelectSpawn(spawn);
+                }
+                else if (value == null)
+                {
+                    ClearAllSelections();
+                }
+                this.RaisePropertyChanged(nameof(SelectedHierarchyItem));
             }
         }
     }
@@ -527,10 +536,13 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedPath = null;
                 SelectedVolume = null;
                 SelectedTrigger = null;
+                SelectedSpawn = null;
+                SelectedSpawnTemplate = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedMesh));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(HasSelectedSpawn)); // Add explicit notification
             NotifySelectionChanged();
         }
     }
@@ -551,10 +563,13 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedPath = null;
                 SelectedMesh = null;
                 SelectedTrigger = null;
+                SelectedSpawn = null;
+                SelectedSpawnTemplate = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedVolume));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(HasSelectedSpawn)); // Add explicit notification
             this.RaisePropertyChanged(nameof(SelectedVolumeEnterTriggers));
             this.RaisePropertyChanged(nameof(SelectedVolumeExitTriggers));
             NotifySelectionChanged();
@@ -626,10 +641,13 @@ public class ZoneEditorViewModel : ViewModelBase
                 SelectedPath = null;
                 SelectedMesh = null;
                 SelectedVolume = null;
+                SelectedSpawn = null;
+                SelectedSpawnTemplate = null;
             }
             
             this.RaisePropertyChanged(nameof(HasSelectedTrigger));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
+            this.RaisePropertyChanged(nameof(HasSelectedSpawn)); // Add explicit notification
             this.RaisePropertyChanged(nameof(SelectedTriggerActivatingVolumes));
             this.RaisePropertyChanged(nameof(SelectedTriggerDeactivatingVolumes));
             this.RaisePropertyChanged(nameof(SelectedTriggerFireVolumes));
@@ -865,6 +883,9 @@ public class ZoneEditorViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(HasSpawnLootTables));
             this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLootTableItems));
             
+            // Update creature deck detection asynchronously
+            _ = UpdateCreatureDeckDetectionAsync();
+            
             // Ensure drop table cache is loaded so labels can reflect existence
             _ = EnsureDropTableCacheAsync();
         }
@@ -909,6 +930,267 @@ public class ZoneEditorViewModel : ViewModelBase
                 }
             }
             return items;
+        }
+    }
+    
+    private string? _selectedSpawnDeckName;
+    
+    // Spawn template creature deck detection (following CombatCreatureDeckComponent logic)
+    public string? SelectedSpawnDeckName 
+    { 
+        get 
+        { 
+            Console.WriteLine($"[DECK DEBUG] SelectedSpawnDeckName accessed, cached value: {_selectedSpawnDeckName ?? "null"}");
+            return _selectedSpawnDeckName;
+        } 
+        private set
+        {
+            _selectedSpawnDeckName = value;
+            this.RaisePropertyChanged(nameof(SelectedSpawnDeckName));
+            this.RaisePropertyChanged(nameof(HasSpawnDeck));
+        }
+    }
+    public bool HasSpawnDeck 
+    { 
+        get 
+        { 
+            var deckName = SelectedSpawnDeckName;
+            var result = !string.IsNullOrEmpty(deckName);
+            Console.WriteLine($"[DECK DEBUG] HasSpawnDeck returning: {result} (deck name: {deckName ?? "null"})");
+            return result;
+        } 
+    }
+    
+    private string _spawnDeckButtonText = "Edit Deck";
+    
+    /// <summary>
+    /// Gets the button text for the creature deck action (Create or Edit)
+    /// </summary>
+    public string SpawnDeckButtonText 
+    {
+        get => _spawnDeckButtonText;
+        private set
+        {
+            _spawnDeckButtonText = value;
+            this.RaisePropertyChanged(nameof(SpawnDeckButtonText));
+        }
+    }
+    
+    /// <summary>
+    /// Checks if the creature deck exists in the database
+    /// </summary>
+    public async Task<bool> SpawnDeckExistsAsync()
+    {
+        if (string.IsNullOrEmpty(SelectedSpawnDeckName))
+            return false;
+            
+        try
+        {
+            return await CreatureDeckService.HasCreatureDeckAsync(SelectedSpawnDeckName);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DECK DEBUG] Error checking if deck exists: {ex.Message}");
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Detects if the spawn template has a creature deck following the exact logic from CombatCreatureDeckComponent
+    /// </summary>
+    private async Task<string?> GetCreatureDeckNameAsync(GameObjectTemplate? template)
+    {
+        Console.WriteLine($"[DECK DEBUG] GetCreatureDeckName called with template: {template?.GetType()?.Name ?? "null"}");
+        
+        if (template?.m_behaviors == null) 
+        {
+            Console.WriteLine($"[DECK DEBUG] Template is null or has no behaviors");
+            return null;
+        }
+        
+        Console.WriteLine($"[DECK DEBUG] Template has {template.m_behaviors.Count} behaviors");
+        
+        // Log all behavior types for debugging
+        foreach (var behavior in template.m_behaviors)
+        {
+            Console.WriteLine($"[DECK DEBUG] Found behavior: {behavior?.GetType()?.Name ?? "null"}");
+        }
+        
+        // Check if has both NPCBehaviorTemplate and DuelistBehaviorTemplate (required for dueling creatures)
+        var hasNpcBehavior = template.m_behaviors.Any(b => b?.GetType().Name == "NPCBehaviorTemplate");
+        var hasDuelistBehavior = template.m_behaviors.Any(b => b?.GetType().Name == "DuelistBehaviorTemplate");
+        
+        Console.WriteLine($"[DECK DEBUG] Has NPCBehaviorTemplate: {hasNpcBehavior}");
+        Console.WriteLine($"[DECK DEBUG] Has DuelistBehaviorTemplate: {hasDuelistBehavior}");
+        
+        if (!hasNpcBehavior || !hasDuelistBehavior) 
+        {
+            Console.WriteLine($"[DECK DEBUG] Missing required behaviors - not a dueling creature");
+            return null;
+        }
+        
+        Console.WriteLine($"[DECK DEBUG] Found both NPC and Duelist behaviors - this is a dueling creature!");
+        
+        // Find EquipmentBehaviorTemplate and get m_itemList
+        var equipmentBehavior = template.m_behaviors.FirstOrDefault(b => b?.GetType().Name == "EquipmentBehaviorTemplate");
+        Console.WriteLine($"[DECK DEBUG] EquipmentBehaviorTemplate found: {equipmentBehavior != null}");
+        
+        if (equipmentBehavior == null) 
+        {
+            Console.WriteLine($"[DECK DEBUG] No EquipmentBehaviorTemplate found");
+            return null;
+        }
+        
+        // Get m_itemList property using reflection (since it's generated code)
+        var itemListProperty = equipmentBehavior.GetType().GetProperty("m_itemList");
+        Console.WriteLine($"[DECK DEBUG] m_itemList property found: {itemListProperty != null}");
+        
+        if (itemListProperty?.GetValue(equipmentBehavior) is not List<uint> itemList || !itemList.Any())
+        {
+            Console.WriteLine($"[DECK DEBUG] m_itemList is null or empty");
+            return null;
+        }
+        
+        Console.WriteLine($"[DECK DEBUG] Found {itemList.Count} items in equipment list: [{string.Join(", ", itemList)}]");
+        
+        // Load each item template and look for DeckBehaviorTemplate
+        foreach (var itemId in itemList)
+        {
+            try
+            {
+                Console.WriteLine($"[DECK DEBUG] Loading item template {itemId}...");
+                var itemTemplate = await LoadItemTemplateAsync(itemId);
+                
+                if (itemTemplate?.m_behaviors != null)
+                {
+                    Console.WriteLine($"[DECK DEBUG] Item template {itemId} has {itemTemplate.m_behaviors.Count} behaviors");
+                    
+                    var deckBehavior = itemTemplate.m_behaviors.FirstOrDefault(b => b?.GetType().Name == "DeckBehaviorTemplate");
+                    if (deckBehavior != null)
+                    {
+                        Console.WriteLine($"[DECK DEBUG] Found DeckBehaviorTemplate in item {itemId}!");
+                        
+                        var defaultDeckProperty = deckBehavior.GetType().GetProperty("m_defaultDeck");
+                        if (defaultDeckProperty?.GetValue(deckBehavior) is string deckName && !string.IsNullOrEmpty(deckName))
+                        {
+                            Console.WriteLine($"[DECK DEBUG] Found deck name: {deckName}");
+                            return deckName;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[DECK DEBUG] DeckBehaviorTemplate found but m_defaultDeck is null or empty");
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[DECK DEBUG] Item template {itemId} has no behaviors");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DECK DEBUG] Error loading item template {itemId}: {ex.Message}");
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Updates the creature deck detection asynchronously
+    /// </summary>
+    private async Task UpdateCreatureDeckDetectionAsync()
+    {
+        try
+        {
+            var deckName = await GetCreatureDeckNameAsync(SelectedSpawnGameObjectTemplate);
+            SelectedSpawnDeckName = deckName;
+            
+            // Check if deck exists in database and update button text
+            if (!string.IsNullOrEmpty(deckName))
+            {
+                var deckExists = await CreatureDeckService.HasCreatureDeckAsync(deckName);
+                SpawnDeckButtonText = deckExists ? "Edit Deck" : "Create Deck";
+                Console.WriteLine($"[DECK DEBUG] Deck '{deckName}' exists in database: {deckExists}, button text: {SpawnDeckButtonText}");
+            }
+            else
+            {
+                SpawnDeckButtonText = "Edit Deck";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DECK DEBUG] Error updating deck detection: {ex.Message}");
+            SelectedSpawnDeckName = null;
+            SpawnDeckButtonText = "Edit Deck";
+        }
+    }
+    
+    /// <summary>
+    /// Loads an item template by its template ID for deck detection
+    /// </summary>
+    /// <param name="itemTemplateId">The item template ID to load</param>
+    /// <returns>The loaded item template as GameObjectTemplate, or null if not found</returns>
+    private async Task<GameObjectTemplate?> LoadItemTemplateAsync(uint itemTemplateId)
+    {
+        try
+        {
+            // First, ensure template manifest is loaded
+            var manifestService = TemplateManifestService.Instance;
+            if (!manifestService.IsLoaded)
+            {
+                var templateManifestData = await RootWadService.Instance.GetFileAsync("TemplateManifest.xml");
+                if (templateManifestData == null || !templateManifestData.HasValue)
+                {
+                    Console.WriteLine($"[DECK DEBUG] Failed to load TemplateManifest.xml from Root.wad");
+                    return null;
+                }
+                
+                if (!manifestService.LoadFromFileData(templateManifestData.Value))
+                {
+                    Console.WriteLine($"[DECK DEBUG] Failed to parse TemplateManifest.xml");
+                    return null;
+                }
+            }
+            
+            // Find the template location by template ID
+            var templateLocations = manifestService.GetAllTemplateLocations();
+            var templateLocation = templateLocations.FirstOrDefault(t => t.m_id == itemTemplateId);
+            
+            if (templateLocation == null)
+            {
+                Console.WriteLine($"[DECK DEBUG] Item template with ID {itemTemplateId} not found in manifest");
+                return null;
+            }
+            
+            Console.WriteLine($"[DECK DEBUG] Loading item template: {templateLocation.m_filename} for ID {itemTemplateId}");
+            
+            // Load the template file from Root.wad
+            var templateData = await RootWadService.Instance.GetFileAsync(templateLocation.m_filename);
+            if (templateData == null || !templateData.HasValue)
+            {
+                Console.WriteLine($"[DECK DEBUG] Failed to load item template file '{templateLocation.m_filename}' from Root.wad");
+                return null;
+            }
+            
+            // Use the same BindSerializer instance and configuration as zone data loading
+            var bindSerializer = new BindSerializer();
+            var templateDataBytes = templateData.Value.ToArray();
+            
+            // Try GameObjectTemplate first (items should be GameObjectTemplates)
+            if (bindSerializer.Deserialize<GameObjectTemplate>(templateDataBytes, 1, out var gameObjectTemplate) && gameObjectTemplate != null)
+            {
+                Console.WriteLine($"[DECK DEBUG] Successfully loaded item GameObjectTemplate: {templateLocation.m_filename}");
+                return gameObjectTemplate;
+            }
+            
+            Console.WriteLine($"[DECK DEBUG] Failed to deserialize item template from '{templateLocation.m_filename}'");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DECK DEBUG] Error loading item template ID {itemTemplateId}: {ex.Message}");
+            return null;
         }
     }
     
@@ -1123,6 +1405,7 @@ public class ZoneEditorViewModel : ViewModelBase
     public ICommand SelectZoneCommand { get; }
     public ICommand EditNpcInventoryCommand { get; }
     public ICommand EditNpcSpellInventoryCommand { get; }
+    public ICommand EditCreatureDeckCommand { get; }
     public ICommand ViewDropTableCommand { get; }
     public ICommand CreateDropTableCommand { get; }
     public ICommand OpenOrCreateDropTableCommand { get; }
@@ -1201,6 +1484,11 @@ public class ZoneEditorViewModel : ViewModelBase
     public void SetZoneObjectCanvas(Canvas canvas)
     {
         _zoneObjectCanvas = canvas;
+        if (_zoneObjectCanvas != null)
+        {
+            // Ensure visuals exist on the current canvas
+            RebuildSceneVisuals();
+        }
     }
     
     public void SetScrollViewer(ScrollViewer scrollViewer)
@@ -1467,6 +1755,69 @@ public class ZoneEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             MessageService.Error($"Failed to open NPC spell inventory editor: {ex.Message}").Send();
+        }
+    }
+
+    private async Task EditCreatureDeck()
+    {
+        try
+        {
+            var deckName = SelectedSpawnDeckName;
+            if (string.IsNullOrEmpty(deckName))
+            {
+                MessageService.Error("No creature deck detected. Please select a spawn with both NPCBehaviorTemplate and DuelistBehaviorTemplate.").Send();
+                return;
+            }
+
+            // Check database connection
+            if (WorldDatabase.Instance.Store == null)
+            {
+                MessageService.Error("Database connection not available. Please ensure your certificate is configured and the database is accessible.").Send();
+                return;
+            }
+
+            var creatureName = SelectedSpawn?.Name ?? "Unknown Creature";
+
+            // Load existing deck data
+            MessageService.Info("Loading creature deck data...").Send();
+            var existingDeck = await CreatureDeckService.GetCreatureDeckAsync(deckName);
+            
+            if (existingDeck != null)
+            {
+                Console.WriteLine($"[DECK DEBUG] Loaded existing deck '{existingDeck.DeckName}' with {existingDeck.SpellTemplateIds.Count} spells: [{string.Join(", ", existingDeck.SpellTemplateIds)}]");
+            }
+            else
+            {
+                Console.WriteLine($"[DECK DEBUG] No existing deck found for '{deckName}' - will create new deck");
+            }
+
+            // Create and show the deck editor
+            var editor = new Controls.CreatureDeckEditor(deckName, creatureName, existingDeck);
+            
+            // Find the main window as owner
+            var mainWindow = Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop 
+                ? desktop.MainWindow 
+                : null;
+                
+            if (mainWindow != null)
+            {
+                await editor.ShowDialog(mainWindow);
+            }
+            else
+            {
+                // Fallback - show as regular window if no main window available
+                editor.Show();
+            }
+            
+            // Show success message if saved
+            if (editor.WasSaved)
+            {
+                MessageService.Info($"Creature deck '{deckName}' has been updated in the database.").Send();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to open creature deck editor: {ex.Message}").Send();
         }
     }
 
@@ -2433,6 +2784,26 @@ public class ZoneEditorViewModel : ViewModelBase
             }
         }
         
+    }
+
+    public void RebuildSceneVisuals()
+    {
+        if (_zoneObjectCanvas == null)
+            return;
+        try
+        {
+            _zoneObjectCanvas.Children.Clear();
+            CreateVisualObjects();
+            CreatePathVisuals();
+            CreateVolumeVisuals();
+            CreateNifGeometryVisuals();
+            UpdateVisibility();
+            UpdateVisualSelection();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to rebuild scene visuals: {ex.Message}");
+        }
     }
 
     private void CreateNifGeometryVisuals()
@@ -3651,6 +4022,8 @@ public class ZoneEditorViewModel : ViewModelBase
     {
         ClearAllSelections();
         SelectedPath = path;
+        _selectedHierarchyItem = path;
+        this.RaisePropertyChanged(nameof(SelectedHierarchyItem));
         NotifySelectionChanged();
     }
     
@@ -3658,6 +4031,8 @@ public class ZoneEditorViewModel : ViewModelBase
     {
         ClearAllSelections();
         SelectedMesh = mesh;
+        // Ensure Spawn property notification is explicit
+        this.RaisePropertyChanged(nameof(HasSelectedSpawn));
         NotifySelectionChanged();
     }
     
@@ -3665,6 +4040,8 @@ public class ZoneEditorViewModel : ViewModelBase
     {
         ClearAllSelections();
         SelectedVolume = volume;
+        // Ensure Spawn property notification is explicit
+        this.RaisePropertyChanged(nameof(HasSelectedSpawn));
         NotifySelectionChanged();
     }
     
@@ -3672,6 +4049,8 @@ public class ZoneEditorViewModel : ViewModelBase
     {
         ClearAllSelections();
         SelectedTrigger = trigger;
+        // Ensure Spawn property notification is explicit
+        this.RaisePropertyChanged(nameof(HasSelectedSpawn));
         NotifySelectionChanged();
     }
     
@@ -3679,6 +4058,8 @@ public class ZoneEditorViewModel : ViewModelBase
     {
         ClearAllSelections();
         SelectedSpawn = spawn;
+        _selectedHierarchyItem = spawn;
+        this.RaisePropertyChanged(nameof(SelectedHierarchyItem));
         NotifySelectionChanged();
     }
     
@@ -3695,6 +4076,12 @@ public class ZoneEditorViewModel : ViewModelBase
         SelectedSpawn = null;
         SelectedSpawnTemplate = null;
         SelectedNode = null;
+
+        if (_selectedHierarchyItem != null)
+        {
+            _selectedHierarchyItem = null;
+            this.RaisePropertyChanged(nameof(SelectedHierarchyItem));
+        }
     }
     
     // Drop table existence cache
@@ -3779,6 +4166,9 @@ public class ZoneEditorViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(SelectedSpawnTemplateDescription));
         this.RaisePropertyChanged(nameof(SelectedSpawnTemplateLootTables));
         this.RaisePropertyChanged(nameof(HasSpawnLootTables));
+        
+        // Update creature deck detection asynchronously  
+        _ = UpdateCreatureDeckDetectionAsync();
         
         this.RaisePropertyChanged(nameof(LocationX));
         this.RaisePropertyChanged(nameof(LocationY));

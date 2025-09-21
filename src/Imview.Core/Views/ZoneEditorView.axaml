@@ -1932,6 +1932,53 @@
                                                        Grid.Row="4" Grid.Column="1" Height="20" FontSize="9" Margin="0,1" IsReadOnly="True"/>
                                             </Grid>
                                         </StackPanel>
+                                        
+                                        <!-- Adjectives -->
+                                        <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedSpawnGameObjectTemplate, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                            <TextBlock Text="Adjectives:" FontSize="9" FontWeight="Bold" 
+                                                     Foreground="#CCCCCC" Margin="0,0,0,2"/>
+                                            <ItemsControl ItemsSource="{Binding SelectedSpawnGameObjectTemplate.m_adjectiveList}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="8" 
+                                                                 Foreground="#AAAAAA" Margin="2,1"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+
+                                        <!-- Creature Spell Deck for Spawn Template -->
+                                        <StackPanel Margin="0,8,0,0" IsVisible="{Binding HasSpawnDeck}">
+                                            <TextBlock Text="Creature Spell Deck:" FontSize="11" FontWeight="Bold" 
+                                                     Foreground="#8A2BE2" Margin="0,0,0,8"/>
+                                            
+                                            <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#8A2BE2" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    
+                                                    <!-- Deck Name -->
+                                                    <TextBlock Grid.Column="0" Text="{Binding SelectedSpawnDeckName}" FontSize="10" FontWeight="Bold" 
+                                                             Foreground="#8A2BE2" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    
+                                                    <!-- Edit/Create Deck Button -->
+                                                    <Button Grid.Column="1" Content="{Binding SpawnDeckButtonText}" 
+                                                            Command="{Binding EditCreatureDeckCommand}"
+                                                            Height="24" Width="70" FontSize="9" Background="#8A2BE2" Foreground="White">
+                                                        <Button.Styles>
+                                                            <Style Selector="Button:pointerover">
+                                                                <Setter Property="Background" Value="#7B68EE"/>
+                                                            </Style>
+                                                        </Button.Styles>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                            
+                                            <TextBlock Text="This creature has a spell deck that can be edited for dueling encounters." 
+                                                     FontSize="8" Foreground="#888888" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
 
                                         <!-- Loot Tables for Spawn Template -->
                                         <StackPanel Margin="0,8,0,0" IsVisible="{Binding HasSpawnLootTables}">
