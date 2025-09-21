@@ -8,9 +8,8 @@
              x:DataType="vm:SplashPageViewModel">
 
     <Grid Background="#1E1E1E">
-        <StackPanel VerticalAlignment="Center" 
-                    HorizontalAlignment="Center" 
-                    Spacing="40">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="40">
             
             <!-- Logo and Title -->
             <StackPanel Spacing="20">
@@ -240,6 +239,7 @@
                 </Border>
                 
             </StackPanel>
-        </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

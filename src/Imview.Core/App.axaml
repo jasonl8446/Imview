@@ -7,5 +7,9 @@
         <FluentTheme/>
         <StyleInclude Source="avares://Notification.Avalonia/Themes/Generic.xaml" />
     </Application.Styles>
+    <Application.Resources>
+        <!-- Global accent brush for Imview UI elements -->
+        <SolidColorBrush x:Key="ImviewAccentBrush" Color="#1751C3"/>
+    </Application.Resources>
              
 </Application>
