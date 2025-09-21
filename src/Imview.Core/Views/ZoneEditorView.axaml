@@ -107,6 +107,13 @@
                                 <Canvas Name="ZoneObjectCanvas"/>
                             </Canvas>
                         </ScrollViewer>
+
+                        <!-- Overlay canvas for viewport indicators (arrows to off-screen selection) -->
+                        <Canvas Name="ViewportOverlay"
+                                IsHitTestVisible="False"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Panel.ZIndex="1000"/>
                         
                         <!-- Loading overlay -->
                         <Border Background="#AA000000" 
@@ -200,7 +207,7 @@
                                             Foreground="#FFFF00" 
                                             FontSize="9"/>
                                     <CheckBox Content="Paths &amp; Spawns" 
-                                            IsChecked="{Binding ShowSpawns}" 
+                                            IsChecked="{Binding ShowPathsAndSpawns}" 
                                             Foreground="#FF8C00" 
                                             FontSize="9"/>
                                     <CheckBox Content="Volumes" 

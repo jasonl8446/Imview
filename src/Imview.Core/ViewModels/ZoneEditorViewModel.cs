@@ -34,6 +34,8 @@ using ReactiveUI;
 using Avalonia.Controls.Shapes;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
+using Avalonia.Layout;
 using Imview.Core.Services;
 using Imview.Core.Models;
 using Imcodec.ObjectProperty.TypeCache;
@@ -96,8 +98,20 @@ public class ZoneEditorViewModel : ViewModelBase
     private bool _showMeshCollisions = false;
     private bool _showRayCollisions = true;
     
-    private Canvas? _zoneObjectCanvas = null;
+private Canvas? _zoneObjectCanvas = null;
     private ScrollViewer? _scrollViewer = null;
+    private Canvas? _overlayCanvas = null;
+    
+    // Highlight styling
+    private static readonly Avalonia.Media.Color HighlightColor = Avalonia.Media.Color.FromRgb(255, 215, 0); // Imview gold (#FFD700)
+    private static readonly SolidColorBrush HighlightBrush = new SolidColorBrush(HighlightColor);
+    private const double HighlightThickness = 4.0;
+
+    // Base path styling (uniform color for all paths)
+    private static readonly Avalonia.Media.Color PathBaseColor = Avalonia.Media.Color.FromRgb(102, 102, 102); // Dark gray (#666666) for unselected paths
+    private static readonly SolidColorBrush PathBaseBrush = new SolidColorBrush(PathBaseColor);
+
+    private Control? _triggerHighlightMarker;
     
     // Viewport state for camera control
     private double _zoomLevel = 0.5; // Default to 50% zoom
@@ -697,6 +711,7 @@ public class ZoneEditorViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _showSpawns, value);
+            this.RaisePropertyChanged(nameof(ShowPathsAndSpawns));
             UpdateVisibility();
         }
     }
@@ -707,6 +722,24 @@ public class ZoneEditorViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _showPaths, value);
+            this.RaisePropertyChanged(nameof(ShowPathsAndSpawns));
+            UpdateVisibility();
+        }
+    }
+
+    // Convenience filter to toggle both Paths and Spawns from a single checkbox
+    public bool ShowPathsAndSpawns
+    {
+        get => ShowPaths && ShowSpawns;
+        set
+        {
+            // Set both flags together
+            if (ShowPaths != value)
+                ShowPaths = value;
+            if (ShowSpawns != value)
+                ShowSpawns = value;
+            // Notify combined property for UI
+            this.RaisePropertyChanged(nameof(ShowPathsAndSpawns));
             UpdateVisibility();
         }
     }
@@ -1491,9 +1524,14 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
     
-    public void SetScrollViewer(ScrollViewer scrollViewer)
+public void SetScrollViewer(ScrollViewer scrollViewer)
     {
         _scrollViewer = scrollViewer;
+    }
+
+    public void SetOverlayCanvas(Canvas overlay)
+    {
+        _overlayCanvas = overlay;
     }
 
     private void SelectZone()
@@ -2455,29 +2493,848 @@ public class ZoneEditorViewModel : ViewModelBase
         }, Avalonia.Threading.DispatcherPriority.Loaded);
     }
     
-    private void UpdateVisualSelection()
+private void UpdateVisualSelection()
     {
         if (_zoneObjectCanvas == null)
             return;
-            
-        // Update selection highlighting for all zone objects
-        foreach (var child in _zoneObjectCanvas.Children.OfType<Border>())
+        
+        try
         {
-            if (child.Tag is ZoneVisualizationObject obj)
+            // 1) Highlight Zone Objects (small markers)
+            foreach (var child in _zoneObjectCanvas.Children.OfType<Border>())
             {
-                // Highlight selected object
-                if (SelectedObject != null && obj.TemplateID == SelectedObject.TemplateID)
+                if (child.Tag is ZoneVisualizationObject obj)
                 {
-                    child.BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)); // Yellow border for selected
-                    child.BorderThickness = new Avalonia.Thickness(2);
+                    bool isSelected = SelectedObject != null && obj.TemplateID == SelectedObject.TemplateID;
+                    ApplyBorderHighlight(child, isSelected, defaultThickness: 1, defaultBrush: Brushes.White);
+                    if (isSelected) child.IsVisible = true;
+                }
+                else if (child.Tag is SpawnVisualizationObject spawn)
+                {
+                    bool isSelected = SelectedSpawn != null && spawn.SpawnId == SelectedSpawn.SpawnId;
+                    // Spawn visuals default border thickness is 2 and Brush is White
+                    ApplyBorderHighlight(child, isSelected, defaultThickness: 2, defaultBrush: Brushes.White);
+                    if (isSelected) child.IsVisible = true;
+                }
+            }
+            
+            // 2) Highlight Nodes
+            foreach (var shape in _zoneObjectCanvas.Children.OfType<Shape>())
+            {
+                if (shape.Tag is NodeVisualizationObject node)
+                {
+                    bool isSelectedNode = SelectedNode != null && node.NodeId == SelectedNode.NodeId;
+                    bool isInSelectedPath = SelectedPath != null && node.PathId == SelectedPath.PathId;
+                    bool highlight = isSelectedNode || isInSelectedPath;
+                    ApplyShapeHighlight(shape, highlight, defaultThickness: 1, defaultBrush: new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 255)));
+                    if (highlight) shape.IsVisible = true;
+                }
+                else if (shape.Tag is CollisionVisualizationObject collision)
+                {
+bool isSelected = SelectedCollision != null && ReferenceEquals(collision, SelectedCollision);
+                    // Collisions default stroke is cyan-ish with thickness 1/2 depending on shape; use 1 as base
+                    ApplyShapeHighlight(shape, isSelected, defaultThickness: 1, defaultBrush: new SolidColorBrush(Avalonia.Media.Color.FromRgb(0, 200, 255)));
+                    if (isSelected) shape.IsVisible = true;
+                }
+                else if (shape.Tag is NifMeshVisualizationObject mesh)
+                {
+                    bool isSelected = SelectedMesh != null && ReferenceEquals(mesh, SelectedMesh);
+                    // NIF default stroke is yellow
+                    ApplyShapeHighlight(shape, isSelected, defaultThickness: 1, defaultBrush: new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 255, 0)));
+                    if (isSelected) shape.IsVisible = true;
+                }
+                else if (shape.Tag is PathLineTag pathTag)
+                {
+                    bool isSelected = SelectedPath != null && pathTag.Path != null && pathTag.Path.PathId == SelectedPath.PathId;
+                    if (isSelected)
+                    {
+                        shape.Stroke = HighlightBrush;
+                        shape.StrokeThickness = HighlightThickness;
+                        shape.IsVisible = true;
+                    }
+                    else
+                    {
+                        // Reset to uniform base style for all non-selected paths
+                        shape.Stroke = PathBaseBrush;
+                        shape.StrokeThickness = 2;
+                    }
+                }
+                else if (shape.Tag is VolumeVisualizationObject volumeTag)
+                {
+                    bool isSelected = SelectedVolume != null && ReferenceEquals(volumeTag, SelectedVolume);
+                    // Volume visuals often are children of a Canvas, but some shapes may carry the tag
+                    ApplyShapeHighlight(shape, isSelected, defaultThickness: 2, defaultBrush: new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0)));
+                    if (isSelected) shape.IsVisible = true;
+                }
+            }
+            
+            // 3) Highlight Volume composite canvases (their Tag is the VolumeVisualizationObject)
+            foreach (var composite in _zoneObjectCanvas.Children.OfType<Canvas>())
+            {
+                if (composite.Tag is VolumeVisualizationObject vol)
+                {
+                    bool isSelected = SelectedVolume != null && ReferenceEquals(vol, SelectedVolume);
+                    ApplyCompositeCanvasHighlight(composite, isSelected, defaultBrush: new SolidColorBrush(Avalonia.Media.Color.FromRgb(255, 0, 0)), defaultThickness: 2);
+                    if (isSelected) composite.IsVisible = true;
+                }
+            }
+            
+            // 4) Trigger highlight marker (triggers are not rendered otherwise)
+            UpdateTriggerHighlightMarker();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to update visual selection: {ex.Message}");
+        }
+    }
+
+    private void ApplyBorderHighlight(Border border, bool highlight, double defaultThickness, IBrush defaultBrush)
+    {
+        if (highlight)
+        {
+            border.BorderBrush = HighlightBrush;
+            border.BorderThickness = new Avalonia.Thickness(HighlightThickness);
+        }
+        else
+        {
+            border.BorderBrush = defaultBrush;
+            border.BorderThickness = new Avalonia.Thickness(defaultThickness);
+        }
+    }
+
+    private void ApplyShapeHighlight(Shape shape, bool highlight, double defaultThickness, IBrush defaultBrush)
+    {
+        if (highlight)
+        {
+            shape.Stroke = HighlightBrush;
+            shape.StrokeThickness = HighlightThickness;
+            shape.Opacity = 1.0;
+        }
+        else
+        {
+            shape.Stroke = defaultBrush;
+            shape.StrokeThickness = defaultThickness;
+            // leave opacity as-is for base visuals
+        }
+    }
+
+    private void ApplyCompositeCanvasHighlight(Canvas canvas, bool highlight, IBrush defaultBrush, double defaultThickness)
+    {
+        foreach (var child in canvas.Children.OfType<Shape>())
+        {
+            ApplyShapeHighlight(child, highlight, defaultThickness, defaultBrush);
+        }
+    }
+
+    private void UpdateTriggerHighlightMarker()
+    {
+        if (_zoneObjectCanvas == null)
+            return;
+
+        if (SelectedTrigger != null)
+        {
+            // Convert trigger coordinates to canvas
+            var canvasX = 10000.0 + (SelectedTrigger.X * 0.25);
+            var canvasY = 10000.0 - (SelectedTrigger.Y * 0.25);
+            var radius = 18.0;
+
+            if (_triggerHighlightMarker is not Ellipse ellipse)
+            {
+                ellipse = new Ellipse
+                {
+                    Width = radius * 2,
+                    Height = radius * 2,
+                    Fill = Brushes.Transparent,
+                    Stroke = HighlightBrush,
+                    StrokeThickness = 3,
+                    Opacity = 0.9,
+                    IsHitTestVisible = false,
+                    Tag = "TriggerHighlightMarker"
+                };
+                _triggerHighlightMarker = ellipse;
+                _zoneObjectCanvas.Children.Add(ellipse);
+            }
+            else
+            {
+                ellipse.Width = radius * 2;
+                ellipse.Height = radius * 2;
+                ellipse.Stroke = HighlightBrush;
+                ellipse.StrokeThickness = 3;
+                ellipse.IsVisible = true;
+            }
+
+            Canvas.SetLeft(ellipse, canvasX - radius);
+            Canvas.SetTop(ellipse, canvasY - radius);
+        }
+        else
+        {
+            if (_triggerHighlightMarker != null)
+            {
+                _triggerHighlightMarker.IsVisible = false;
+            }
+        }
+    }
+
+private Control? _selectionArrow;
+    private Control? _selectionPulseRing;
+    private Control? _selectionPulseOuter;
+    private DispatcherTimer? _pulseTimer;
+    private double _pulseT;
+
+    public void UpdateViewportIndicator()
+    {
+        try
+        {
+if (_overlayCanvas == null || _scrollViewer == null)
+            {
+                StopPulse();
+                return;
+            }
+
+            // Determine target canvas position based on actual visuals; fallback to model coords
+            double targetContentX, targetContentY;
+            if (!TryGetSelectionCenterFromVisuals(out targetContentX, out targetContentY))
+            {
+                if (!TryGetSelectedCanvasPosition(out targetContentX, out targetContentY))
+                {
+                    if (_selectionArrow != null) _selectionArrow.IsVisible = false;
+                    HideSelectionPulse();
+                    return;
+                }
+            }
+
+            var zoom = Math.Max(ZoomLevel, 0.0001);
+
+            // Viewport rect in content units
+            var leftContent = _scrollViewer.Offset.X;
+            var topContent = _scrollViewer.Offset.Y;
+            var vpWidthContent = _scrollViewer.Viewport.Width / zoom;
+            var vpHeightContent = _scrollViewer.Viewport.Height / zoom;
+            var rightContent = leftContent + vpWidthContent;
+            var bottomContent = topContent + vpHeightContent;
+
+            // If target is inside viewport (content space), hide arrow and show pulse ring
+            bool inView = targetContentX >= leftContent && targetContentX <= rightContent && targetContentY >= topContent && targetContentY <= bottomContent;
+            if (inView)
+            {
+                if (_selectionArrow != null) _selectionArrow.IsVisible = false;
+                // Compute overlay point directly from visuals to avoid math drift
+                if (TryGetSelectionOverlayCenterFromVisuals(out var ovx, out var ovy))
+                {
+                    UpdateSelectionPulseOverlay(ovx, ovy);
                 }
                 else
                 {
-                    child.BorderBrush = Brushes.White; // Default white border
-                    child.BorderThickness = new Avalonia.Thickness(1);
+                    zoom = Math.Max(ZoomLevel, 0.0001);
+                    var ovx2 = (targetContentX - leftContent) * zoom;
+                    var ovy2 = (targetContentY - topContent) * zoom;
+                    UpdateSelectionPulseOverlay(ovx2, ovy2);
                 }
+                return;
+            }
+            else
+            {
+                HideSelectionPulse();
+            }
+
+            // Viewport center in content coords
+            var cx = leftContent + vpWidthContent / 2.0;
+            var cy = topContent + vpHeightContent / 2.0;
+            var dx = targetContentX - cx;
+            var dy = targetContentY - cy;
+
+            if (Math.Abs(dx) < 1e-6 && Math.Abs(dy) < 1e-6)
+            {
+                if (_selectionArrow != null) _selectionArrow.IsVisible = false;
+                return;
+            }
+
+            // Find intersection with viewport rectangle edges along ray from center
+            var intersections = new List<(double t, double x, double y)>();
+            if (Math.Abs(dx) > 1e-6)
+            {
+                // Left edge
+                var tL = (leftContent - cx) / dx;
+                var yL = cy + tL * dy;
+                if (tL > 0 && yL >= topContent && yL <= bottomContent) intersections.Add((tL, leftContent, yL));
+                // Right edge
+                var tR = (rightContent - cx) / dx;
+                var yR = cy + tR * dy;
+                if (tR > 0 && yR >= topContent && yR <= bottomContent) intersections.Add((tR, rightContent, yR));
+            }
+            if (Math.Abs(dy) > 1e-6)
+            {
+                // Top edge
+                var tT = (topContent - cy) / dy;
+                var xT = cx + tT * dx;
+                if (tT > 0 && xT >= leftContent && xT <= rightContent) intersections.Add((tT, xT, topContent));
+                // Bottom edge
+                var tB = (bottomContent - cy) / dy;
+                var xB = cx + tB * dx;
+                if (tB > 0 && xB >= leftContent && xB <= rightContent) intersections.Add((tB, xB, bottomContent));
+            }
+
+            if (intersections.Count == 0)
+            {
+                if (_selectionArrow != null) _selectionArrow.IsVisible = false;
+                return;
+            }
+
+            // Choose the nearest intersection (smallest positive t)
+            var hit = intersections.OrderBy(h => h.t).First();
+            var hitX = hit.x;
+            var hitY = hit.y;
+
+            // Convert to overlay coords (pixels relative to viewport)
+            var overlayX = (hitX - leftContent) * zoom;
+            var overlayY = (hitY - topContent) * zoom;
+
+            // Create arrow if needed
+            if (_selectionArrow is not Polygon arrow)
+            {
+                arrow = new Polygon
+                {
+                    Points = new List<Avalonia.Point>
+                    {
+                        new Avalonia.Point(0, -12), // tip
+                        new Avalonia.Point(8, 12),
+                        new Avalonia.Point(-8, 12)
+                    },
+                    Fill = HighlightBrush,
+                    Stroke = HighlightBrush,
+                    StrokeThickness = 2,
+                    IsHitTestVisible = false,
+                    Tag = "ViewportSelectionArrow"
+                };
+                _selectionArrow = arrow;
+                _overlayCanvas.Children.Add(arrow);
+            }
+            else
+            {
+                arrow = (Polygon)_selectionArrow;
+            }
+
+            // Position arrow centered on overlay point
+            Canvas.SetLeft(arrow, overlayX);
+            Canvas.SetTop(arrow, overlayY);
+
+            // Rotate arrow to face target direction
+            var angleRad = Math.Atan2(dy, dx);
+            var angleDeg = angleRad * 180.0 / Math.PI;
+            arrow.RenderTransform = new RotateTransform(angleDeg);
+            arrow.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+
+            // Nudge arrow slightly inside viewport so it remains visible
+            const double margin = 14.0;
+            var width = _scrollViewer.Viewport.Width;
+            var height = _scrollViewer.Viewport.Height;
+            var clampedX = Math.Min(Math.Max(overlayX, margin), width - margin);
+            var clampedY = Math.Min(Math.Max(overlayY, margin), height - margin);
+            Canvas.SetLeft(arrow, clampedX);
+            Canvas.SetTop(arrow, clampedY);
+
+            arrow.IsVisible = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to update viewport indicator: {ex.Message}");
+        }
+    }
+
+    private void UpdateSelectionPulseOverlay(double overlayX, double overlayY)
+    {
+        try
+        {
+            if (_overlayCanvas == null || _scrollViewer == null)
+                return;
+
+            // Create or update outer glow ring (white)
+            if (_selectionPulseOuter is not Ellipse outer)
+            {
+                outer = new Ellipse
+                {
+                    Width = 120,
+                    Height = 120,
+                    Fill = Brushes.Transparent,
+                    Stroke = new SolidColorBrush(Avalonia.Media.Color.FromArgb(160, 255, 255, 255)),
+                    StrokeThickness = 10,
+                    IsHitTestVisible = false,
+                    Tag = "SelectionPulseOuter",
+                    Opacity = 0.6
+                };
+                _selectionPulseOuter = outer;
+                _overlayCanvas.Children.Add(outer);
+            }
+
+            // Create or update main pulse ring (gold)
+            if (_selectionPulseRing is not Ellipse ring)
+            {
+                ring = new Ellipse
+                {
+                    Width = 90,
+                    Height = 90,
+                    Fill = Brushes.Transparent,
+                    Stroke = HighlightBrush,
+                    StrokeThickness = 6,
+                    IsHitTestVisible = false,
+                    Tag = "SelectionPulseRing",
+                    Opacity = 0.95
+                };
+                _selectionPulseRing = ring;
+                _overlayCanvas.Children.Add(ring);
+            }
+
+            // Ensure correct draw order: outer behind ring
+            if (_selectionPulseOuter != null && _selectionPulseRing != null)
+            {
+                _overlayCanvas.Children.Remove(_selectionPulseOuter);
+                _overlayCanvas.Children.Remove(_selectionPulseRing);
+                _overlayCanvas.Children.Add(_selectionPulseOuter);
+                _overlayCanvas.Children.Add(_selectionPulseRing);
+            }
+
+// Position centered (use current Width/Height; Bounds may be 0 before layout)
+            var outerW = (_selectionPulseOuter as Ellipse)?.Width ?? 0;
+            var outerH = (_selectionPulseOuter as Ellipse)?.Height ?? 0;
+            Canvas.SetLeft(_selectionPulseOuter, overlayX - outerW / 2);
+            Canvas.SetTop(_selectionPulseOuter, overlayY - outerH / 2);
+            _selectionPulseOuter.IsVisible = true;
+
+            var ringW = (_selectionPulseRing as Ellipse)?.Width ?? 0;
+            var ringH = (_selectionPulseRing as Ellipse)?.Height ?? 0;
+            Canvas.SetLeft(_selectionPulseRing, overlayX - ringW / 2);
+            Canvas.SetTop(_selectionPulseRing, overlayY - ringH / 2);
+            _selectionPulseRing.IsVisible = true;
+
+            // Start or continue the pulse animation
+            StartPulse();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to update selection pulse: {ex.Message}");
+        }
+    }
+
+    private void HideSelectionPulse()
+    {
+        if (_selectionPulseRing != null) _selectionPulseRing.IsVisible = false;
+        if (_selectionPulseOuter != null) _selectionPulseOuter.IsVisible = false;
+        StopPulse();
+    }
+
+    private void StartPulse()
+    {
+        if (_pulseTimer != null && _pulseTimer.IsEnabled)
+            return;
+
+        _pulseT = 0;
+        _pulseTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) }; // ~30 FPS
+        _pulseTimer.Tick -= OnPulseTick;
+        _pulseTimer.Tick += OnPulseTick;
+        _pulseTimer.IsEnabled = true;
+    }
+
+    private void StopPulse()
+    {
+        if (_pulseTimer != null)
+        {
+            _pulseTimer.IsEnabled = false;
+            _pulseTimer.Tick -= OnPulseTick;
+        }
+    }
+
+    private void OnPulseTick(object? sender, EventArgs e)
+    {
+        if (_overlayCanvas == null || _scrollViewer == null)
+            return;
+
+        // Animate sizes and opacity
+        _pulseT += _pulseTimer!.Interval.TotalSeconds / 2.0; // slower pulse: 2.0s period
+        if (_pulseT > 1) _pulseT -= 1;
+        var s = (1 - Math.Cos(2 * Math.PI * _pulseT)) / 2.0; // 0..1
+
+        if (_selectionPulseRing is Ellipse ring)
+        {
+            var radius = 40.0 + 50.0 * s; // toned down: 40..90 px
+            ring.Width = radius;
+            ring.Height = radius;
+            ring.StrokeThickness = 4 + 4 * (1 - s);
+            ring.Opacity = 0.85;
+        }
+        if (_selectionPulseOuter is Ellipse outer)
+        {
+            var radius = 60.0 + 60.0 * s; // toned down: 60..120 px
+            outer.Width = radius;
+            outer.Height = radius;
+            outer.StrokeThickness = 8 + 6 * s;
+            outer.Opacity = 0.45 + 0.25 * (1 - s);
+        }
+
+        // Keep centered on the current selection and hide when off-screen
+        if (TryGetSelectionOverlayCenterFromVisuals(out var overlayX, out var overlayY))
+        {
+            // Keep ring centered on overlay coords
+            if (_selectionPulseRing is Ellipse r)
+            {
+                Canvas.SetLeft(r, overlayX - r.Width / 2);
+                Canvas.SetTop(r, overlayY - r.Height / 2);
+            }
+            if (_selectionPulseOuter is Ellipse o)
+            {
+                Canvas.SetLeft(o, overlayX - o.Width / 2);
+                Canvas.SetTop(o, overlayY - o.Height / 2);
+            }
+
+            // In-view test in overlay space
+            var vpWpx = _scrollViewer.Viewport.Width;
+            var vpHpx = _scrollViewer.Viewport.Height;
+            var inView = overlayX >= 0 && overlayX <= vpWpx && overlayY >= 0 && overlayY <= vpHpx;
+            if (_selectionPulseRing is Ellipse r2) r2.IsVisible = inView;
+            if (_selectionPulseOuter is Ellipse o2) o2.IsVisible = inView;
+        }
+        else if (TryGetSelectionCenterFromVisuals(out var cxContent, out var cyContent) || TryGetSelectedCanvasPosition(out cxContent, out cyContent))
+        {
+            var zoom = Math.Max(ZoomLevel, 0.0001);
+            var left = _scrollViewer.Offset.X;
+            var top = _scrollViewer.Offset.Y;
+            var ovx = (cxContent - left) * zoom;
+            var ovy = (cyContent - top) * zoom;
+            if (_selectionPulseRing is Ellipse r)
+            {
+                Canvas.SetLeft(r, ovx - r.Width / 2);
+                Canvas.SetTop(r, ovy - r.Height / 2);
+            }
+            if (_selectionPulseOuter is Ellipse o)
+            {
+                Canvas.SetLeft(o, ovx - o.Width / 2);
+                Canvas.SetTop(o, ovy - o.Height / 2);
             }
         }
+    }
+
+    private void GetSelectionCanvasAnchorOffset(out double offXContent, out double offYContent)
+    {
+        // Default to centered anchors
+        offXContent = 0; offYContent = 0;
+
+        // Zone objects are drawn as 16x16 Border at top-left => add half-size
+        if (SelectedObject != null)
+        {
+            offXContent = 8; offYContent = 8;
+            return;
+        }
+        // Spawns are centered in CreateEnhancedSpawnVisual
+        if (SelectedSpawn != null)
+        {
+            offXContent = 0; offYContent = 0; return;
+        }
+        // Nodes are centered
+        if (SelectedNode != null)
+        {
+            offXContent = 0; offYContent = 0; return;
+        }
+        // NIF mesh uses centroid of projected vertices
+        if (SelectedMesh != null)
+        {
+            offXContent = 0; offYContent = 0; return;
+        }
+        // Triggers: just use point
+        if (SelectedTrigger != null)
+        {
+            offXContent = 0; offYContent = 0; return;
+        }
+        // Volumes: visuals are placed at top-left, sizes depend on primitive
+        if (SelectedVolume != null)
+        {
+            var type = SelectedVolume.PrimitiveType?.ToLowerInvariant() ?? string.Empty;
+            if (type == "box" || type == "cube")
+            {
+                var w = Math.Max(10, SelectedVolume.Width * 0.25);
+                var h = Math.Max(10, SelectedVolume.Length * 0.25);
+                offXContent = w / 2.0; offYContent = h / 2.0; return;
+            }
+            if (type == "sphere" || type == "ball" || type == "cylinder")
+            {
+                var d = Math.Max(10, SelectedVolume.Radius * 2 * 0.25);
+                offXContent = d / 2.0; offYContent = d / 2.0; return;
+            }
+            // Fallback
+            offXContent = 0; offYContent = 0; return;
+        }
+        // Collisions: approximate using geometry
+        if (SelectedCollision != null)
+        {
+            // Use underlying geometry params when available
+            if (SelectedCollision.GeometryParams is BcdGeomParams.BoxGeomParams box)
+            {
+                var w = Math.Max(4, box.Length * SelectedCollision.Scale * 0.25);
+                var h = Math.Max(4, box.Width * SelectedCollision.Scale * 0.25);
+                offXContent = w / 2.0; offYContent = h / 2.0; return;
+            }
+            if (SelectedCollision.GeometryParams is BcdGeomParams.SphereGeomParams s)
+            {
+                var d = Math.Max(4, s.Radius * 2 * SelectedCollision.Scale * 0.25);
+                offXContent = d / 2.0; offYContent = d / 2.0; return;
+            }
+            if (SelectedCollision.GeometryParams is BcdGeomParams.CylinderGeomParams c)
+            {
+                var d = Math.Max(4, c.Radius * 2 * SelectedCollision.Scale * 0.25);
+                offXContent = d / 2.0; offYContent = d / 2.0; return;
+            }
+            if (SelectedCollision.GeometryParams is BcdGeomParams.TubeGeomParams t)
+            {
+                var d = Math.Max(4, t.Radius * 2 * SelectedCollision.Scale * 0.25);
+                offXContent = d / 2.0; offYContent = d / 2.0; return;
+            }
+            // For Plane and Ray we can't easily center without orientation; skip
+            offXContent = 0; offYContent = 0; return;
+        }
+    }
+
+    private bool TryGetSelectionOverlayCenterFromVisuals(out double overlayX, out double overlayY)
+    {
+        overlayX = overlayY = 0;
+        if (_zoneObjectCanvas == null || _overlayCanvas == null)
+            return false;
+
+        var points = new List<Avalonia.Point>();
+        foreach (var child in _zoneObjectCanvas.Children.OfType<Control>())
+        {
+            if (child.Tag == null) continue;
+
+            bool match = false;
+            if (SelectedObject != null && child.Tag is ZoneVisualizationObject z && ReferenceEquals(z, SelectedObject)) match = true;
+            else if (SelectedSpawn != null && child.Tag is SpawnVisualizationObject s && ReferenceEquals(s, SelectedSpawn)) match = true;
+            else if (SelectedNode != null && child.Tag is NodeVisualizationObject n && ReferenceEquals(n, SelectedNode)) match = true;
+            else if (SelectedVolume != null && child.Tag is VolumeVisualizationObject v && ReferenceEquals(v, SelectedVolume)) match = true;
+            else if (SelectedCollision != null && child.Tag is CollisionVisualizationObject c && ReferenceEquals(c, SelectedCollision)) match = true;
+            else if (SelectedMesh != null && child.Tag is NifMeshVisualizationObject m && ReferenceEquals(m, SelectedMesh)) match = true;
+            else if (SelectedPath != null && child.Tag is PathLineTag p && p.Path != null && p.Path.PathId == SelectedPath.PathId) match = true;
+
+            if (!match) continue;
+
+            Avalonia.Point? localCenter = null;
+            if (child is Avalonia.Controls.Shapes.Line line)
+            {
+                localCenter = new Avalonia.Point((line.StartPoint.X + line.EndPoint.X) / 2.0, (line.StartPoint.Y + line.EndPoint.Y) / 2.0);
+            }
+            else if (child is Polygon poly && poly.Points != null && poly.Points.Count > 0)
+            {
+                localCenter = new Avalonia.Point(poly.Points.Average(p => p.X), poly.Points.Average(p => p.Y));
+            }
+            else if (child is Polyline polyline && polyline.Points != null && polyline.Points.Count > 0)
+            {
+                localCenter = new Avalonia.Point(polyline.Points.Average(p => p.X), polyline.Points.Average(p => p.Y));
+            }
+            else
+            {
+                var w = child.Bounds.Width; var h = child.Bounds.Height;
+                localCenter = new Avalonia.Point(w > 0 ? w / 2.0 : 0, h > 0 ? h / 2.0 : 0);
+            }
+
+            if (localCenter.HasValue)
+            {
+                var translated = child.TranslatePoint(localCenter.Value, _overlayCanvas);
+                if (translated.HasValue)
+                    points.Add(translated.Value);
+            }
+        }
+
+        if (points.Count == 0) { return false; }
+        overlayX = points.Average(p => p.X);
+        overlayY = points.Average(p => p.Y);
+        return true;
+    }
+
+    private bool TryGetSelectionCenterFromVisuals(out double x, out double y)
+    {
+        x = y = 0;
+        if (_zoneObjectCanvas == null)
+            return false;
+
+        var centers = new List<(double X, double Y)>();
+        foreach (var child in _zoneObjectCanvas.Children.OfType<Control>())
+        {
+            if (child.Tag == null) continue;
+
+            bool match = false;
+            if (SelectedObject != null && child.Tag is ZoneVisualizationObject z && ReferenceEquals(z, SelectedObject)) match = true;
+            else if (SelectedSpawn != null && child.Tag is SpawnVisualizationObject s && ReferenceEquals(s, SelectedSpawn)) match = true;
+            else if (SelectedNode != null && child.Tag is NodeVisualizationObject n && ReferenceEquals(n, SelectedNode)) match = true;
+            else if (SelectedVolume != null && child.Tag is VolumeVisualizationObject v && ReferenceEquals(v, SelectedVolume)) match = true;
+            else if (SelectedCollision != null && child.Tag is CollisionVisualizationObject c && ReferenceEquals(c, SelectedCollision)) match = true;
+            else if (SelectedMesh != null && child.Tag is NifMeshVisualizationObject m && ReferenceEquals(m, SelectedMesh)) match = true;
+            else if (SelectedPath != null && child.Tag is PathLineTag p && p.Path != null && p.Path.PathId == SelectedPath.PathId) match = true;
+
+            if (!match) continue;
+
+            // Lines (path segments)
+            if (child is Avalonia.Controls.Shapes.Line line)
+            {
+                var baseL = Canvas.GetLeft(line);
+                var baseT = Canvas.GetTop(line);
+                if (double.IsNaN(baseL)) baseL = 0;
+                if (double.IsNaN(baseT)) baseT = 0;
+                var cx = baseL + (line.StartPoint.X + line.EndPoint.X) / 2.0;
+                var cy = baseT + (line.StartPoint.Y + line.EndPoint.Y) / 2.0;
+                centers.Add((cx, cy));
+                continue;
+            }
+            // Polygons (arrows, meshes)
+            if (child is Polygon poly && poly.Points != null && poly.Points.Count > 0)
+            {
+                var baseL = Canvas.GetLeft(poly); if (double.IsNaN(baseL)) baseL = 0;
+                var baseT = Canvas.GetTop(poly); if (double.IsNaN(baseT)) baseT = 0;
+                var ax = poly.Points.Average(p => p.X);
+                var ay = poly.Points.Average(p => p.Y);
+                centers.Add((baseL + ax, baseT + ay));
+                continue;
+            }
+            if (child is Polyline polyline && polyline.Points != null && polyline.Points.Count > 0)
+            {
+                var baseL = Canvas.GetLeft(polyline); if (double.IsNaN(baseL)) baseL = 0;
+                var baseT = Canvas.GetTop(polyline); if (double.IsNaN(baseT)) baseT = 0;
+                var ax = polyline.Points.Average(p => p.X);
+                var ay = polyline.Points.Average(p => p.Y);
+                centers.Add((baseL + ax, baseT + ay));
+                continue;
+            }
+            
+            // General case: center from left/top and size, with type-aware width/height fallback
+            double baseLeft = Canvas.GetLeft(child); if (double.IsNaN(baseLeft)) baseLeft = 0;
+            double baseTop = Canvas.GetTop(child); if (double.IsNaN(baseTop)) baseTop = 0;
+
+            double width = child.Bounds.Width;
+            double height = child.Bounds.Height;
+
+            if (width <= 0 || height <= 0)
+            {
+                switch (child)
+                {
+                    case Border b:
+                        width = b.Width > 0 ? b.Width : width;
+                        height = b.Height > 0 ? b.Height : height;
+                        break;
+                    case Ellipse e:
+                        width = e.Width > 0 ? e.Width : width;
+                        height = e.Height > 0 ? e.Height : height;
+                        break;
+                    case Avalonia.Controls.Shapes.Rectangle r:
+                        width = r.Width > 0 ? r.Width : width;
+                        height = r.Height > 0 ? r.Height : height;
+                        break;
+                    case Canvas canv:
+                        width = canv.Width > 0 ? canv.Width : width;
+                        height = canv.Height > 0 ? canv.Height : height;
+                        break;
+                }
+            }
+
+            centers.Add((baseLeft + (width > 0 ? width / 2.0 : 0), baseTop + (height > 0 ? height / 2.0 : 0)));
+        }
+
+        if (centers.Count == 0) return false;
+        x = centers.Average(c => c.X);
+        y = centers.Average(c => c.Y);
+        return true;
+    }
+
+    private bool TryGetSelectedCanvasPosition(out double x, out double y)
+    {
+        x = y = 0;
+
+        // Priority order: explicit selected visuals
+        if (SelectedObject != null)
+        {
+            x = 10000.0 + (SelectedObject.X * 0.25);
+            y = 10000.0 - (SelectedObject.Y * 0.25);
+            return true;
+        }
+        if (SelectedSpawn != null)
+        {
+            x = 10000.0 + (SelectedSpawn.X * 0.25);
+            y = 10000.0 - (SelectedSpawn.Y * 0.25);
+            return true;
+        }
+        if (SelectedVolume != null)
+        {
+            x = 10000.0 + (SelectedVolume.X * 0.25);
+            y = 10000.0 - (SelectedVolume.Y * 0.25);
+            return true;
+        }
+        if (SelectedCollision != null)
+        {
+            x = 10000.0 + (SelectedCollision.X * 0.25);
+            y = 10000.0 - (SelectedCollision.Y * 0.25);
+            return true;
+        }
+        if (SelectedTrigger != null)
+        {
+            x = 10000.0 + (SelectedTrigger.X * 0.25);
+            y = 10000.0 - (SelectedTrigger.Y * 0.25);
+            return true;
+        }
+        if (SelectedMesh != null)
+        {
+            var verts = SelectedMesh.Vertices2D;
+            if (verts != null && verts.Count > 0)
+            {
+                x = verts.Average(p => p.X);
+                y = verts.Average(p => p.Y);
+                return true;
+            }
+        }
+        if (SelectedPath != null)
+        {
+            if (SelectedPath.Nodes != null && SelectedPath.Nodes.Count > 0)
+            {
+                // Prefer a node that is actually inside the current viewport if any
+                if (_scrollViewer != null)
+                {
+                    var left = _scrollViewer.Offset.X;
+                    var top = _scrollViewer.Offset.Y;
+                    var vpW = _scrollViewer.Viewport.Width / Math.Max(ZoomLevel, 0.0001);
+                    var vpH = _scrollViewer.Viewport.Height / Math.Max(ZoomLevel, 0.0001);
+                    var right = left + vpW;
+                    var bottom = top + vpH;
+                    var centerX = left + vpW / 2.0;
+                    var centerY = top + vpH / 2.0;
+
+                    var nodesWithCoords = SelectedPath.Nodes
+                        .Select(n => new { n, cx = 10000.0 + (n.X * 0.25), cy = 10000.0 - (n.Y * 0.25) })
+                        .ToList();
+
+                    var visibleNodes = nodesWithCoords
+                        .Where(p => p.cx >= left && p.cx <= right && p.cy >= top && p.cy <= bottom)
+                        .OrderBy(p => (p.cx - centerX) * (p.cx - centerX) + (p.cy - centerY) * (p.cy - centerY))
+                        .ToList();
+
+                    if (visibleNodes.Count > 0)
+                    {
+                        x = visibleNodes[0].cx;
+                        y = visibleNodes[0].cy;
+                        return true;
+                    }
+
+                    // Otherwise, pick the node nearest to viewport center (even if off-screen) so the arrow points to it
+                    var nearest = nodesWithCoords
+                        .OrderBy(p => (p.cx - centerX) * (p.cx - centerX) + (p.cy - centerY) * (p.cy - centerY))
+                        .First();
+                    x = nearest.cx;
+                    y = nearest.cy;
+                    return true;
+                }
+
+                // Fallback: centroid of nodes
+                var xs = SelectedPath.Nodes.Select(n => 10000.0 + (n.X * 0.25));
+                var ys = SelectedPath.Nodes.Select(n => 10000.0 - (n.Y * 0.25));
+                x = xs.Average();
+                y = ys.Average();
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void PanUp()
@@ -2516,7 +3373,7 @@ public class ZoneEditorViewModel : ViewModelBase
         }
     }
 
-    public void HandleMouseWheel(double delta, Avalonia.Point mousePosition)
+public void HandleMouseWheel(double delta, Avalonia.Point mousePosition)
     {
         var oldZoom = ZoomLevel;
         var zoomFactor = delta > 0 ? 1 + ZoomStep : 1 - ZoomStep;
@@ -2529,19 +3386,21 @@ public class ZoneEditorViewModel : ViewModelBase
             PanX = mousePosition.X - (mousePosition.X - PanX) * zoomRatio;
             PanY = mousePosition.Y - (mousePosition.Y - PanY) * zoomRatio;
             ZoomLevel = newZoom;
+            UpdateViewportIndicator();
         }
     }
 
-    public void HandleMouseDrag(double deltaX, double deltaY)
+public void HandleMouseDrag(double deltaX, double deltaY)
     {
         if (_scrollViewer != null)
         {
             var newOffset = _scrollViewer.Offset + new Vector(-deltaX, -deltaY);
             _scrollViewer.Offset = newOffset;
+            UpdateViewportIndicator();
         }
     }
 
-    public void UpdateCanvasTransform()
+public void UpdateCanvasTransform()
     {
         if (_zoneObjectCanvas?.Parent is Canvas mainCanvas)
         {
@@ -2549,6 +3408,9 @@ public class ZoneEditorViewModel : ViewModelBase
             var scaleTransform = new ScaleTransform(ZoomLevel, ZoomLevel);
             mainCanvas.RenderTransform = scaleTransform;
         }
+        
+        // Keep overlays in sync
+        UpdateViewportIndicator();
         
         // Update zoom display
         this.RaisePropertyChanged(nameof(ZoomDisplayText));
@@ -3100,20 +3962,8 @@ public class ZoneEditorViewModel : ViewModelBase
         
         if (path.Nodes == null || path.Nodes.Count < 2) return visuals;
         
-        // Use different colors for different paths
-        var pathColors = new[]
-        {
-            Avalonia.Media.Color.FromRgb(255, 255, 0),   // Yellow
-            Avalonia.Media.Color.FromRgb(0, 255, 255),   // Cyan  
-            Avalonia.Media.Color.FromRgb(255, 0, 255),   // Magenta
-            Avalonia.Media.Color.FromRgb(255, 165, 0),   // Orange
-            Avalonia.Media.Color.FromRgb(128, 255, 0),   // Lime
-            Avalonia.Media.Color.FromRgb(255, 20, 147),  // Deep pink
-            Avalonia.Media.Color.FromRgb(30, 144, 255),  // Dodger blue
-            Avalonia.Media.Color.FromRgb(255, 69, 0)     // Red orange
-        };
-        
-        var pathColor = pathColors[(int)(path.PathId % (ulong)pathColors.Length)];
+        // Uniform color for all paths
+        var pathColor = PathBaseColor;
         
         // Create line segments connecting consecutive nodes
         for (int i = 0; i < path.Nodes.Count - 1; i++)
@@ -3132,7 +3982,7 @@ public class ZoneEditorViewModel : ViewModelBase
             {
                 StartPoint = new Avalonia.Point(fromX, fromY),
                 EndPoint = new Avalonia.Point(toX, toY),
-                Stroke = new SolidColorBrush(pathColor),
+                Stroke = PathBaseBrush,
                 StrokeThickness = 2,
                 IsHitTestVisible = true,
                 Tag = new PathLineTag { Path = path, IsArrow = false } // Custom tag for path components
@@ -3156,7 +4006,7 @@ public class ZoneEditorViewModel : ViewModelBase
             visuals.Add(pathLine);
             
             // Create directional arrow at the end of each segment
-            var arrowVisual = CreateArrowHead(fromX, fromY, toX, toY, pathColor);
+            var arrowVisual = CreateArrowHead(fromX, fromY, toX, toY, PathBaseColor);
             if (arrowVisual != null)
             {
                 // Set the correct path reference for the arrow
@@ -4182,8 +5032,13 @@ public class ZoneEditorViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(CurrentScale));
         this.RaisePropertyChanged(nameof(SelectedTemplate));
 
-        // Refresh drop table existence on any selection change
+// Refresh drop table existence on any selection change
         _ = RefreshDropTableCacheAsync();
+
+// Update highlight visuals on selection change
+        UpdateVisualSelection();
+        // Update off-screen arrow indicator
+        UpdateViewportIndicator();
     }
     
     /// <summary>

@@ -18,6 +18,7 @@ modification, are permitted provided that the following conditions are met:
    this software without specific prior written permission.
 */
 
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -63,6 +64,12 @@ public partial class ZoneEditorView : UserControl
             if (scrollViewer != null)
             {
                 viewModel.SetScrollViewer(scrollViewer);
+
+// React to scroll changes to update viewport indicator
+                scrollViewer.ScrollChanged += (s, _) =>
+                {
+                    viewModel.UpdateViewportIndicator();
+                };
                 
                 // Initialize viewport and zoom after everything is loaded
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -73,7 +80,15 @@ public partial class ZoneEditorView : UserControl
                     viewModel.InitializeViewportCenter();
                     // Rebuild visuals to ensure they are present on re-entry
                     viewModel.RebuildSceneVisuals();
+                    // Initial indicator update
+                    viewModel.UpdateViewportIndicator();
                 }, Avalonia.Threading.DispatcherPriority.Background);
+            }
+
+            var overlay = this.FindControl<Canvas>("ViewportOverlay");
+            if (overlay != null)
+            {
+                viewModel.SetOverlayCanvas(overlay);
             }
         }
         
