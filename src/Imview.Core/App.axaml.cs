@@ -13,7 +13,9 @@ public partial class App : Application {
 
     public override void OnFrameworkInitializationCompleted() {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) {
-            ShowLoginWindow(desktop);
+            // Start directly with the main window (splash) — login popup deferred for later use
+            desktop.MainWindow = new MainWindow();
+            desktop.MainWindow.Show();
         }
 
         base.OnFrameworkInitializationCompleted();

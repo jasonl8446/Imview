@@ -80,6 +80,13 @@ public class ZoneEditorViewModel : ViewModelBase
     private WizZoneTriggers? _currentTriggerData = null;
     private NifGeometryProcessor? _nifProcessor = null;
     private bool _isLoading = false;
+
+    // Track whether we've already auto-prompted for zone selection for this tab instance
+    private bool _autoPromptedZoneSelection = false;
+
+    // World database availability
+    private bool _isWorldDatabaseReady = false;
+    private string _worldDatabaseStatusText = string.Empty;
     private bool _showCollisions = true;
     private bool _showZoneObjects = true;
     private bool _showNifGeometry = true;
@@ -183,6 +190,19 @@ private Canvas? _zoneObjectCanvas = null;
         }, Avalonia.Threading.DispatcherPriority.Loaded);
         
         LoadAvailableZones();
+
+        // Check world database availability at startup
+        _ = System.Threading.Tasks.Task.Run(CheckWorldDatabaseAvailabilityAsync);
+
+        // Auto-prompt for zone selection on first open of a brand new Zone Editor tab
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!_autoPromptedZoneSelection && string.IsNullOrEmpty(SelectedZone))
+            {
+                _autoPromptedZoneSelection = true;
+                LoadZone();
+            }
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
     }
 
     public ObservableCollection<string> Zones { get; }
@@ -234,12 +254,16 @@ private Canvas? _zoneObjectCanvas = null;
                 SelectedMesh = null;
                 SelectedVolume = null;
                 SelectedTrigger = null;
+                // Important: clear any lingering spawn selection so its panel doesn't remain visible
+                SelectedSpawn = null;
+                SelectedSpawnTemplate = null;
             }
             
             // Notify property changes
             this.RaisePropertyChanged(nameof(HasSelectedObject));
             this.RaisePropertyChanged(nameof(HasSelectedAnyObject));
             this.RaisePropertyChanged(nameof(IsSelectedObjectNpc));
+            this.RaisePropertyChanged(nameof(HasSelectedSpawn));
             NotifySelectionChanged();
             
             // Update visual selection in the viewport
@@ -288,6 +312,10 @@ private Canvas? _zoneObjectCanvas = null;
             this.RaisePropertyChanged(nameof(SelectedTemplateLootTables));
             this.RaisePropertyChanged(nameof(HasLootTables));
             this.RaisePropertyChanged(nameof(SelectedTemplateLootTableItems));
+
+            // Update dependent visibility properties
+            this.RaisePropertyChanged(nameof(ShowSpawnDeckSection));
+            this.RaisePropertyChanged(nameof(ShowSpawnLootTablesSection));
             
             // Ensure drop table cache is loaded so labels can reflect existence
             _ = EnsureDropTableCacheAsync();
@@ -1378,6 +1406,27 @@ private Canvas? _zoneObjectCanvas = null;
 
     public string ZoomDisplayText => $"Zoom: {ZoomLevel:P0}";
 
+    // World database gating properties
+    public bool IsWorldDatabaseReady {
+        get => _isWorldDatabaseReady;
+        private set {
+            this.RaiseAndSetIfChanged(ref _isWorldDatabaseReady, value);
+            this.RaisePropertyChanged(nameof(NotWorldDatabaseReady));
+            this.RaisePropertyChanged(nameof(ShowSpawnDeckSection));
+            this.RaisePropertyChanged(nameof(ShowSpawnLootTablesSection));
+            this.RaisePropertyChanged(nameof(ShowNpcDbActions));
+        }
+    }
+    public bool NotWorldDatabaseReady => !IsWorldDatabaseReady;
+    public string WorldDatabaseStatusText {
+        get => _worldDatabaseStatusText;
+        private set => this.RaiseAndSetIfChanged(ref _worldDatabaseStatusText, value);
+    }
+
+    public bool ShowSpawnDeckSection => HasSpawnDeck && IsWorldDatabaseReady;
+    public bool ShowSpawnLootTablesSection => HasSpawnLootTables && IsWorldDatabaseReady;
+    public bool ShowNpcDbActions => IsSelectedObjectNpc && IsWorldDatabaseReady;
+
     // Expose Vector3 components for XAML binding (Zone Objects)
     public float LocationX => SelectedCoreObject?.m_location.X ?? 0f;
     public float LocationY => SelectedCoreObject?.m_location.Y ?? 0f;  
@@ -1634,6 +1683,38 @@ public void SetScrollViewer(ScrollViewer scrollViewer)
             .WithDuration(TimeSpan.FromSeconds(3))
             .Send();
         return null;
+    }
+
+    private async System.Threading.Tasks.Task CheckWorldDatabaseAvailabilityAsync()
+    {
+        try
+        {
+            // Check certificate presence
+            var certPathSetting = Imview.Core.Common.ConfigurationManager.Settings["Database.WorldDatabaseCertificatePath"].AsString();
+            bool hasCert = false;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(certPathSetting))
+                {
+                    var absolutePath = System.IO.Path.GetFullPath(certPathSetting);
+                    hasCert = System.IO.File.Exists(absolutePath);
+                }
+            }
+            catch { hasCert = false; }
+
+            // Test connection
+            var connected = await Imview.Core.Services.DatabaseConfigService.TestDatabaseConnectionAsync();
+
+            IsWorldDatabaseReady = hasCert && connected;
+            WorldDatabaseStatusText = IsWorldDatabaseReady
+                ? string.Empty
+                : (hasCert ? "Database could not be reached." : "Missing worlddata certificate.");
+        }
+        catch
+        {
+            IsWorldDatabaseReady = false;
+            WorldDatabaseStatusText = "Database could not be reached.";
+        }
     }
 
     private void SaveZone()

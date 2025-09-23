@@ -1232,7 +1232,9 @@
                                         <StackPanel Margin="0,8,0,0" IsVisible="{Binding IsSelectedObjectNpc}">
                                             <TextBlock Text="NPC Database Actions" FontSize="11" FontWeight="Bold" 
                                                      Foreground="#4CAF50" Margin="0,0,0,8"/>
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+
+                                            <!-- Actions only when DB is available -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4" IsVisible="{Binding IsWorldDatabaseReady}">
                                                 <Button Content="Edit Inventory" 
                                                         Command="{Binding EditNpcInventoryCommand}"
                                                         Height="30" Width="120"
@@ -1261,11 +1263,14 @@
                                                     </Button.Styles>
                                                 </Button>
                                             </StackPanel>
-                                            <TextBlock Text="Requires database authority and connection" 
+
+                                            <!-- Fallback status when DB not available -->
+                                            <TextBlock Text="{Binding WorldDatabaseStatusText}"
                                                      FontSize="8" 
                                                      Foreground="#888888" 
                                                      FontStyle="Italic"
-                                                     Margin="0,4,0,0"/>
+                                                     Margin="0,4,0,0"
+                                                     IsVisible="{Binding NotWorldDatabaseReady}"/>
                                         </StackPanel>
                                         
                                         <!-- Loot Tables -->
@@ -1315,12 +1320,6 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                             
-                                            <TextBlock Text="Loot tables listed in the template's m_lootTable property. Use the buttons to view or create drop tables in the Drop Table Editor." 
-                                                     FontSize="8" 
-                                                     Foreground="#888888" 
-                                                     FontStyle="Italic"
-                                                     TextWrapping="Wrap"
-                                                     Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
                                     
@@ -1958,8 +1957,9 @@
                                         <StackPanel Margin="0,8,0,0" IsVisible="{Binding HasSpawnDeck}">
                                             <TextBlock Text="Creature Spell Deck:" FontSize="11" FontWeight="Bold" 
                                                      Foreground="#8A2BE2" Margin="0,0,0,8"/>
-                                            
-                                            <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#8A2BE2" BorderThickness="1">
+
+                                            <!-- Deck editor only when DB available -->
+                                            <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#8A2BE2" BorderThickness="1" IsVisible="{Binding IsWorldDatabaseReady}">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
@@ -1982,17 +1982,15 @@
                                                     </Button>
                                                 </Grid>
                                             </Border>
-                                            
-                                            <TextBlock Text="This creature has a spell deck that can be edited for dueling encounters." 
-                                                     FontSize="8" Foreground="#888888" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
 
-                                        <!-- Loot Tables for Spawn Template -->
+                                                    <!-- Loot Tables for Spawn Template -->
                                         <StackPanel Margin="0,8,0,0" IsVisible="{Binding HasSpawnLootTables}">
                                             <TextBlock Text="{Binding SelectedSpawnTemplateLootTables.Count, StringFormat='Loot Tables ({0}):'}" FontSize="11" FontWeight="Bold" 
                                                      Foreground="#FF6B35" Margin="0,0,0,8"/>
                                             
-                                            <ItemsControl ItemsSource="{Binding SelectedSpawnTemplateLootTableItems}">
+                                            <!-- Only show when DB available -->
+                                            <ItemsControl ItemsSource="{Binding SelectedSpawnTemplateLootTableItems}" IsVisible="{Binding IsWorldDatabaseReady}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border Background="#2A2A2A" Margin="0,2" Padding="8,4" CornerRadius="3" BorderBrush="#FF6B35" BorderThickness="1">
@@ -2021,12 +2019,14 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
-                                            
-                                            <TextBlock Text="Use the buttons to view or create drop tables in the Drop Table Editor." 
-                                                     FontSize="8" Foreground="#888888" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
+
+                                            <!-- Fallback status when DB not available -->
+                                            <TextBlock Text="{Binding WorldDatabaseStatusText}" 
+                                                     FontSize="8" Foreground="#888888" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                     IsVisible="{Binding NotWorldDatabaseReady}"/>
                                         </StackPanel>
+
                                     </StackPanel>
-                                </StackPanel>
 
                                 <!-- Loading Message while SelectedSpawnTemplate is null -->
                                 <StackPanel IsVisible="{Binding SelectedSpawnTemplate, Converter={x:Static ObjectConverters.IsNull}}">
@@ -2058,6 +2058,7 @@
                                 </StackPanel>
                             </StackPanel>
 
+                        </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
