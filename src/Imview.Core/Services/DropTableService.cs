@@ -58,6 +58,10 @@ public class DropTableService {
             Weight = 100,
             NoneChance = 0.0,
             PityCounter = 0.0,
+            MinGold = 0,
+            MaxGold = 0,
+            ExperienceAmount = 0,
+            TrainingPoints = 0,
             Items = new List<DropItem>()
         };
 
@@ -158,6 +162,34 @@ public class DropTableService {
 
         if (dropTable.PityCounter < 0) {
             errors.Add("Pity counter must be non-negative.");
+        }
+
+        if (dropTable.MinGold < 0) {
+            errors.Add("Min gold must be non-negative.");
+        }
+
+        if (dropTable.MaxGold < 0) {
+            errors.Add("Max gold must be non-negative.");
+        }
+
+        if (dropTable.MinGold > dropTable.MaxGold && dropTable.MaxGold > 0) {
+            errors.Add("Min gold cannot be greater than max gold.");
+        }
+
+        if (dropTable.ExperienceAmount < 0) {
+            errors.Add("Experience amount must be non-negative.");
+        }
+
+        if (dropTable.TrainingPoints < 0) {
+            errors.Add("Training points must be non-negative.");
+        }
+
+        bool hasRewards = dropTable.MinGold > 0 || dropTable.MaxGold > 0 || 
+                          dropTable.ExperienceAmount > 0 || dropTable.TrainingPoints > 0 || 
+                          dropTable.Items.Count > 0;
+
+        if (!hasRewards) {
+            errors.Add("Drop table must have at least one reward (gold, XP, training points, or items).");
         }
 
         for (int i = 0; i < dropTable.Items.Count; i++) {

@@ -134,6 +134,8 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Spacing="5" Margin="0,0,10,0">
@@ -184,6 +186,54 @@
                                                   Background="#444444"
                                                   Foreground="White"/>
                                 </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="0" Spacing="5" Margin="0,10,10,0">
+                                    <TextBlock Text="Min Gold:" 
+                                              Foreground="White"
+                                              ToolTip.Tip="Minimum gold amount awarded. For quest rewards, set this equal to Max Gold for a fixed amount."/>
+                                    <NumericUpDown Value="{Binding MinGold}"
+                                                  Minimum="0"
+                                                  Maximum="999999999"
+                                                  FormatString="N0"
+                                                  Background="#444444"
+                                                  Foreground="White"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="5" Margin="10,10,0,0">
+                                    <TextBlock Text="Max Gold:" 
+                                              Foreground="White"
+                                              ToolTip.Tip="Maximum gold amount awarded. For quest rewards, set this equal to Min Gold for a fixed amount."/>
+                                    <NumericUpDown Value="{Binding MaxGold}"
+                                                  Minimum="0"
+                                                  Maximum="999999999"
+                                                  FormatString="N0"
+                                                  Background="#444444"
+                                                  Foreground="White"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="3" Grid.Column="0" Spacing="5" Margin="0,10,10,0">
+                                    <TextBlock Text="Experience Amount:" 
+                                              Foreground="White"
+                                              ToolTip.Tip="Fixed amount of experience points awarded from this drop table."/>
+                                    <NumericUpDown Value="{Binding ExperienceAmount}"
+                                                  Minimum="0"
+                                                  Maximum="999999999"
+                                                  FormatString="N0"
+                                                  Background="#444444"
+                                                  Foreground="White"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="5" Margin="10,10,0,0">
+                                    <TextBlock Text="Training Points:" 
+                                              Foreground="White"
+                                              ToolTip.Tip="Fixed number of training points awarded from this drop table."/>
+                                    <NumericUpDown Value="{Binding TrainingPoints}"
+                                                  Minimum="0"
+                                                  Maximum="999"
+                                                  FormatString="N0"
+                                                  Background="#444444"
+                                                  Foreground="White"/>
+                                </StackPanel>
                             </Grid>
 
                             <!-- Action Buttons -->
@@ -202,9 +252,18 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Reward Summary -->
+                        <Border Background="#2A2A2A" CornerRadius="4" Padding="15" Margin="0,10,0,0"
+                               IsVisible="{Binding RewardSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Rewards Summary:" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="{Binding RewardSummary}" Foreground="#CCCCCC" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Items Table -->
                         <StackPanel Spacing="10">
-                            <TextBlock Text="Drop Items"
+                            <TextBlock Text="Drop Items (Optional)"
                                       FontSize="16"
                                       FontWeight="Bold"
                                       Foreground="White"/>
@@ -219,8 +278,8 @@
                                     <ColumnDefinition Width="80"/>
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0" Text="Item ID" FontWeight="Bold" Foreground="White" Padding="5"/>
-                                <TextBlock Grid.Column="1" Text="Item Name" FontWeight="Bold" Foreground="White" Padding="5"/>
+                                <TextBlock Grid.Column="0" Text="Item ID (Optional)" FontWeight="Bold" Foreground="White" Padding="5"/>
+                                <TextBlock Grid.Column="1" Text="Item Name (Optional)" FontWeight="Bold" Foreground="White" Padding="5"/>
                                 <TextBlock Grid.Column="2" Text="Notes" FontWeight="Bold" Foreground="White" Padding="5"/>
                                 <TextBlock Grid.Column="3" Text="Requirements" FontWeight="Bold" Foreground="White" Padding="5"/>
                                 <TextBlock Grid.Column="4" Text="Actions" FontWeight="Bold" Foreground="White" Padding="5"/>
@@ -289,10 +348,11 @@
                                    CornerRadius="4" 
                                    Padding="10"
                                    IsVisible="{Binding Items.Count, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=0}">
-                                <TextBlock Text="No items in this drop table. Click 'Add Item' to get started."
+                                <TextBlock Text="No items in this drop table. Items are optional - you can use gold, XP, and training points only. Click 'Add Item' to add items."
                                           Foreground="#CCCCCC"
                                           FontStyle="Italic"
-                                          HorizontalAlignment="Center"/>
+                                          HorizontalAlignment="Center"
+                                          TextWrapping="Wrap"/>
                             </Border>
                         </StackPanel>
                     </StackPanel>

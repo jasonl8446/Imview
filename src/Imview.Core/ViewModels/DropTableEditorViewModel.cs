@@ -110,6 +110,82 @@ public class DropTableEditorViewModel : ViewModelBase {
         }
     }
 
+    public int MinGold {
+        get => _selectedDropTable?.MinGold ?? 0;
+        set {
+            if (_selectedDropTable != null) {
+                _selectedDropTable.MinGold = Math.Max(0, value);
+                this.RaisePropertyChanged();
+                this.RaisePropertyChanged(nameof(RewardSummary));
+            }
+        }
+    }
+
+    public int MaxGold {
+        get => _selectedDropTable?.MaxGold ?? 0;
+        set {
+            if (_selectedDropTable != null) {
+                _selectedDropTable.MaxGold = Math.Max(0, value);
+                this.RaisePropertyChanged();
+                this.RaisePropertyChanged(nameof(RewardSummary));
+            }
+        }
+    }
+
+    public int ExperienceAmount {
+        get => _selectedDropTable?.ExperienceAmount ?? 0;
+        set {
+            if (_selectedDropTable != null) {
+                _selectedDropTable.ExperienceAmount = Math.Max(0, value);
+                this.RaisePropertyChanged();
+                this.RaisePropertyChanged(nameof(RewardSummary));
+            }
+        }
+    }
+
+    public int TrainingPoints {
+        get => _selectedDropTable?.TrainingPoints ?? 0;
+        set {
+            if (_selectedDropTable != null) {
+                _selectedDropTable.TrainingPoints = Math.Max(0, value);
+                this.RaisePropertyChanged();
+                this.RaisePropertyChanged(nameof(RewardSummary));
+            }
+        }
+    }
+
+    public string RewardSummary {
+        get {
+            if (_selectedDropTable == null) return string.Empty;
+            
+            var parts = new List<string>();
+            
+            if (_selectedDropTable.MinGold > 0 || _selectedDropTable.MaxGold > 0) {
+                if (_selectedDropTable.MinGold == _selectedDropTable.MaxGold) {
+                    parts.Add($"{_selectedDropTable.MinGold} gold");
+                } else {
+                    parts.Add($"{_selectedDropTable.MinGold}-{_selectedDropTable.MaxGold} gold");
+                }
+            }
+            
+            if (_selectedDropTable.ExperienceAmount > 0) {
+                parts.Add($"{_selectedDropTable.ExperienceAmount} XP");
+            }
+            
+            if (_selectedDropTable.TrainingPoints > 0) {
+                parts.Add($"{_selectedDropTable.TrainingPoints} training points");
+            }
+            
+            if (_selectedDropTable.Items.Count > 0) {
+                parts.Add($"{_selectedDropTable.Items.Count} items");
+            }
+            
+            return parts.Count > 0 
+                ? $"This table gives: {string.Join(", ", parts)}"
+                : "This table gives no rewards";
+        }
+    }
+
     public ICommand CreateTableCommand { get; }
     public ICommand DeleteTableCommand { get; }
     public ICommand SaveTableCommand { get; }
@@ -300,6 +376,11 @@ public class DropTableEditorViewModel : ViewModelBase {
         this.RaisePropertyChanged(nameof(Weight));
         this.RaisePropertyChanged(nameof(NoneChance));
         this.RaisePropertyChanged(nameof(PityCounter));
+        this.RaisePropertyChanged(nameof(MinGold));
+        this.RaisePropertyChanged(nameof(MaxGold));
+        this.RaisePropertyChanged(nameof(ExperienceAmount));
+        this.RaisePropertyChanged(nameof(TrainingPoints));
+        this.RaisePropertyChanged(nameof(RewardSummary));
     }
 
     private void UpdateTableFromItems() {
