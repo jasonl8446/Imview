@@ -57,6 +57,10 @@ public static class DropTableCollection {
                 existing.Items = dropTable.Items;
                 existing.ModifiedAt = DateTime.UtcNow;
                 existing.ModifiedBy = Environment.UserName;
+                existing.MinGold = dropTable.MinGold;
+                existing.MaxGold = dropTable.MaxGold;
+                existing.ExperienceAmount = dropTable.ExperienceAmount;
+                existing.TrainingPoints = dropTable.TrainingPoints;
             } else {
                 // Create new
                 dropTable.Id = id;
@@ -64,10 +68,16 @@ public static class DropTableCollection {
                 dropTable.CreatedBy = Environment.UserName;
                 dropTable.ModifiedAt = DateTime.UtcNow;
                 dropTable.ModifiedBy = Environment.UserName;
-                
+                dropTable.PityCounter = dropTable.PityCounter;
+                dropTable.Items = dropTable.Items;
+                dropTable.MinGold = dropTable.MinGold;
+                dropTable.MaxGold = dropTable.MaxGold;
+                dropTable.ExperienceAmount = dropTable.ExperienceAmount;
+                dropTable.TrainingPoints = dropTable.TrainingPoints;
+
                 await session.StoreAsync(dropTable, id);
             }
-            
+
             await session.SaveChangesAsync();
             return id;
         }
