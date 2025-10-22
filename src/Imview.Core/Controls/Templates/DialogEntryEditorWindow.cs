@@ -717,8 +717,8 @@ public class DialogEntryEditorWindow : Window {
 
     private static NumericUpDown CreateFloatNumericUpDown() {
         return new NumericUpDown {
-            Minimum = -9999,
-            Maximum = 9999,
+            Minimum = decimal.MinValue,
+            Maximum = decimal.MaxValue,
             Value = 0,
             Increment = 0.1m,
             FormatString = "F2"
