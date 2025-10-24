@@ -187,14 +187,6 @@
                                     FontSize="13"
                                     FontWeight="Medium"
                                     Margin="0,0,15,10"/>
-
-                            <Button Content="Configure Database &amp; Client Files"
-                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[2].FifthButtonCommand}"
-                                    Width="250"
-                                    Height="38"
-                                    FontSize="13"
-                                    FontWeight="Medium"
-                                    Margin="0,0,15,10"/>
                         </WrapPanel>
                     </StackPanel>
                 </Border>
@@ -230,6 +222,22 @@
                             <Button Content="Unpack KIWADs"
                                     Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[3].SecondButtonCommand}"
                                     Width="150"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
+                                    
+                            <Button Content="View WAD Files"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[3].ThirdButtonCommand}"
+                                    Width="140"
+                                    Height="38"
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Margin="0,0,15,10"/>
+                                    
+                            <Button Content="Configure Database &amp; Client Files"
+                                    Command="{Binding $parent[UserControl].((vm:SplashPageViewModel)DataContext).Sections[3].FourthButtonCommand}"
+                                    Width="250"
                                     Height="38"
                                     FontSize="13"
                                     FontWeight="Medium"

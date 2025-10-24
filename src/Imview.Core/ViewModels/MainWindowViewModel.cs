@@ -333,6 +333,14 @@ public class MainWindowViewModel : ViewModelBase {
     }
 
     /// <summary>
+    /// Opens the WAD Viewer in a new tab.
+    /// </summary>
+    public void ShowWadViewer() {
+        var tab = TabManager.AddTab("WAD Viewer", new WadViewerViewModel(this));
+        TabManager.SelectTab(tab);
+    }
+
+    /// <summary>
     /// Shows the client file download dialog.
     /// </summary>
     public void ShowClientFileDownload() {

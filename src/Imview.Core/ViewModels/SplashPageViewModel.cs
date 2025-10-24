@@ -134,12 +134,12 @@ public class SplashPageViewModel : ViewModelBase {
                 "Get Quests From Packet Capture",
                 "Edit Zone",
                 "Download WAD Files",
-                "Configure Database & Client Files",
+                "",
                 _mainViewModel.ShowQuestBrowser,
                 _mainViewModel.GetQuestsFromPacketCapture,
                 _mainViewModel.ShowZoneEditor,
                 _mainViewModel.ShowClientFileDownload,
-                _mainViewModel.ShowDatabaseAndClientConfig),
+                null),
             new SplashSectionViewModel(
                 "",
                 "General",
@@ -148,13 +148,13 @@ public class SplashPageViewModel : ViewModelBase {
                 "#888888",
                 "Analyze Object Property Blob",
                 "Unpack KIWADs",
-                "",
-                "",
+                "View WAD Files",
+                "Configure Database & Client Files",
                 "",
                 _mainViewModel.AnalyzeObjectPropertyBlob,
                 () => _mainViewModel.UnpackKiwad(false),
-                null,
-                null,
+                _mainViewModel.ShowWadViewer,
+                _mainViewModel.ShowDatabaseAndClientConfig,
                 null)
         ];
     }

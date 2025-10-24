@@ -1,0 +1,254 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Imview.Core.ViewModels"
+             xmlns:models="clr-namespace:Imview.Core.Models"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="Imview.Core.Views.WadViewerView"
+             x:DataType="vm:WadViewerViewModel">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" 
+                Background="#2D2D30" 
+                BorderBrush="#3F3F46" 
+                BorderThickness="0,0,0,1" 
+                Padding="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Load/Refresh Buttons -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                    <Button Content="Load WAD" 
+                            Command="{Binding LoadWadCommand}"
+                            Classes="accent"
+                            IsEnabled="{Binding !IsLoading}" />
+                    
+                    <Button Content="Refresh" 
+                            Command="{Binding RefreshCommand}"
+                            IsEnabled="{Binding HasWadLoaded}"
+                            IsVisible="{Binding HasWadLoaded}" />
+                </StackPanel>
+
+                <!-- WAD Info -->
+                <StackPanel Grid.Column="1" 
+                           Orientation="Horizontal" 
+                           HorizontalAlignment="Center"
+                           Spacing="20"
+                           IsVisible="{Binding HasWadLoaded}">
+                    <TextBlock Text="{Binding WadInfo.FileName}" 
+                              FontWeight="Bold" 
+                              Foreground="White" />
+                    <TextBlock Text="{Binding WadInfo.TotalFiles, StringFormat='{}{0} files'}" 
+                              Foreground="#CCCCCC" />
+                    <TextBlock Text="{Binding WadInfo.TotalSizeFormatted}" 
+                              Foreground="#CCCCCC" />
+                </StackPanel>
+
+                <!-- Loading Indicator -->
+                <StackPanel Grid.Column="2" 
+                           Orientation="Horizontal" 
+                           Spacing="10"
+                           IsVisible="{Binding IsLoading}">
+                    <TextBlock Text="Loading..." 
+                              Foreground="#CCCCCC" 
+                              VerticalAlignment="Center" />
+                    <Border Width="16" Height="16" 
+                           Background="Transparent"
+                           VerticalAlignment="Center">
+                        <!-- Simple loading animation placeholder -->
+                        <Ellipse Width="12" Height="12" 
+                                Fill="#007ACC"
+                                Opacity="0.8" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" IsVisible="{Binding HasWadLoaded}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="400" MinWidth="200" MaxWidth="600" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="300" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Panel - File Tree -->
+            <Border Grid.Column="0" 
+                    Background="#1E1E1E" 
+                    BorderBrush="#3F3F46" 
+                    BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Tree Header -->
+                    <Border Grid.Row="0" 
+                            Background="#2D2D30" 
+                            BorderBrush="#3F3F46" 
+                            BorderThickness="0,0,0,1" 
+                            Padding="10,5">
+                        <TextBlock Text="Files" 
+                                  FontWeight="Bold" 
+                                  Foreground="White" />
+                    </Border>
+
+                    <!-- Tree View -->
+                    <TreeView Grid.Row="1" 
+                             ItemsSource="{Binding TreeNodes}"
+                             SelectedItem="{Binding SelectedNode}"
+                             Background="Transparent"
+                             Padding="5">
+                        
+                        <TreeView.DataTemplates>
+                            <TreeDataTemplate DataType="models:WadTreeNode" ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <!-- Icon -->
+                                    <TextBlock Text="{Binding IsFolder, Converter={x:Static vm:WadViewerViewModel.FolderIconConverter}}"
+                                              FontFamily="Segoe MDL2 Assets"
+                                              Foreground="{Binding IsFolder, Converter={x:Static vm:WadViewerViewModel.IconColorConverter}}"
+                                              VerticalAlignment="Center" />
+                                    
+                                    <!-- File/Folder Name -->
+                                    <TextBlock Text="{Binding Name}" 
+                                              Foreground="White"
+                                              VerticalAlignment="Center" />
+                                    
+                                    <!-- File Size -->
+                                    <TextBlock Text="{Binding FileSizeFormatted}" 
+                                              Foreground="#888888"
+                                              FontSize="11"
+                                              VerticalAlignment="Center"
+                                              IsVisible="{Binding IsFile}" />
+                                </StackPanel>
+                            </TreeDataTemplate>
+                        </TreeView.DataTemplates>
+                    </TreeView>
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" 
+                         Width="4" 
+                         Background="#3F3F46" 
+                         ResizeDirection="Columns" />
+
+            <!-- Right Panel - File Content -->
+            <Border Grid.Column="2" 
+                    Background="#1E1E1E">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Content Header -->
+                    <Border Grid.Row="0" 
+                            Background="#2D2D30" 
+                            BorderBrush="#3F3F46" 
+                            BorderThickness="0,0,0,1" 
+                            Padding="10,5"
+                            IsVisible="{Binding FileContent.FileName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding FileContent.FileName}" 
+                                          FontWeight="Bold" 
+                                          Foreground="White" />
+                                <TextBlock Text="{Binding FileContent.FileSizeFormatted}" 
+                                          Foreground="#CCCCCC" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding FileContent.ContentTypeDescription}" 
+                                          FontSize="11"
+                                          Foreground="#888888" />
+                                <Border Background="#007ACC" 
+                                       CornerRadius="3" 
+                                       Padding="4,2"
+                                       IsVisible="{Binding FileContent.IsDeserialized}">
+                                    <TextBlock Text="DESERIALIZED" 
+                                              FontSize="10" 
+                                              FontWeight="Bold"
+                                              Foreground="White" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Content Display -->
+                    <ScrollViewer Grid.Row="1" 
+                                 HorizontalScrollBarVisibility="Auto" 
+                                 VerticalScrollBarVisibility="Auto">
+                        <TextBox Text="{Binding FileContent.Content}" 
+                                IsReadOnly="True"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="White"
+                                FontFamily="Consolas, Monaco, 'Courier New', monospace"
+                                FontSize="12"
+                                Padding="10"
+                                TextWrapping="NoWrap"
+                                AcceptsReturn="True"
+                                IsVisible="{Binding FileContent.Content, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </ScrollViewer>
+
+                    <!-- No File Selected Message -->
+                    <Border Grid.Row="1" 
+                           Background="Transparent"
+                           IsVisible="{Binding FileContent.FileName, Converter={x:Static StringConverters.IsNullOrEmpty}}">
+                        <TextBlock Text="Select a file to view its contents" 
+                                  HorizontalAlignment="Center" 
+                                  VerticalAlignment="Center"
+                                  Foreground="#888888"
+                                  FontStyle="Italic" />
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- No WAD Loaded Message -->
+        <Border Grid.Row="1" 
+               Background="#1E1E1E"
+               IsVisible="{Binding !HasWadLoaded}">
+            <StackPanel HorizontalAlignment="Center" 
+                       VerticalAlignment="Center" 
+                       Spacing="20">
+                <TextBlock Text="No WAD file loaded" 
+                          FontSize="18" 
+                          HorizontalAlignment="Center"
+                          Foreground="#888888" />
+                <Button Content="Load WAD File" 
+                       Command="{Binding LoadWadCommand}"
+                       Classes="accent"
+                       IsEnabled="{Binding !IsLoading}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" 
+                Background="#007ACC" 
+                Padding="10,5">
+            <TextBlock Text="{Binding StatusText}" 
+                      Foreground="White" 
+                      FontSize="12" />
+        </Border>
+    </Grid>
+</UserControl>

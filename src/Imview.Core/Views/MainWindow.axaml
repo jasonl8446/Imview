@@ -102,6 +102,9 @@
                             <DataTemplate DataType="{x:Type vm:DropTableEditorViewModel}">
                                 <views:DropTableEditorView />
                             </DataTemplate>
+                            <DataTemplate DataType="{x:Type vm:WadViewerViewModel}">
+                                <views:WadViewerView />
+                            </DataTemplate>
                         </ContentControl.DataTemplates>
                     </ContentControl>
                 </DataTemplate>
