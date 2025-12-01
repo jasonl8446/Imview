@@ -139,13 +139,17 @@ public class DatabaseConfigViewModel : ViewModelBase {
             var originalUrl = ConfigurationManager.Settings["Database.WorldDatabaseUrl"].AsString();
             var originalName = ConfigurationManager.Settings["Database.WorldDatabaseName"].AsString();
             var originalCert = ConfigurationManager.Settings["Database.WorldDatabaseCertificatePath"].AsString();
-
+ 
             // Set test configuration
             ConfigurationManager.SetSetting("Database.WorldDatabaseUrl", DatabaseUrl);
             ConfigurationManager.SetSetting("Database.WorldDatabaseName", DatabaseName);
             ConfigurationManager.SetSetting("Database.WorldDatabaseCertificatePath", CertificatePath);
-
-            // Test the connection
+ 
+            // Re-initialize the RavenDB store so it picks up the temporary configuration,
+            // including the selected certificate.
+            WorldDatabase.Instance.ReinitializeStore();
+ 
+            // Test the connection using the updated configuration
             var store = WorldDatabase.Instance.Store;
             if (store != null) {
                 using var session = store.OpenAsyncSession();
@@ -158,11 +162,15 @@ public class DatabaseConfigViewModel : ViewModelBase {
                 ConnectionStatus = "Failed to create database connection.";
                 ConnectionStatusColor = Brushes.Red;
             }
-
+ 
             // Restore original configuration
             ConfigurationManager.SetSetting("Database.WorldDatabaseUrl", originalUrl ?? "");
             ConfigurationManager.SetSetting("Database.WorldDatabaseName", originalName ?? "WorldDB");
             ConfigurationManager.SetSetting("Database.WorldDatabaseCertificatePath", originalCert ?? "");
+ 
+            // Re-initialize the RavenDB store again so it returns to using the
+            // original configuration values after testing.
+            WorldDatabase.Instance.ReinitializeStore();
         }
         catch (Exception ex) {
             ConnectionStatus = $"Connection failed: {ex.Message}";

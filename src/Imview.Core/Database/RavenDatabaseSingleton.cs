@@ -53,7 +53,18 @@ public abstract class RavenDatabaseSingleton<T> where T : RavenDatabaseSingleton
     // Create the store if it doesn't exist, otherwise return the existing store.
     protected IDocumentStore? _store;
     public IDocumentStore? Store => _store ??= CreateStore();
-
+ 
+    /// <summary>
+    /// Disposes the current document store (if any) so that a new one will be
+    /// created on the next access using the latest configuration values.
+    /// </summary>
+    public void ReinitializeStore() {
+        if (_store != null) {
+            _store.Dispose();
+            _store = null;
+        }
+    }
+ 
     protected virtual IDocumentStore? CreateStore() {
         if (string.IsNullOrEmpty(Url)) {
             Console.WriteLine("No database URL configured.");

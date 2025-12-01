@@ -19,16 +19,20 @@ modification, are permitted provided that the following conditions are met:
 */
 
 using Imview.Core.Common;
-
-namespace Imview.Core.Database;
-
-public class WorldDatabase : RavenDatabaseSingleton<WorldDatabase> {
-
-    protected override string DatabaseName { get; } 
-        = ConfigurationManager.Settings["Database.WorldDatabaseName"];
-    protected override string Url { get; } 
-        = ConfigurationManager.Settings["Database.WorldDatabaseUrl"];
-    protected override string CertificatePath { get; } 
-        = ConfigurationManager.Settings["Database.WorldDatabaseCertificatePath"];
-
-}
+ 
+ namespace Imview.Core.Database;
+ 
+ public class WorldDatabase : RavenDatabaseSingleton<WorldDatabase> {
+ 
+     // Always read the latest values from the configuration so changes made at runtime
+     // (e.g. from the database configuration dialog) are picked up correctly.
+     protected override string DatabaseName
+         => ConfigurationManager.Settings["Database.WorldDatabaseName"].AsString("WorldDB");
+ 
+     protected override string Url
+         => ConfigurationManager.Settings["Database.WorldDatabaseUrl"].AsString();
+ 
+     protected override string CertificatePath
+         => ConfigurationManager.Settings["Database.WorldDatabaseCertificatePath"].AsString();
+ 
+ }
