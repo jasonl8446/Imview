@@ -67,6 +67,7 @@ public static class DropTableCollection {
                 existing.MaxGold = dropTable.MaxGold;
                 existing.ExperienceAmount = dropTable.ExperienceAmount;
                 existing.TrainingPoints = dropTable.TrainingPoints;
+                existing.GrantsPotionSlot = dropTable.GrantsPotionSlot;
             } else {
                 // Create new
                 dropTable.Id = id;
@@ -80,6 +81,7 @@ public static class DropTableCollection {
                 dropTable.MaxGold = dropTable.MaxGold;
                 dropTable.ExperienceAmount = dropTable.ExperienceAmount;
                 dropTable.TrainingPoints = dropTable.TrainingPoints;
+                dropTable.GrantsPotionSlot = dropTable.GrantsPotionSlot;
 
                 await session.StoreAsync(dropTable, id);
             }

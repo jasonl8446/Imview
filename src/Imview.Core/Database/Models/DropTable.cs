@@ -36,6 +36,7 @@ public class DropTable {
     public int MaxGold { get; set; } = 0;
     public int ExperienceAmount { get; set; } = 0;
     public int TrainingPoints { get; set; } = 0;
+    public bool GrantsPotionSlot { get; set; } = false;
     public List<DropItem> Items { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;

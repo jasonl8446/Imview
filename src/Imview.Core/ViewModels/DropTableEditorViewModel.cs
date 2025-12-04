@@ -154,6 +154,17 @@ public class DropTableEditorViewModel : ViewModelBase {
         }
     }
 
+    public bool GrantsPotionSlot {
+        get => _selectedDropTable?.GrantsPotionSlot ?? false;
+        set {
+            if (_selectedDropTable != null) {
+                _selectedDropTable.GrantsPotionSlot = value;
+                this.RaisePropertyChanged();
+                this.RaisePropertyChanged(nameof(RewardSummary));
+            }
+        }
+    }
+
     public string RewardSummary {
         get {
             if (_selectedDropTable == null) return string.Empty;
@@ -175,12 +186,16 @@ public class DropTableEditorViewModel : ViewModelBase {
             if (_selectedDropTable.TrainingPoints > 0) {
                 parts.Add($"{_selectedDropTable.TrainingPoints} training points");
             }
-            
+
+            if (_selectedDropTable.GrantsPotionSlot) {
+                parts.Add("1 potion slot");
+            }
+
             if (_selectedDropTable.Items.Count > 0) {
                 parts.Add($"{_selectedDropTable.Items.Count} items");
             }
-            
-            return parts.Count > 0 
+
+            return parts.Count > 0
                 ? $"This table gives: {string.Join(", ", parts)}"
                 : "This table gives no rewards";
         }
@@ -381,6 +396,7 @@ public class DropTableEditorViewModel : ViewModelBase {
         this.RaisePropertyChanged(nameof(MaxGold));
         this.RaisePropertyChanged(nameof(ExperienceAmount));
         this.RaisePropertyChanged(nameof(TrainingPoints));
+        this.RaisePropertyChanged(nameof(GrantsPotionSlot));
         this.RaisePropertyChanged(nameof(RewardSummary));
     }
 

@@ -62,6 +62,7 @@ public class DropTableService {
             MaxGold = 0,
             ExperienceAmount = 0,
             TrainingPoints = 0,
+            GrantsPotionSlot = false,
             Items = new List<DropItem>()
         };
 

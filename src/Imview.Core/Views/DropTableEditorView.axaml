@@ -188,9 +188,9 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="2" Grid.Column="0" Spacing="5" Margin="0,10,10,0">
-                                    <TextBlock Text="Min Gold:" 
+                                    <TextBlock Text="Min Gold (Range):"
                                               Foreground="White"
-                                              ToolTip.Tip="Minimum gold amount awarded. For quest rewards, set this equal to Max Gold for a fixed amount."/>
+                                              ToolTip.Tip="Minimum gold for random range. For fixed gold, set Min = Max."/>
                                     <NumericUpDown Value="{Binding MinGold}"
                                                   Minimum="0"
                                                   Maximum="999999999"
@@ -200,9 +200,9 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="2" Grid.Column="1" Spacing="5" Margin="10,10,0,0">
-                                    <TextBlock Text="Max Gold:" 
+                                    <TextBlock Text="Max Gold (Range):"
                                               Foreground="White"
-                                              ToolTip.Tip="Maximum gold amount awarded. For quest rewards, set this equal to Min Gold for a fixed amount."/>
+                                              ToolTip.Tip="Maximum gold for random range. For fixed gold, set Min = Max."/>
                                     <NumericUpDown Value="{Binding MaxGold}"
                                                   Minimum="0"
                                                   Maximum="999999999"
@@ -224,7 +224,7 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="3" Grid.Column="1" Spacing="5" Margin="10,10,0,0">
-                                    <TextBlock Text="Training Points:" 
+                                    <TextBlock Text="Training Points:"
                                               Foreground="White"
                                               ToolTip.Tip="Fixed number of training points awarded from this drop table."/>
                                     <NumericUpDown Value="{Binding TrainingPoints}"
@@ -233,6 +233,13 @@
                                                   FormatString="N0"
                                                   Background="#444444"
                                                   Foreground="White"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Spacing="5" Margin="0,10,0,0">
+                                    <CheckBox IsChecked="{Binding GrantsPotionSlot}"
+                                             Foreground="White"
+                                             Content="Grants Additional Potion Slot"
+                                             ToolTip.Tip="If checked, grants the player one additional potion slot when this drop table is rolled."/>
                                 </StackPanel>
                             </Grid>
 
