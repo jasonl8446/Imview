@@ -54,7 +54,13 @@ public static class DropTableCollection {
                 existing.Weight = dropTable.Weight;
                 existing.NoneChance = dropTable.NoneChance;
                 existing.PityCounter = dropTable.PityCounter;
-                existing.Items = dropTable.Items;
+
+                // Clear and add items individually to ensure RavenDB tracks nested property changes
+                existing.Items.Clear();
+                foreach (var item in dropTable.Items) {
+                    existing.Items.Add(item);
+                }
+
                 existing.ModifiedAt = DateTime.UtcNow;
                 existing.ModifiedBy = Environment.UserName;
                 existing.MinGold = dropTable.MinGold;

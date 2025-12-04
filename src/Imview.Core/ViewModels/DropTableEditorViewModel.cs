@@ -199,7 +199,7 @@ public class DropTableEditorViewModel : ViewModelBase {
         _dropTableService = new DropTableService();
 
         CreateTableCommand = ReactiveCommand.CreateFromTask(ShowCreateTableDialogAsync);
-        DeleteTableCommand = ReactiveCommand.CreateFromTask(DeleteTableAsync, 
+        DeleteTableCommand = ReactiveCommand.CreateFromTask(DeleteTableAsync,
             this.WhenAnyValue(x => x.SelectedDropTable).Select(x => x != null));
         SaveTableCommand = ReactiveCommand.CreateFromTask(SaveTableAsync,
             this.WhenAnyValue(x => x.SelectedDropTable).Select(x => x != null));
@@ -207,7 +207,8 @@ public class DropTableEditorViewModel : ViewModelBase {
             this.WhenAnyValue(x => x.SelectedDropTable).Select(x => x != null));
         RemoveItemCommand = ReactiveCommand.Create<DropItemViewModel>(RemoveItem);
         RefreshCommand = ReactiveCommand.CreateFromTask(LoadDropTablesAsync);
-        EditItemRequirementsCommand = ReactiveCommand.CreateFromTask<DropItemViewModel>(EditItemRequirementsAsync);
+        EditItemRequirementsCommand = ReactiveCommand.CreateFromTask<DropItemViewModel>(EditItemRequirementsAsync,
+            this.WhenAnyValue(x => x.SelectedDropTable).Select(x => x != null));
 
         _ = LoadDropTablesAsync();
     }
