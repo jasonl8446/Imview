@@ -110,16 +110,24 @@ public sealed class LocaleService {
             Console.WriteLine($"[LocaleService] Sample paths: {string.Join(", ", samplePaths)}");
 
             // Check if any Locale files exist at all
-            var anyLocaleFiles = fileNames.Any(f => f.Contains("Locale", StringComparison.OrdinalIgnoreCase));
+            var anyLocaleFiles = fileNames.Any(f => f.Contains("Locale", StringComparison.OrdinalIgnoreCase) ||
+                                                     f.Contains("locale", StringComparison.OrdinalIgnoreCase));
             Console.WriteLine($"[LocaleService] Any files containing 'Locale': {anyLocaleFiles}");
 
-            var langFiles = fileNames.Where(f => f.StartsWith("Locale/English/", StringComparison.OrdinalIgnoreCase)
-                                                && f.EndsWith(".lang", StringComparison.OrdinalIgnoreCase))
-                                     .ToList();
+            // Try multiple possible locale paths for compatibility
+            // Older versions: Locale/English/
+            // Newer versions: locale/en-US/
+            var langFiles = fileNames.Where(f =>
+                (f.StartsWith("Locale/English/", StringComparison.OrdinalIgnoreCase) ||
+                 f.StartsWith("locale/en-US/", StringComparison.OrdinalIgnoreCase) ||
+                 f.StartsWith("Locale/en-US/", StringComparison.OrdinalIgnoreCase) ||
+                 f.StartsWith("locale/English/", StringComparison.OrdinalIgnoreCase)) &&
+                f.EndsWith(".lang", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-            Console.WriteLine($"[LocaleService] Found {langFiles.Count} .lang files in Locale/English/");
+            Console.WriteLine($"[LocaleService] Found {langFiles.Count} .lang files in locale directories");
 
-            // If no files found with standard path, try case-insensitive search
+            // If no files found with standard paths, try broader search
             if (langFiles.Count == 0) {
                 var allLangFiles = fileNames.Where(f => f.EndsWith(".lang", StringComparison.OrdinalIgnoreCase)).ToList();
                 Console.WriteLine($"[LocaleService] Found {allLangFiles.Count} total .lang files in archive");
