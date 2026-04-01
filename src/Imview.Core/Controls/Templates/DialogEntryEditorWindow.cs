@@ -37,10 +37,11 @@ namespace Imview.Core.Controls.Templates;
 /// Window for editing individual dialog entries with all their properties
 /// </summary>
 public class DialogEntryEditorWindow : Window {
-    
+
     private DialogEntryWrapper _result;
     private DialogEntryWrapper _originalEntry;
     private readonly string? _questTitle;
+    private readonly bool _isReadOnly;
     
     // Basic UI Controls
     private TextBox _personaNameBox = null!;
@@ -125,9 +126,10 @@ public class DialogEntryEditorWindow : Window {
     private NumericUpDown _secondaryCameraInitialDelayBox = null!;
     private CheckBox _displayButtonsOnTimedDialogBox = null!;
 
-    public DialogEntryEditorWindow(DialogEntryWrapper entry, string? questTitle = null) {
+    public DialogEntryEditorWindow(DialogEntryWrapper entry, string? questTitle = null, bool isReadOnly = false) {
         _originalEntry = entry;
         _questTitle = questTitle;
+        _isReadOnly = isReadOnly;
         _dialogKeyValue = entry.DialogKey;
         
         // Create a complete copy of all properties
@@ -225,12 +227,12 @@ public class DialogEntryEditorWindow : Window {
     }
 
     private void InitializeWindow() {
-        Title = "Edit Dialog Entry - Comprehensive Editor";
+        Title = _isReadOnly ? "View Dialog Entry (Read-Only)" : "Edit Dialog Entry - Comprehensive Editor";
         Width = 900;
         Height = 1000;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         CanResize = true;
-        
+
         // Set window icon and styling
         Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
     }
@@ -727,6 +729,22 @@ public class DialogEntryEditorWindow : Window {
 
 
     private Control CreateActionButtons() {
+        if (_isReadOnly) {
+            return new StackPanel {
+                Orientation = Orientation.Horizontal,
+                Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 20, 0, 0),
+                Children = {
+                    new Button {
+                        Content = "Close",
+                        Padding = new Thickness(20, 10),
+                        Command = ReactiveCommand.Create(() => Close(null))
+                    }
+                }
+            };
+        }
+
         return new StackPanel {
             Orientation = Orientation.Horizontal,
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
@@ -872,6 +890,84 @@ public class DialogEntryEditorWindow : Window {
         _npcStandInListBox.Text = string.Join(",", _result.NpcStandInList);
         _dialogAnimationListBox.Text = string.Join(",", _result.DialogAnimationList);
         _dialogTurningListBox.Text = string.Join(",", _result.DialogTurningList);
+
+        // If read-only mode, disable all controls
+        if (_isReadOnly) {
+            DisableAllControls();
+        }
+    }
+
+    /// <summary>
+    /// Disables all input controls for read-only mode.
+    /// </summary>
+    private void DisableAllControls() {
+        // Disable text boxes
+        _personaNameBox.IsReadOnly = true;
+        _soundFileBox.IsReadOnly = true;
+        _cameraNameBox.IsReadOnly = true;
+        _pictureBox.IsReadOnly = true;
+        _actionBox.IsReadOnly = true;
+        _nameOverrideBox.IsReadOnly = true;
+        _guiDisplayBox.IsReadOnly = true;
+        _dialogEventBox.IsReadOnly = true;
+        _cameraShakeTypeBox.IsReadOnly = true;
+        _cameraZoneNameBox.IsReadOnly = true;
+        _cameraFadeTypeBox.IsReadOnly = true;
+        _standInPlayerTagBox.IsReadOnly = true;
+        _secondaryCameraNameBox.IsReadOnly = true;
+        _idleAnimationBox.IsReadOnly = true;
+        _soundEffectFileBox.IsReadOnly = true;
+        _musicFileBox.IsReadOnly = true;
+        _npcStandInListBox.IsReadOnly = true;
+        _dialogAnimationListBox.IsReadOnly = true;
+        _dialogTurningListBox.IsReadOnly = true;
+
+        // Disable numeric up downs
+        _actorTemplateIdBox.IsEnabled = false;
+        _interpolationDurationBox.IsEnabled = false;
+        _cameraOffsetXBox.IsEnabled = false;
+        _cameraOffsetYBox.IsEnabled = false;
+        _cameraOffsetZBox.IsEnabled = false;
+        _pitchBox.IsEnabled = false;
+        _yawBox.IsEnabled = false;
+        _rollBox.IsEnabled = false;
+        _cameraShakeDurationBox.IsEnabled = false;
+        _cameraShakeAmplitudeBox.IsEnabled = false;
+        _durationBox.IsEnabled = false;
+        _delayBox.IsEnabled = false;
+        _cameraHidePlayersBox.IsEnabled = false;
+        _spamTimeBox.IsEnabled = false;
+        _walkAwayNpcTemplateIDBox.IsEnabled = false;
+        _walkAwayExitDirectionBox.IsEnabled = false;
+        _walkAwayFadeTimeBox.IsEnabled = false;
+        _secondaryInterpolationDurationBox.IsEnabled = false;
+        _secondaryCameraInitialDelayBox.IsEnabled = false;
+        _npcYawOffsetBox.IsEnabled = false;
+        _soundEffectDelayBox.IsEnabled = false;
+        _musicDelayBox.IsEnabled = false;
+        _musicFadeTimeBox.IsEnabled = false;
+        _stopMusicFadeTimeBox.IsEnabled = false;
+        _restartMusicFadeTimeBox.IsEnabled = false;
+
+        // Disable checkboxes
+        _bypassCameraOnReviewBox.IsEnabled = false;
+        _fadeOutCameraBox.IsEnabled = false;
+        _snapCameraToPlayerAtExitBox.IsEnabled = false;
+        _dontReleaseCameraAtExitBox.IsEnabled = false;
+        _allowPlayerToMoveBox.IsEnabled = false;
+        _disableBackButtonBox.IsEnabled = false;
+        _enableExitButtonBox.IsEnabled = false;
+        _displayButtonsOnTimedDialogBox.IsEnabled = false;
+        _meetsRequirementsBox.IsEnabled = false;
+        _walkAwayUseCurrentFacingBox.IsEnabled = false;
+        _nonStackableMusicBox.IsEnabled = false;
+        _nonRepeatableMusicBox.IsEnabled = false;
+        _playMusicAtSFXVolumeBox.IsEnabled = false;
+        _playSoundIfSpammingBox.IsEnabled = false;
+        _playMusicIfSpammingBox.IsEnabled = false;
+
+        // Disable the dialog key button
+        _dialogKeyButton.IsEnabled = false;
     }
 
     private void SaveAndClose() {

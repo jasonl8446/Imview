@@ -35,6 +35,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
 using Imcodec.ObjectProperty.TypeCache;
+using Imview.Core.Controls.Templates;
 
 namespace Imview.Core.ViewModels;
 
@@ -53,6 +54,7 @@ public class QuestBrowserViewModel : ViewModelBase {
 
     public QuestBrowserViewModel() {
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshAsync);
+        ImportPacketCaptureCommand = ReactiveCommand.CreateFromTask(ImportPacketCaptureAsync);
         NewQuestCommand = ReactiveCommand.Create(NewQuest);
         LoadLocalQuestCommand = ReactiveCommand.CreateFromTask(LoadLocalQuestAsync);
         DeleteSelectedCommand = ReactiveCommand.CreateFromTask(DeleteSelectedAsync, 
@@ -79,6 +81,11 @@ public class QuestBrowserViewModel : ViewModelBase {
 
         // Load quests on initialization
         _ = RefreshAsync();
+
+        // Subscribe to packet capture import events
+        DialogPacketImportService.Instance.PacketCaptureImported += (s, e) => {
+            this.RaisePropertyChanged(nameof(HasImportedPacketCapture));
+        };
     }
 
     public ObservableCollection<QuestDocument> FilteredQuests => _filteredQuests;
@@ -110,6 +117,8 @@ public class QuestBrowserViewModel : ViewModelBase {
 
     public bool HasSelectedQuest => SelectedQuest != null;
 
+    public bool HasImportedPacketCapture => DialogPacketImportService.Instance.HasImportedPacketCapture;
+
     public QuestTemplateEditorViewModel? QuestEditorViewModel {
         get => _questEditorViewModel;
         private set => this.RaiseAndSetIfChanged(ref _questEditorViewModel, value);
@@ -139,6 +148,7 @@ public class QuestBrowserViewModel : ViewModelBase {
     }
 
     public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
+    public ReactiveCommand<Unit, Unit> ImportPacketCaptureCommand { get; }
     public ReactiveCommand<Unit, Unit> NewQuestCommand { get; }
     public ReactiveCommand<Unit, Unit> LoadLocalQuestCommand { get; }
     public ReactiveCommand<Unit, Unit> DeleteSelectedCommand { get; }
@@ -173,6 +183,55 @@ public class QuestBrowserViewModel : ViewModelBase {
         }
         finally {
             IsLoading = false;
+        }
+    }
+
+    private async Task ImportPacketCaptureAsync() {
+        try {
+            // Get reference to main window for file dialog
+            var app = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            var mainWindow = app?.MainWindow;
+
+            if (mainWindow == null) {
+                StatusText = "Could not access main window for file dialog";
+                return;
+            }
+
+            // Open file dialog to select packet capture
+            var dialog = new OpenFileDialog {
+                Title = "Select Packet Capture File",
+                Filters = new List<FileDialogFilter> {
+                    new() { Name = "JSON Files", Extensions = { "json" } },
+                    new() { Name = "All Files", Extensions = { "*" } }
+                }
+            };
+
+            var result = await dialog.ShowAsync(mainWindow);
+            if (result == null || result.Length == 0) {
+                StatusText = "No file selected";
+                return;
+            }
+
+            var filePath = result[0];
+            StatusText = $"Importing packet capture: {filePath}";
+
+            // Import using the service
+            var success = await DialogPacketImportService.Instance.ImportPacketCaptureAsync(filePath);
+            if (success) {
+                StatusText = $"Successfully imported {DialogPacketImportService.Instance.CapturedDialogs.Count} dialog entries";
+
+                // Raise property changed for HasImportedPacketCapture
+                this.RaisePropertyChanged(nameof(HasImportedPacketCapture));
+
+                // Open the import window to view dialogs
+                var importWindow = new DialogPacketImportWindow();
+                await importWindow.ShowDialog(mainWindow);
+            } else {
+                StatusText = "Failed to import packet capture";
+            }
+        }
+        catch (Exception ex) {
+            StatusText = $"Error importing packet capture: {ex.Message}";
         }
     }
 

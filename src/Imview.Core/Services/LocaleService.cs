@@ -88,19 +88,46 @@ public sealed class LocaleService {
     /// </summary>
     /// <returns>True if successfully loaded, false if Root.wad not available or failed to load.</returns>
     public bool LoadFromRootWad() {
+        Console.WriteLine("[LocaleService] LoadFromRootWad called");
+
         if (!RootWadService.Instance.IsLoaded) {
+            Console.WriteLine("[LocaleService] RootWadService is not loaded!");
             return false;
         }
+
+        Console.WriteLine("[LocaleService] RootWadService is loaded, getting file names...");
 
         try {
             var loadedCategories = 0;
             var loadedStrings = 0;
 
             // Get list of all files in the Root.wad
-            var fileNames = RootWadService.Instance.GetFileNames();
+            var fileNames = RootWadService.Instance.GetFileNames().ToList();
+            Console.WriteLine($"[LocaleService] Total files in Root.wad: {fileNames.Count}");
+
+            // Debug: show some sample file paths
+            var samplePaths = fileNames.Take(10).ToList();
+            Console.WriteLine($"[LocaleService] Sample paths: {string.Join(", ", samplePaths)}");
+
+            // Check if any Locale files exist at all
+            var anyLocaleFiles = fileNames.Any(f => f.Contains("Locale", StringComparison.OrdinalIgnoreCase));
+            Console.WriteLine($"[LocaleService] Any files containing 'Locale': {anyLocaleFiles}");
+
             var langFiles = fileNames.Where(f => f.StartsWith("Locale/English/", StringComparison.OrdinalIgnoreCase)
                                                 && f.EndsWith(".lang", StringComparison.OrdinalIgnoreCase))
                                      .ToList();
+
+            Console.WriteLine($"[LocaleService] Found {langFiles.Count} .lang files in Locale/English/");
+
+            // If no files found with standard path, try case-insensitive search
+            if (langFiles.Count == 0) {
+                var allLangFiles = fileNames.Where(f => f.EndsWith(".lang", StringComparison.OrdinalIgnoreCase)).ToList();
+                Console.WriteLine($"[LocaleService] Found {allLangFiles.Count} total .lang files in archive");
+
+                if (allLangFiles.Count > 0) {
+                    Console.WriteLine($"[LocaleService] Sample .lang paths: {string.Join(", ", allLangFiles.Take(5))}");
+                }
+            }
 
             lock (_lock) {
                 _localeData.Clear();
@@ -123,7 +150,11 @@ public sealed class LocaleService {
                             if (loadedCategories % 50 == 0) {
                                 Console.WriteLine($"Loaded {loadedCategories}/{langFiles.Count} locale categories...");
                             }
+                        } else {
+                            Console.WriteLine($"[LocaleService] Failed to parse category from {langFile}");
                         }
+                    } else {
+                        Console.WriteLine($"[LocaleService] No data returned for {langFile}");
                     }
                 }
                 catch (Exception ex) {
@@ -131,11 +162,12 @@ public sealed class LocaleService {
                 }
             }
 
-            Console.WriteLine($"Loaded {loadedCategories} locale categories with {loadedStrings} strings total");
+            Console.WriteLine($"[LocaleService] Loaded {loadedCategories} locale categories with {loadedStrings} strings total");
             return loadedCategories > 0;
         }
         catch (Exception ex) {
             Console.WriteLine($"Failed to load locale data: {ex.Message}");
+            Console.WriteLine($"[LocaleService] Stack trace: {ex.StackTrace}");
             return false;
         }
     }

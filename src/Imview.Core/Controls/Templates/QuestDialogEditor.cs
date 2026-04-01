@@ -30,6 +30,8 @@ using Imview.Core.Common.Constants;
 using System.Linq;
 using ReactiveUI;
 using Avalonia.Controls.Templates;
+using Imview.Core.Services;
+using Avalonia.VisualTree;
 
 namespace Imview.Core.Controls.Templates;
 
@@ -93,40 +95,45 @@ public partial class QuestDialogEditor : UserControl {
 
         // Create sections for each dialog tag
         mainPanel.Children.Add(CreateDialogSection(
-            "Quest Info", 
+            "Quest Info",
             "Dialogue shown when the quest giver first explains the quest objectives and story context.",
-            _questInfoDialogEntries, 
+            _questInfoDialogEntries,
+            "QuestInfo",
             out _questInfoDialogList));
 
         mainPanel.Children.Add(CreateDialogSection(
-            "Quest Prep", 
+            "Quest Prep",
             "Initial dialogue when the quest is first offered to the player, before acceptance.",
-            _prepDialogEntries, 
+            _prepDialogEntries,
+            "Prep",
             out _prepDialogList));
 
         mainPanel.Children.Add(CreateDialogSection(
-            "Quest Underway", 
+            "Quest Underway",
             "Dialogue shown when the player talks to the quest giver while the quest is still active.",
-            _underwayDialogEntries, 
+            _underwayDialogEntries,
+            "Underway",
             out _underwayDialogList));
 
         mainPanel.Children.Add(CreateDialogSection(
-            "Quest Completion", 
+            "Quest Completion",
             "Dialogue shown when the player returns to complete the quest and claim rewards.",
-            _completionDialogEntries, 
+            _completionDialogEntries,
+            "Completion",
             out _completionDialogList));
 
         mainPanel.Children.Add(CreateDialogSection(
-            "Hyperlink (Optional)", 
+            "Hyperlink (Optional)",
             "Additional optional dialogue that can be accessed through hyperlinks or special interactions.",
-            _hyperlinkDialogEntries, 
+            _hyperlinkDialogEntries,
+            "Hyperlink",
             out _hyperlinkDialogList));
 
         Content = new ScrollViewer { Content = mainPanel };
     }
 
-    private Control CreateDialogSection(string title, string explanationText, 
-        ObservableCollection<DialogEntryWrapper> dialogEntries, out ListBox dialogList) {
+    private Control CreateDialogSection(string title, string explanationText,
+        ObservableCollection<DialogEntryWrapper> dialogEntries, string dialogTag, out ListBox dialogList) {
         
         // Create the explanation info panel (like in Quest Goals section)
         var infoPanel = new StackPanel {
@@ -192,15 +199,25 @@ public partial class QuestDialogEditor : UserControl {
         };
 
         // Create buttons for managing dialog entries
+        var importButton = new Avalonia.Controls.Button {
+            Content = "Import Entry",
+            Command = ReactiveCommand.Create(() => ImportDialogEntry(capturedDialogEntries, dialogTag)),
+            IsEnabled = DialogPacketImportService.Instance.HasImportedPacketCapture
+        };
+        ToolTip.SetTip(importButton, DialogPacketImportService.Instance.HasImportedPacketCapture
+            ? "Import a dialog entry from the packet capture"
+            : "Import a packet capture first to enable dialog import");
+
         var buttonPanel = new StackPanel {
             Orientation = Orientation.Horizontal,
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
             Margin = new Thickness(0, 5, 0, 0),
             Children = {
                 new Avalonia.Controls.Button {
-                    Content = "Add Entry",
+                    Content = "Create Entry",
                     Command = ReactiveCommand.Create(() => AddDialogEntry(capturedDialogEntries))
                 },
+                importButton,
                 new Avalonia.Controls.Button {
                     Content = "Remove Selected",
                     Command = ReactiveCommand.Create(() => RemoveSelectedDialogEntry(capturedDialogList, capturedDialogEntries))
@@ -214,6 +231,14 @@ public partial class QuestDialogEditor : UserControl {
                     Command = ReactiveCommand.Create(() => MoveDialogEntry(capturedDialogList, capturedDialogEntries, 1))
                 }
             }
+        };
+
+        // Subscribe to packet capture import events to update button state
+        DialogPacketImportService.Instance.PacketCaptureImported += (s, e) => {
+            importButton.IsEnabled = DialogPacketImportService.Instance.HasImportedPacketCapture;
+            ToolTip.SetTip(importButton, DialogPacketImportService.Instance.HasImportedPacketCapture
+                ? "Import a dialog entry from the packet capture"
+                : "Import a packet capture first to enable dialog import");
         };
 
         var content = new DockPanel {
@@ -263,6 +288,31 @@ public partial class QuestDialogEditor : UserControl {
         if (result != null) {
             entries.Add(result);
         }
+    }
+
+    private async void ImportDialogEntry(ObservableCollection<DialogEntryWrapper> entries, string dialogTag) {
+        if (!DialogPacketImportService.Instance.HasImportedPacketCapture) {
+            MessageService.Warn("Please import a packet capture first using the 'Import Packet Capture' button in the quest browser.")
+                .Send();
+            return;
+        }
+
+        // Open the import window showing ALL dialogs (no filtering by tag)
+        var importWindow = new DialogPacketImportWindow();
+        var result = await importWindow.ShowDialog<CapturedDialogEntry?>(GetParentWindow());
+
+        if (result?.DialogEntry != null) {
+            // Add the imported entry to the collection
+            entries.Add(result.DialogEntry);
+            MessageService.Info($"Imported dialog entry from packet capture.")
+                .Send();
+        }
+    }
+
+    private Avalonia.Controls.Window GetParentWindow() {
+        return this.FindAncestorOfType<Avalonia.Controls.Window>() ??
+               (Application.Current?.ApplicationLifetime as
+                Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow!;
     }
 
     private void RemoveSelectedDialogEntry(ListBox listBox, ObservableCollection<DialogEntryWrapper> entries) {
