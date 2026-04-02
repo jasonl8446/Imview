@@ -62,6 +62,8 @@ public class DialogPacketImportWindow : Window {
         ulong? highlightQuestId = null,
         ulong? highlightGoalId = null) {
 
+        Console.WriteLine("[DialogPacketImportWindow] Constructor called");
+
         _highlightMobileId = highlightMobileId;
         _highlightQuestId = highlightQuestId;
         _highlightGoalId = highlightGoalId;
@@ -207,6 +209,10 @@ public class DialogPacketImportWindow : Window {
     private void LoadDialogs() {
         var service = DialogPacketImportService.Instance;
 
+        Console.WriteLine($"[DialogPacketImportWindow] LoadDialogs called");
+        Console.WriteLine($"[DialogPacketImportWindow] HasImportedPacketCapture: {service.HasImportedPacketCapture}");
+        Console.WriteLine($"[DialogPacketImportWindow] CapturedDialogs.Count: {service.CapturedDialogs.Count}");
+
         if (!service.HasImportedPacketCapture) {
             var emptyText = new TextBlock {
                 Text = "No packet capture has been imported.",
@@ -220,6 +226,7 @@ public class DialogPacketImportWindow : Window {
 
         // Store all dialogs
         _allDialogs = new ObservableCollection<CapturedDialogEntry>(service.CapturedDialogs);
+        Console.WriteLine($"[DialogPacketImportWindow] _allDialogs.Count: {_allDialogs.Count}");
 
         // Sort: highlight matches first, then by completion type
         var sortedDialogs = _allDialogs.ToList();
@@ -234,6 +241,8 @@ public class DialogPacketImportWindow : Window {
 
             return string.Compare(a.CompletionType, b.CompletionType, StringComparison.OrdinalIgnoreCase);
         });
+
+        Console.WriteLine($"[DialogPacketImportWindow] sortedDialogs.Count: {sortedDialogs.Count}");
 
         _filteredDialogs = new ObservableCollection<CapturedDialogEntry>(sortedDialogs);
         RefreshListBox();
@@ -272,10 +281,12 @@ public class DialogPacketImportWindow : Window {
     }
 
     private void RefreshListBox() {
+        Console.WriteLine($"[DialogPacketImportWindow] RefreshListBox called, _filteredDialogs.Count: {_filteredDialogs.Count}");
         _dialogListBox.Items.Clear();
         foreach (var dialog in _filteredDialogs) {
             _dialogListBox.Items.Add(dialog);
         }
+        Console.WriteLine($"[DialogPacketImportWindow] ListBox.Items.Count: {_dialogListBox.Items.Count}");
     }
 
     private FuncDataTemplate<CapturedDialogEntry> CreateItemTemplate() {
@@ -288,13 +299,18 @@ public class DialogPacketImportWindow : Window {
 
             var panel = new StackPanel { Spacing = 3 };
 
-            // NPC Name (resolved from locale)
+            // NPC Name (resolved from locale) with entry index for multi-entry dialogs
             var npcName = !string.IsNullOrEmpty(entry.ResolvedPersonaName) && entry.ResolvedPersonaName != entry.PersonaName
                 ? $"{entry.ResolvedPersonaName} ({entry.PersonaName})"
                 : entry.PersonaName;
 
+            // Add entry index indicator for multi-entry dialogs
+            var npcNameWithIndex = entry.IsMultiEntry
+                ? $"{npcName} [{entry.EntryIndex + 1}/{entry.TotalEntries}]"
+                : npcName;
+
             var personaText = new TextBlock {
-                Text = $"NPC: {npcName}",
+                Text = $"NPC: {npcNameWithIndex}",
                 FontWeight = FontWeight.SemiBold,
                 TextWrapping = TextWrapping.Wrap
             };
@@ -394,9 +410,15 @@ public class DialogPacketImportWindow : Window {
     }
 
     private void ImportSelected() {
+        Console.WriteLine($"[DialogPacketImportWindow] ImportSelected called");
+        Console.WriteLine($"[DialogPacketImportWindow] SelectedItem type: {_dialogListBox.SelectedItem?.GetType().Name ?? "null"}");
+
         if (_dialogListBox.SelectedItem is CapturedDialogEntry entry) {
+            Console.WriteLine($"[DialogPacketImportWindow] Entry selected: {entry.DialogKey}, HasDialogEntry: {entry.DialogEntry != null}");
             SelectedEntry = entry;
             Close(entry);
+        } else {
+            Console.WriteLine("[DialogPacketImportWindow] No valid entry selected");
         }
     }
 

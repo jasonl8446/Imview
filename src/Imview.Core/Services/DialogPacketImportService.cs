@@ -45,6 +45,16 @@ public class CapturedDialogEntry {
     public ActorDialog? ActorDialog { get; set; }
 
     /// <summary>
+    /// Index of this entry within the ActorDialog (0-based).
+    /// </summary>
+    public int EntryIndex { get; set; }
+
+    /// <summary>
+    /// Total number of entries in the ActorDialog.
+    /// </summary>
+    public int TotalEntries { get; set; }
+
+    /// <summary>
     /// The raw dialog key (locale reference like "WizQst9559_00000129")
     /// </summary>
     public string DialogKey { get; set; } = string.Empty;
@@ -63,6 +73,11 @@ public class CapturedDialogEntry {
     /// Display text for search/filter purposes.
     /// </summary>
     public string SearchText => $"{PersonaName} {Persona} {CompletionType} {DialogKey} {ResolvedDialogText} {ResolvedPersonaName} {QuestID} {GoalID}";
+
+    /// <summary>
+    /// Indicates if this is part of a multi-entry ActorDialog.
+    /// </summary>
+    public bool IsMultiEntry => TotalEntries > 1;
 }
 
 /// <summary>
@@ -167,9 +182,11 @@ public sealed class DialogPacketImportService {
 
             // Process each packet
             foreach (var packet in actorDialogPackets) {
-                var capturedEntry = ProcessActorDialogPacket(packet);
-                if (capturedEntry != null) {
-                    CapturedDialogs.Add(capturedEntry);
+                var capturedEntries = ProcessActorDialogPacket(packet);
+                if (capturedEntries != null) {
+                    foreach (var entry in capturedEntries) {
+                        CapturedDialogs.Add(entry);
+                    }
                 }
             }
 
@@ -195,50 +212,74 @@ public sealed class DialogPacketImportService {
     }
 
     /// <summary>
-    /// Processes an ActorDialogPacket and converts it to a CapturedDialogEntry.
+    /// Processes an ActorDialogPacket and converts it to a list of CapturedDialogEntry objects.
+    /// Each dialog entry in the ActorDialog becomes a separate CapturedDialogEntry.
     /// </summary>
-    private CapturedDialogEntry? ProcessActorDialogPacket(ActorDialogPacket packet) {
+    private List<CapturedDialogEntry>? ProcessActorDialogPacket(ActorDialogPacket packet) {
         try {
-            var entry = new CapturedDialogEntry {
-                MobileID = packet.MobileID,
-                QuestID = packet.QuestID,
-                GoalID = packet.GoalID,
-                CompletionType = packet.CompletionType ?? string.Empty,
-                Persona = packet.Persona ?? string.Empty,
-                PersonaName = packet.PersonaName ?? string.Empty,
-            };
+            var entries = new List<CapturedDialogEntry>();
+
+            // Resolve the persona name from locale (PersonaName is like "WC-NPCs_00000514")
+            var resolvedPersonaName = ResolveLocaleString(packet.PersonaName);
 
             // Try to deserialize the ActorDialog hex blob
+            ActorDialog? actorDialog = null;
             if (!string.IsNullOrEmpty(packet.ActorDialog)) {
-                var actorDialogBlob = packet.ActorDialog.Replace(" ", string.Empty);
-                var actorDialogBytes = Convert.FromHexString(actorDialogBlob);
-                var serializer = new ObjectSerializer(false, SerializerFlags.None);
-
-                if (serializer.Deserialize<ActorDialog>(actorDialogBytes, 16, out var actorDialog)) {
-                    entry.ActorDialog = actorDialog;
-
-                    // Convert to DialogEntryWrapper if we have dialog entries
-                    if (actorDialog?.m_dialogEntries != null && actorDialog.m_dialogEntries.Count > 0) {
-                        // For now, we'll create a wrapper from the first NPCDialogEntry if available
-                        // The full dialog structure can be accessed via ActorDialog property
-                        var firstEntry = actorDialog.m_dialogEntries[0];
-                        if (firstEntry is NPCDialogEntry npcEntry) {
-                            entry.DialogEntry = CreateDialogEntryWrapper(npcEntry);
-                            entry.DialogKey = npcEntry.m_dialog ?? "";
-
-                            // Resolve the dialog text from locale
-                            entry.ResolvedDialogText = ResolveLocaleString(entry.DialogKey);
-                        }
-                    }
+                try {
+                    var actorDialogBlob = packet.ActorDialog.Replace(" ", string.Empty);
+                    var actorDialogBytes = Convert.FromHexString(actorDialogBlob);
+                    var serializer = new ObjectSerializer(false, SerializerFlags.None);
+                    serializer.Deserialize<ActorDialog>(actorDialogBytes, 16, out actorDialog);
+                }
+                catch (Exception ex) {
+                    Console.WriteLine($"[DialogPacketImportService] Failed to deserialize ActorDialog: {ex.Message}");
                 }
             }
 
-            // Resolve the persona name from locale (PersonaName is like "WC-NPCs_00000514")
-            if (!string.IsNullOrEmpty(entry.PersonaName)) {
-                entry.ResolvedPersonaName = ResolveLocaleString(entry.PersonaName);
+            // Create entries from the dialog entries in the ActorDialog
+            if (actorDialog?.m_dialogEntries != null && actorDialog.m_dialogEntries.Count > 0) {
+                var totalEntries = actorDialog.m_dialogEntries.Count;
+                for (int i = 0; i < totalEntries; i++) {
+                    var dialogEntry = actorDialog.m_dialogEntries[i];
+                    if (dialogEntry is NPCDialogEntry npcEntry) {
+                        var entry = new CapturedDialogEntry {
+                            MobileID = packet.MobileID,
+                            QuestID = packet.QuestID,
+                            GoalID = packet.GoalID,
+                            CompletionType = packet.CompletionType ?? string.Empty,
+                            Persona = packet.Persona ?? string.Empty,
+                            PersonaName = packet.PersonaName ?? string.Empty,
+                            ActorDialog = actorDialog,
+                            DialogEntry = CreateDialogEntryWrapper(npcEntry),
+                            DialogKey = npcEntry.m_dialog ?? "",
+                            ResolvedPersonaName = resolvedPersonaName,
+                            EntryIndex = i,
+                            TotalEntries = totalEntries
+                        };
+
+                        // Resolve the dialog text from locale
+                        entry.ResolvedDialogText = ResolveLocaleString(entry.DialogKey);
+
+                        entries.Add(entry);
+                    }
+                }
+            }
+            else {
+                // No dialog entries in the ActorDialog, create a placeholder entry
+                var entry = new CapturedDialogEntry {
+                    MobileID = packet.MobileID,
+                    QuestID = packet.QuestID,
+                    GoalID = packet.GoalID,
+                    CompletionType = packet.CompletionType ?? string.Empty,
+                    Persona = packet.Persona ?? string.Empty,
+                    PersonaName = packet.PersonaName ?? string.Empty,
+                    ActorDialog = actorDialog,
+                    ResolvedPersonaName = resolvedPersonaName
+                };
+                entries.Add(entry);
             }
 
-            return entry;
+            return entries.Count > 0 ? entries : null;
         }
         catch (Exception ex) {
             Console.WriteLine($"Error processing ActorDialogPacket: {ex.Message}");

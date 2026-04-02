@@ -291,20 +291,42 @@ public partial class QuestDialogEditor : UserControl {
     }
 
     private async void ImportDialogEntry(ObservableCollection<DialogEntryWrapper> entries, string dialogTag) {
+        Console.WriteLine($"[QuestDialogEditor] ImportDialogEntry called for tag: {dialogTag}");
+
         if (!DialogPacketImportService.Instance.HasImportedPacketCapture) {
+            Console.WriteLine("[QuestDialogEditor] No packet capture imported, showing warning");
             MessageService.Warn("Please import a packet capture first using the 'Import Packet Capture' button in the quest browser.")
                 .Send();
             return;
         }
 
-        // Open the import window showing ALL dialogs (no filtering by tag)
-        var importWindow = new DialogPacketImportWindow();
-        var result = await importWindow.ShowDialog<CapturedDialogEntry?>(GetParentWindow());
+        Console.WriteLine($"[QuestDialogEditor] Packet capture imported, {DialogPacketImportService.Instance.CapturedDialogs.Count} dialogs available");
 
-        if (result?.DialogEntry != null) {
-            // Add the imported entry to the collection
-            entries.Add(result.DialogEntry);
-            MessageService.Info($"Imported dialog entry from packet capture.")
+        try {
+            // Open the import window showing ALL dialogs (no filtering by tag)
+            var importWindow = new DialogPacketImportWindow();
+            var parentWindow = GetParentWindow();
+            Console.WriteLine($"[QuestDialogEditor] Parent window: {parentWindow?.GetType().Name ?? "null"}");
+
+            var result = await importWindow.ShowDialog<CapturedDialogEntry?>(parentWindow);
+            Console.WriteLine($"[QuestDialogEditor] Dialog result: {(result != null ? "has value" : "null")}");
+
+            if (result?.DialogEntry != null) {
+                // Add the imported entry to the collection
+                entries.Add(result.DialogEntry);
+                MessageService.Info($"Imported dialog entry from packet capture.")
+                    .Send();
+                Console.WriteLine("[QuestDialogEditor] Entry added successfully");
+            } else if (result != null) {
+                Console.WriteLine("[QuestDialogEditor] Result has no DialogEntry");
+                MessageService.Warn("Selected entry has no dialog data to import.")
+                    .Send();
+            }
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"[QuestDialogEditor] Exception: {ex.Message}");
+            Console.WriteLine($"[QuestDialogEditor] Stack trace: {ex.StackTrace}");
+            MessageService.Error($"Failed to import dialog: {ex.Message}")
                 .Send();
         }
     }
