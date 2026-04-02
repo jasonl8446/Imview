@@ -6989,6 +6989,10 @@ public static class DeepJsonSerializer
         if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal) || type.IsEnum)
             return obj;
 
+        // Handle ByteString - serialize as string representation
+        if (type.Name == "ByteString" && type.Namespace == "Imcodec.IO")
+            return obj.ToString();
+
         // Handle collections
         if (obj is System.Collections.ICollection collection)
         {
@@ -7093,6 +7097,15 @@ public static class DeepJsonSerializer
     {
         if (depth > 10 || value == null)
             return "null";
+
+        var type = value.GetType();
+
+        // Handle ByteString - serialize as string representation
+        if (type.Name == "ByteString" && type.Namespace == "Imcodec.IO")
+        {
+            var strValue = value.ToString() ?? string.Empty;
+            return $"\"{strValue.Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r")}\"";
+        }
 
         return value switch
         {
