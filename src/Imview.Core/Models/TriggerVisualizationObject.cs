@@ -19,6 +19,7 @@ modification, are permitted provided that the following conditions are met:
 */
 
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Imcodec.ObjectProperty.TypeCache;
 using Imview.Core.ViewModels;
@@ -45,6 +46,16 @@ public class TriggerVisualizationObject
     public string Zone { get; set; } = string.Empty;
     public Trigger OriginalTrigger { get; set; } = null!;
     public List<ObjectFlag> Flags { get; set; } = new();
+
+    /// <summary>
+    /// Wrapped results for JSON display
+    /// </summary>
+    public ObservableCollection<ResultWrapper> WrappedResults { get; } = new();
+
+    /// <summary>
+    /// Wrapped requirements for JSON display
+    /// </summary>
+    public ObservableCollection<RequirementWrapper> WrappedRequirements { get; } = new();
     
     /// <summary>
     /// Gets all events combined for UI display
@@ -66,34 +77,34 @@ public class TriggerVisualizationObject
         }
     }
 
-    public TriggerVisualizationObject(Trigger trigger)
+    public TriggerVisualizationObject(Trigger trigger, string? zoneName = null)
     {
         OriginalTrigger = trigger;
 #pragma warning disable CS8601 // Possible null reference assignment
         Name = trigger.m_triggerName != null ? trigger.m_triggerName.ToString() ?? "Unnamed Trigger" : "Unnamed Trigger";
 #pragma warning restore CS8601
-        
+
         // Ensure Name is never null or empty
         if (string.IsNullOrEmpty(Name))
         {
             Name = "Unnamed Trigger";
         }
-        
+
         TriggerMax = trigger.m_triggerMax;
         Cooldown = trigger.m_cooldown;
         CooldownRand = trigger.m_cooldownRand;
         IsPulsar = trigger.m_pulsar;
         UnknownUint = trigger.unknown_uint_3;
-        
+
 #pragma warning disable CS8601 // Possible null reference assignment
         UnknownString = trigger.unknown_str_3 != null ? trigger.unknown_str_3.ToString() ?? string.Empty : string.Empty;
 #pragma warning restore CS8601
-        
+
         // Determine trigger type - this is a simplified classification
         TriggerType = IsPulsar ? "Pulsar" : "Standard";
-        
-        // For now, Zone is empty - we could extract this from context if needed
-        Zone = "Current Zone";
+
+        // Set the zone name from parameter
+        Zone = zoneName ?? string.Empty;
         
         // Extract location from trigger object info if available
         if (trigger.m_triggerObjInfo != null)
@@ -138,6 +149,30 @@ public class TriggerVisualizationObject
                 .Select(e => e.ToString() ?? string.Empty)
                 .Where(e => !string.IsNullOrEmpty(e))
                 .ToList();
+        }
+
+        // Wrap results for JSON display
+        if (trigger.m_results?.m_results != null)
+        {
+            foreach (var result in trigger.m_results.m_results)
+            {
+                if (result != null)
+                {
+                    WrappedResults.Add(new ResultWrapper(result, Zone, Name));
+                }
+            }
+        }
+
+        // Wrap requirements for JSON display
+        if (trigger.m_requirements?.m_requirements != null)
+        {
+            foreach (var requirement in trigger.m_requirements.m_requirements)
+            {
+                if (requirement != null)
+                {
+                    WrappedRequirements.Add(new RequirementWrapper(requirement));
+                }
+            }
         }
     }
     

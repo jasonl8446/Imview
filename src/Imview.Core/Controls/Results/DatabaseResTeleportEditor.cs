@@ -40,7 +40,7 @@ namespace Imview.Core.Controls.Results;
 /// <summary>
 /// Database-enabled ResTeleport editor that saves changes to the world database
 /// </summary>
-public class DatabaseResTeleportEditor : EditorWindowBase<ResTeleport> 
+public class DatabaseResTeleportEditor : EditorWindowBase<ResTeleport>
 {
     private readonly ResTeleport _result;
     private readonly string _zoneName;
@@ -53,19 +53,21 @@ public class DatabaseResTeleportEditor : EditorWindowBase<ResTeleport>
     private readonly NumericUpDown _teleporterTagInput;
     private readonly ComboBox _teleportTypeComboBox;
     private readonly NumericUpDown _transitionIdInput;
-    
+    private readonly bool _isNew;
+
     /// <summary>
     /// Gets whether the data was successfully saved to the database
     /// </summary>
     public bool WasSaved { get; private set; } = false;
 
-    public DatabaseResTeleportEditor(ResTeleport result, string zoneName, string triggerName, ZoneDataService? zoneDataService = null)
-        : base($"Edit Database Teleport - {triggerName} ({zoneName})")
+    public DatabaseResTeleportEditor(ResTeleport result, string zoneName, string triggerName, ZoneDataService? zoneDataService = null, bool isNew = false)
+        : base(isNew ? $"Create Database Teleport - {triggerName} ({zoneName})" : $"Edit Database Teleport - {triggerName} ({zoneName})")
     {
         _result = result ?? throw new ArgumentNullException(nameof(result));
         _zoneName = zoneName ?? throw new ArgumentNullException(nameof(zoneName));
         _triggerName = triggerName ?? throw new ArgumentNullException(nameof(triggerName));
         _zoneDataService = zoneDataService ?? new ZoneDataService();
+        _isNew = isNew;
         
         Width = EditorConstants.DEFAULT_WINDOW_WIDTH + 100; // Slightly wider for database info
         Height = 600; // Taller for additional info

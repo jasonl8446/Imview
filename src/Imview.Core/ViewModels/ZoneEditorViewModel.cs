@@ -26,6 +26,7 @@ using System.Linq;
 using System.Reactive;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Controls;
@@ -162,6 +163,13 @@ private Canvas? _zoneObjectCanvas = null;
         PanDownCommand = ReactiveCommand.Create(PanDown);
         PanLeftCommand = ReactiveCommand.Create(PanLeft);
         PanRightCommand = ReactiveCommand.Create(PanRight);
+
+        // Initialize export command
+        ExportSelectedAsJsonCommand = ReactiveCommand.Create(ExportSelectedAsJson);
+
+        // Initialize teleport database commands
+        EditTeleportCommand = ReactiveCommand.Create<ResultWrapper>(EditTeleport);
+        CreateTeleportCommand = ReactiveCommand.Create<ResultWrapper>(CreateTeleport);
         
         Zones = new ObservableCollection<string>();
         ZoneObjects = new ObservableCollection<ZoneObjectItem>();
@@ -1500,6 +1508,13 @@ private Canvas? _zoneObjectCanvas = null;
     public ICommand PanDownCommand { get; }
     public ICommand PanLeftCommand { get; }
     public ICommand PanRightCommand { get; }
+
+    // Export command
+    public ICommand ExportSelectedAsJsonCommand { get; }
+
+    // Teleport database commands
+    public ICommand EditTeleportCommand { get; }
+    public ICommand CreateTeleportCommand { get; }
     
     // Node details for Properties panel
     public string SelectedNodeName => SelectedNode != null ? $"Node {SelectedNode.NodeIndex}" : "No Node Selected";
@@ -2481,24 +2496,25 @@ public void SetScrollViewer(ScrollViewer scrollViewer)
     private async Task PopulateTriggerData(WizZoneTriggers triggerData)
     {
         var tempTriggerObjects = new List<TriggerVisualizationObject>();
-        
+        var currentZoneName = _selectedZone; // Capture zone name before entering Task.Run
+
         await Task.Run(() =>
         {
             Console.WriteLine($"PopulateTriggerData called with {triggerData.m_triggers?.Count ?? 0} triggers");
-            
+
             if (triggerData.m_triggers != null)
             {
                 foreach (var trigger in triggerData.m_triggers)
                 {
                     if (trigger != null)
                     {
-                        var triggerVis = new TriggerVisualizationObject(trigger);
-                        
+                        var triggerVis = new TriggerVisualizationObject(trigger, currentZoneName);
+
                         // Detect and apply flags for the trigger
                         triggerVis.Flags = ObjectFlagService.DetectTriggerFlags(trigger);
-                        
+
                         tempTriggerObjects.Add(triggerVis);
-                        
+
                         // Debug: Log first few trigger objects
                         if (tempTriggerObjects.Count <= 5)
                         {
@@ -2507,7 +2523,7 @@ public void SetScrollViewer(ScrollViewer scrollViewer)
                     }
                 }
             }
-            
+
             Console.WriteLine($"Trigger processing complete. Created {tempTriggerObjects.Count} trigger visualization objects");
         });
         
@@ -3451,6 +3467,260 @@ if (_overlayCanvas == null || _scrollViewer == null)
         {
             var newOffset = _scrollViewer.Offset + new Vector(PanStep, 0);
             _scrollViewer.Offset = newOffset;
+        }
+    }
+
+    /// <summary>
+    /// Exports the currently selected object as JSON to a file.
+    /// </summary>
+    private async void ExportSelectedAsJson()
+    {
+        object? selectedObject = GetSelectedObjectForExport();
+        string? objectName = GetSelectedObjectName();
+
+        if (selectedObject == null)
+        {
+            MessageService.Warn("No object selected to export.").Send();
+            return;
+        }
+
+        try
+        {
+            var json = DeepJsonSerializer.SerializeDeep(selectedObject);
+
+            // Open save dialog
+            var saveDialog = new SaveFileDialog
+            {
+                Title = "Export Object as JSON",
+                Filters = new List<FileDialogFilter>
+                {
+                    new() { Name = "JSON Files", Extensions = { "json" } },
+                    new() { Name = "All Files", Extensions = { "*" } }
+                },
+                InitialFileName = $"{objectName ?? "object"}.json"
+            };
+
+            var app = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            var mainWindow = app?.MainWindow;
+
+            if (mainWindow != null)
+            {
+                var filePath = await saveDialog.ShowAsync(mainWindow);
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    await System.IO.File.WriteAllTextAsync(filePath, json);
+                    MessageService.Info($"Exported {objectName ?? "object"} to {filePath}").Send();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to export object: {ex.Message}").Send();
+        }
+    }
+
+    private object? GetSelectedObjectForExport()
+    {
+        // Check all possible selected objects with original data
+        if (SelectedTrigger?.OriginalTrigger != null)
+            return SelectedTrigger.OriginalTrigger;
+        if (SelectedVolume?.OriginalVolume != null)
+            return SelectedVolume.OriginalVolume;
+        if (SelectedSpawnTemplate != null)
+            return SelectedSpawnTemplate;
+        if (SelectedTemplate != null)
+            return SelectedTemplate;
+        if (SelectedCoreObject != null)
+            return SelectedCoreObject;
+
+        // For visualization objects without original references, create a simple export object
+        if (SelectedObject != null)
+        {
+            return new
+            {
+                SelectedObject.Name,
+                SelectedObject.Type,
+                SelectedObject.TemplateID,
+                SelectedObject.X,
+                SelectedObject.Y,
+                SelectedObject.Z,
+                SelectedObject.Scale,
+                SelectedObject.Flags
+            };
+        }
+        if (SelectedCollision != null)
+        {
+            return new
+            {
+                SelectedCollision.Name,
+                SelectedCollision.GeometryType,
+                SelectedCollision.X,
+                SelectedCollision.Y,
+                SelectedCollision.Z,
+                SelectedCollision.Scale,
+                SelectedCollision.Rotation,
+                SelectedCollision.Material,
+                SelectedCollision.CategoryFlags,
+                SelectedCollision.CollisionFlags,
+                SelectedCollision.GeometryParams
+            };
+        }
+        if (SelectedPath != null)
+        {
+            return new
+            {
+                SelectedPath.Name,
+                SelectedPath.PathId
+            };
+        }
+        if (SelectedMesh != null)
+        {
+            return new
+            {
+                SelectedMesh.Name
+            };
+        }
+        if (SelectedSpawn != null)
+        {
+            return new
+            {
+                SelectedSpawn.Name,
+                SelectedSpawn.SpawnId,
+                SelectedSpawn.TemplateId,
+                SelectedSpawn.X,
+                SelectedSpawn.Y,
+                SelectedSpawn.Z,
+                SelectedSpawn.Scale,
+                SelectedSpawn.SpawnChance,
+                SelectedSpawn.SpawnType,
+                SelectedSpawn.PathId,
+                SelectedSpawn.CreatureType,
+                SelectedSpawn.PathIds
+            };
+        }
+
+        return null;
+    }
+
+    private string? GetSelectedObjectName()
+    {
+        if (SelectedObject != null)
+            return SelectedObject.Name;
+        if (SelectedCoreObject != null)
+            return SelectedCoreObject.ToString();
+        if (SelectedCollision != null)
+            return SelectedCollision.Name;
+        if (SelectedPath != null)
+            return SelectedPath.Name;
+        if (SelectedMesh != null)
+            return SelectedMesh.Name;
+        if (SelectedVolume != null)
+            return SelectedVolume.Name;
+        if (SelectedTrigger != null)
+            return SelectedTrigger.Name;
+        if (SelectedSpawn != null)
+            return SelectedSpawn.Name;
+        if (SelectedTemplate != null)
+            return SelectedTemplate.GetType().Name;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Opens the editor to modify an existing teleport in the database.
+    /// </summary>
+    private async void EditTeleport(ResultWrapper wrapper)
+    {
+        if (wrapper?.OriginalResult is not ResTeleport resTeleport)
+        {
+            MessageService.Error("Can only edit ResTeleport results.").Send();
+            return;
+        }
+
+        var zoneName = SelectedTrigger?.Zone ?? SelectedZone;
+        var triggerName = wrapper.TriggerName ?? SelectedTrigger?.Name ?? "Unknown";
+
+        if (string.IsNullOrEmpty(zoneName) || string.IsNullOrEmpty(triggerName))
+        {
+            MessageService.Error("Zone and trigger context required for database editing.").Send();
+            return;
+        }
+
+        try
+        {
+            var zoneDataService = new ZoneDataService();
+            var editor = new Controls.Results.DatabaseResTeleportEditor(resTeleport, zoneName, triggerName, zoneDataService, isNew: false);
+
+            var app = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            var mainWindow = app?.MainWindow;
+
+            if (mainWindow != null)
+            {
+                await editor.ShowDialog(mainWindow);
+            }
+            else
+            {
+                editor.Show();
+            }
+
+            if (editor.WasSaved)
+            {
+                MessageService.Info("Teleport data saved to database.").Send();
+                wrapper.RefreshFromDatabase();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to edit teleport: {ex.Message}").Send();
+        }
+    }
+
+    /// <summary>
+    /// Opens the editor to create a new teleport in the database.
+    /// </summary>
+    private async void CreateTeleport(ResultWrapper wrapper)
+    {
+        if (wrapper?.OriginalResult is not ResTeleport resTeleport)
+        {
+            MessageService.Error("Can only create ResTeleport entries.").Send();
+            return;
+        }
+
+        var zoneName = SelectedTrigger?.Zone ?? SelectedZone;
+        var triggerName = wrapper.TriggerName ?? SelectedTrigger?.Name ?? "Unknown";
+
+        if (string.IsNullOrEmpty(zoneName) || string.IsNullOrEmpty(triggerName))
+        {
+            MessageService.Error("Zone and trigger context required for database creation.").Send();
+            return;
+        }
+
+        try
+        {
+            var zoneDataService = new ZoneDataService();
+            var editor = new Controls.Results.DatabaseResTeleportEditor(resTeleport, zoneName, triggerName, zoneDataService, isNew: true);
+
+            var app = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            var mainWindow = app?.MainWindow;
+
+            if (mainWindow != null)
+            {
+                await editor.ShowDialog(mainWindow);
+            }
+            else
+            {
+                editor.Show();
+            }
+
+            if (editor.WasSaved)
+            {
+                MessageService.Info("Teleport data created in database.").Send();
+                wrapper.RefreshFromDatabase();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to create teleport: {ex.Message}").Send();
         }
     }
 
@@ -6504,23 +6774,188 @@ public class BehaviorWrapper
     public object? OriginalBehavior { get; }
     public string TypeName { get; }
     public string FormattedJson { get; }
-    
+
     public BehaviorWrapper(object? behavior)
     {
         OriginalBehavior = behavior;
-        
+
         if (behavior == null)
         {
             TypeName = "Unknown";
             FormattedJson = "// Behavior object is null";
             return;
         }
-        
+
         TypeName = behavior.GetType().Name;
-        
+
+        // Use DeepJsonSerializer for proper nested object handling
+        FormattedJson = DeepJsonSerializer.SerializeDeep(behavior);
+    }
+}
+
+/// <summary>
+/// Database lookup status for ResTeleport results
+/// </summary>
+public enum TeleportDataStatus
+{
+    NotApplicable,  // Not a ResTeleport result
+    Loading,        // Currently loading from database
+    Found,          // Data found in database
+    NotFound,       // No data found in database
+    Error          // Error occurred during lookup
+}
+
+/// <summary>
+/// Wrapper for Result objects with JSON serialization and database lookup for ResTeleport
+/// </summary>
+public class ResultWrapper : ReactiveObject
+{
+    private Result? _originalResult;
+    private string _formattedJson;
+    private TeleportDataStatus _teleportStatus = TeleportDataStatus.NotApplicable;
+    private bool _canEdit;
+    private bool _canCreate;
+
+    public Result? OriginalResult
+    {
+        get => _originalResult;
+        private set => this.RaiseAndSetIfChanged(ref _originalResult, value);
+    }
+
+    public string TypeName { get; }
+
+    public string FormattedJson
+    {
+        get => _formattedJson;
+        private set => this.RaiseAndSetIfChanged(ref _formattedJson, value);
+    }
+
+    public TeleportDataStatus TeleportStatus
+    {
+        get => _teleportStatus;
+        private set => this.RaiseAndSetIfChanged(ref _teleportStatus, value);
+    }
+
+    public bool CanEdit
+    {
+        get => _canEdit;
+        private set => this.RaiseAndSetIfChanged(ref _canEdit, value);
+    }
+
+    public bool CanCreate
+    {
+        get => _canCreate;
+        private set => this.RaiseAndSetIfChanged(ref _canCreate, value);
+    }
+
+    public string? ZoneName { get; }
+    public string? TriggerName { get; }
+
+    public ResultWrapper(Result? result, string? zoneName = null, string? triggerName = null)
+    {
+        _originalResult = result;
+        ZoneName = zoneName;
+        TriggerName = triggerName;
+
+        if (result == null)
+        {
+            TypeName = "Unknown";
+            _formattedJson = "// Result object is null";
+            return;
+        }
+
+        TypeName = result.GetType().Name;
+        _formattedJson = DeepJsonSerializer.SerializeDeep(result);
+
+        // Check if this is a ResTeleport for database lookup
+        if (result is ResTeleport && !string.IsNullOrEmpty(zoneName) && !string.IsNullOrEmpty(triggerName))
+        {
+            TeleportStatus = TeleportDataStatus.Loading;
+            _ = Task.Run(async () => await LoadTeleportDataAsync());
+        }
+    }
+
+    private async Task LoadTeleportDataAsync()
+    {
         try
         {
-            // Try to serialize as JSON with pretty formatting
+            if (string.IsNullOrEmpty(ZoneName) || string.IsNullOrEmpty(TriggerName))
+                return;
+
+            var teleportData = await ZoneTransferService.GetTeleportDataAsync(ZoneName, TriggerName);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (teleportData != null)
+                {
+                    TeleportStatus = TeleportDataStatus.Found;
+                    CanEdit = true;
+                    CanCreate = false;
+                    OriginalResult = teleportData;
+                    FormattedJson = DeepJsonSerializer.SerializeDeep(teleportData);
+                }
+                else
+                {
+                    TeleportStatus = TeleportDataStatus.NotFound;
+                    CanEdit = false;
+                    CanCreate = true;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TeleportStatus = TeleportDataStatus.Error;
+            });
+            Console.WriteLine($"[ResultWrapper] Error loading teleport data: {ex.Message}");
+        }
+    }
+
+    public void RefreshFromDatabase()
+    {
+        if (OriginalResult is ResTeleport && !string.IsNullOrEmpty(ZoneName) && !string.IsNullOrEmpty(TriggerName))
+        {
+            TeleportStatus = TeleportDataStatus.Loading;
+            _ = Task.Run(async () => await LoadTeleportDataAsync());
+        }
+    }
+}
+
+/// <summary>
+/// Wrapper for Requirement objects with JSON serialization
+/// </summary>
+public class RequirementWrapper
+{
+    public Requirement? OriginalRequirement { get; }
+    public string TypeName { get; }
+    public string FormattedJson { get; }
+
+    public RequirementWrapper(Requirement? requirement)
+    {
+        OriginalRequirement = requirement;
+
+        if (requirement == null)
+        {
+            TypeName = "Unknown";
+            FormattedJson = "// Requirement object is null";
+            return;
+        }
+
+        TypeName = requirement.GetType().Name;
+        FormattedJson = DeepJsonSerializer.SerializeDeep(requirement);
+    }
+}
+
+/// <summary>
+/// Helper class for deep JSON serialization that handles nested objects and collections
+/// </summary>
+public static class DeepJsonSerializer
+{
+    public static string SerializeDeep(object obj)
+    {
+        try
+        {
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -6530,50 +6965,158 @@ public class BehaviorWrapper
                 PropertyNameCaseInsensitive = true,
                 AllowTrailingCommas = true
             };
-            FormattedJson = JsonSerializer.Serialize(behavior, behavior.GetType(), options);
+            options.Converters.Add(new JsonStringEnumConverter());
+
+            // Convert to a dictionary structure that handles nested objects properly
+            var dict = ConvertToDictionary(obj, 0);
+            return JsonSerializer.Serialize(dict, options);
         }
-        catch (Exception ex)
+        catch
         {
-            // If JSON serialization fails, try a simple property-by-property approach
+            // Fallback to recursive string-based serialization
+            return SerializeObjectRecursive(obj, 0);
+        }
+    }
+
+    private static object? ConvertToDictionary(object? obj, int depth)
+    {
+        if (depth > 10 || obj == null)
+            return null;
+
+        var type = obj.GetType();
+
+        // Handle primitives and simple types
+        if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal) || type.IsEnum)
+            return obj;
+
+        // Handle collections
+        if (obj is System.Collections.ICollection collection)
+        {
+            var list = new List<object?>();
+            foreach (var item in collection)
+            {
+                list.Add(ConvertToDictionary(item, depth + 1));
+            }
+            return list;
+        }
+
+        // Handle complex objects - convert to dictionary
+        var dict = new Dictionary<string, object?>();
+        dict["_type"] = type.Name;
+
+        var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead && !p.GetIndexParameters().Any());
+
+        foreach (var prop in properties)
+        {
             try
             {
-                var properties = behavior.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine("{");
-                sb.AppendLine($"  \"_type\": \"{behavior.GetType().Name}\",");
-                
-                foreach (var prop in properties)
-                {
-                    try
-                    {
-                        var value = prop.GetValue(behavior);
-                        var valueStr = value?.ToString() ?? "null";
-                        
-                        // Escape quotes in the value
-                        valueStr = valueStr.Replace("\"", "\\\"");
-                        
-                        sb.AppendLine($"  \"{prop.Name}\": \"{valueStr}\",");
-                    }
-                    catch (Exception propEx)
-                    {
-                        sb.AppendLine($"  \"{prop.Name}\": \"<Error: {propEx.Message}>\",");
-                    }
-                }
-                
-                // Remove trailing comma and close
-                var result = sb.ToString().TrimEnd(',', '\n', '\r');
-                if (result.EndsWith(","))
-                {
-                    result = result.Substring(0, result.Length - 1) + "\n";
-                }
-                result += "\n}";
-                FormattedJson = result;
+                var value = prop.GetValue(obj);
+                dict[prop.Name] = ConvertToDictionary(value, depth + 1);
             }
-            catch (Exception fallbackEx)
+            catch
             {
-                // Final fallback to ToString
-                FormattedJson = $"// JSON Serialization Failed: {ex.Message}\n// Property Reflection Failed: {fallbackEx.Message}\n\n{behavior}";
+                dict[prop.Name] = "<unable to read>";
             }
         }
+
+        var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
+        foreach (var field in fields)
+        {
+            try
+            {
+                var value = field.GetValue(obj);
+                dict[field.Name] = ConvertToDictionary(value, depth + 1);
+            }
+            catch
+            {
+                dict[field.Name] = "<unable to read>";
+            }
+        }
+
+        return dict;
+    }
+
+    private static string SerializeObjectRecursive(object obj, int depth)
+    {
+        if (depth > 10)
+            return "\"<max depth reached>\"";
+
+        var type = obj.GetType();
+        var indent = new string(' ', depth * 2);
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"{indent}{{");
+        sb.AppendLine($"{indent}  \"_type\": \"{type.Name}\",");
+
+        var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead && !p.GetIndexParameters().Any());
+
+        foreach (var prop in properties)
+        {
+            try
+            {
+                var value = prop.GetValue(obj);
+                var jsonValue = FormatValueRecursive(value, depth + 1);
+                sb.AppendLine($"{indent}  \"{prop.Name}\": {jsonValue},");
+            }
+            catch
+            {
+                sb.AppendLine($"{indent}  \"{prop.Name}\": \"<unable to read>\",");
+            }
+        }
+
+        var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
+        foreach (var field in fields)
+        {
+            try
+            {
+                var value = field.GetValue(obj);
+                var jsonValue = FormatValueRecursive(value, depth + 1);
+                sb.AppendLine($"{indent}  \"{field.Name}\": {jsonValue},");
+            }
+            catch
+            {
+                sb.AppendLine($"{indent}  \"{field.Name}\": \"<unable to read>\",");
+            }
+        }
+
+        var result = sb.ToString();
+        if (result.EndsWith(",\n"))
+        {
+            result = result.Substring(0, result.Length - 2) + "\n";
+        }
+        result += $"{indent}}}";
+        return result;
+    }
+
+    private static string FormatValueRecursive(object? value, int depth)
+    {
+        if (depth > 10 || value == null)
+            return "null";
+
+        return value switch
+        {
+            string s => $"\"{s.Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r")}\"",
+            bool b => b.ToString().ToLower(),
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => value.ToString() ?? "0",
+            Enum e => $"\"{e.ToString()}\"",
+            System.Collections.ICollection collection => FormatCollectionRecursive(collection, depth),
+            _ => SerializeObjectRecursive(value, depth)
+        };
+    }
+
+    private static string FormatCollectionRecursive(System.Collections.ICollection collection, int depth)
+    {
+        if (collection.Count == 0)
+            return "[]";
+
+        var indent = new string(' ', depth * 2);
+        var innerIndent = new string(' ', (depth + 1) * 2);
+        var items = new List<string>();
+        foreach (var item in collection)
+        {
+            items.Add($"{innerIndent}{FormatValueRecursive(item, depth + 1)}");
+        }
+        return $"[\n{string.Join(",\n", items)}\n{indent}]";
     }
 }

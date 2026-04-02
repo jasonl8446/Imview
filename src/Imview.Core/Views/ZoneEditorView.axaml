@@ -927,15 +927,23 @@
                     </Grid.RowDefinitions>
                     
                     <!-- Properties Panel Header -->
-                    <Border Grid.Row="0" 
-                            Background="#383838" 
+                    <Border Grid.Row="0"
+                            Background="#383838"
                             BorderBrush="#3F3F46"
                             BorderThickness="0,0,0,1"
                             Padding="8,6">
-                        <TextBlock Text="Properties" 
-                                 FontWeight="Bold" 
-                                 FontSize="13"
-                                 Foreground="White"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Properties"
+                                     FontWeight="Bold"
+                                     FontSize="13"
+                                     Foreground="White"/>
+                            <Button Grid.Column="1" Content="📋 JSON Object"
+                                    FontSize="10" Height="22"
+                                    Background="#3A5A8A" Foreground="White"
+                                    BorderBrush="#5A7AAA" BorderThickness="1"
+                                    ToolTip.Tip="Export selected object as JSON file"
+                                    Command="{Binding ExportSelectedAsJsonCommand}"/>
+                        </Grid>
                     </Border>
                     
                     <!-- Properties Content -->
@@ -1609,17 +1617,69 @@
                                     </StackPanel>
                                     
                                     <!-- Results -->
-                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTrigger.OriginalTrigger.m_results.m_results.Count}">
+                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTrigger.WrappedResults.Count}">
                                         <TextBlock Text="Results" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
-                                        <Border Background="#2A2A30" BorderBrush="#4A4A50" BorderThickness="1" CornerRadius="2" Padding="2" MaxHeight="350">
+                                        <Border Background="#2A2A30" BorderBrush="#4A4A50" BorderThickness="1" CornerRadius="2" Padding="2" MaxHeight="800">
                                             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                <ItemsControl ItemsSource="{Binding SelectedTrigger.OriginalTrigger.m_results.m_results}">
+                                                <ItemsControl ItemsSource="{Binding SelectedTrigger.WrappedResults}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border Background="#333338" Margin="0,1" Padding="2" CornerRadius="1">
-                                                                <views:ResultDynamicViewerView MaxHeight="80" 
-                                                                    ZoneName="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectedZone}"
-                                                                    TriggerName="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).SelectedTrigger.Name}"/>
+                                                            <Border Background="#1E1E1E" Margin="0,2" Padding="6" CornerRadius="2" BorderBrush="#444" BorderThickness="1">
+                                                                <StackPanel>
+                                                                    <!-- Header with type name and buttons -->
+                                                                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
+                                                                        <TextBlock Grid.Column="0" Text="{Binding TypeName}" FontSize="11" FontWeight="Bold"
+                                                                                 Foreground="#569CD6" VerticalAlignment="Center"/>
+                                                                        <!-- Modify button for existing teleports -->
+                                                                        <Button Grid.Column="1" Content="Modify" Width="60" Height="20" FontSize="10" Margin="2,0"
+                                                                                Background="#2A4A2A" Foreground="White" BorderBrush="#4A6A4A"
+                                                                                ToolTip.Tip="Modify teleport data in database"
+                                                                                IsVisible="{Binding CanEdit}"
+                                                                                Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).EditTeleportCommand}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                        <!-- Create button for missing teleports -->
+                                                                        <Button Grid.Column="2" Content="Create" Width="60" Height="20" FontSize="10" Margin="2,0"
+                                                                                Background="#4A2A2A" Foreground="White" BorderBrush="#6A4A4A"
+                                                                                ToolTip.Tip="Create new teleport data in database"
+                                                                                IsVisible="{Binding CanCreate}"
+                                                                                Command="{Binding $parent[UserControl].((vm:ZoneEditorViewModel)DataContext).CreateTeleportCommand}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </Grid>
+                                                                    <!-- JSON code block -->
+                                                                    <TextBox Text="{Binding FormattedJson}" IsReadOnly="True" FontSize="11"
+                                                                           FontFamily="Consolas,Monaco,monospace" Background="#1E1E1E"
+                                                                           Foreground="#D4D4D4" TextWrapping="Wrap"
+                                                                           AcceptsReturn="True" BorderThickness="0" Padding="6"
+                                                                           MinHeight="50" MaxHeight="400"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- Requirements -->
+                                    <StackPanel Margin="0,4,0,0" IsVisible="{Binding SelectedTrigger.WrappedRequirements.Count}">
+                                        <TextBlock Text="Requirements" Foreground="#CCCCCC" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                        <Border Background="#2A2A30" BorderBrush="#4A4A50" BorderThickness="1" CornerRadius="2" Padding="2" MaxHeight="600">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding SelectedTrigger.WrappedRequirements}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#1E1E1E" Margin="0,2" Padding="6" CornerRadius="2" BorderBrush="#444" BorderThickness="1">
+                                                                <StackPanel>
+                                                                    <!-- Header with type name -->
+                                                                    <TextBlock Text="{Binding TypeName}" FontSize="11" FontWeight="Bold"
+                                                                             Foreground="#4EC9B0" Margin="0,0,0,4"/>
+                                                                    <!-- JSON code block -->
+                                                                    <TextBox Text="{Binding FormattedJson}" IsReadOnly="True" FontSize="11"
+                                                                           FontFamily="Consolas,Monaco,monospace" Background="#1E1E1E"
+                                                                           Foreground="#D4D4D4" TextWrapping="Wrap"
+                                                                           AcceptsReturn="True" BorderThickness="0" Padding="6"
+                                                                           MinHeight="50" MaxHeight="400"/>
+                                                                </StackPanel>
                                                             </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
