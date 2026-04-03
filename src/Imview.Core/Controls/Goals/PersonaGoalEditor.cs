@@ -74,7 +74,7 @@ public class PersonaGoalEditor : GoalEditorWindowBase {
     public void SaveTypeSpecificValues() {
         PersonaTemplate.m_personaName = new ByteString(_personaNameBox.Text ?? string.Empty);
         PersonaTemplate.m_usePatron = _usePatronBox.IsChecked ?? false;
-        PersonaTemplate.m_goalType = GOAL_TYPE.GOAL_TYPE_PERSONA;
+        // Note: m_goalType is set by the base class SaveValues() from the ComboBox selection
     }
 
     protected override void Save() {

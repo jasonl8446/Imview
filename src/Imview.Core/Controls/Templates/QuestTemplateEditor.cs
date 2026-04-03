@@ -40,6 +40,7 @@ using Avalonia.VisualTree;
 using Avalonia.ReactiveUI;
 using Imview.Core.Views;
 using Imview.Core.Controls.Results;
+using Imview.Core.Models;
 
 namespace Imview.Core.Controls.Templates;
 
@@ -615,6 +616,7 @@ public partial class QuestTemplateEditor : UserControl {
                 CreateGoalButton("Add Bounty Goal", () => AddGoal<BountyGoalTemplate>()),
                 CreateGoalButton("Add Persona Goal", () => AddGoal<PersonaGoalTemplate>()),
                 CreateGoalButton("Add Scavenge Goal", () => AddGoal<ScavengeGoalTemplate>()),
+                CreateGoalButton("Add Usage Goal", () => AddGoal<UsageGoalTemplate>()),
                 CreateGoalButton("Add Waypoint Goal", () => AddGoal<WaypointGoalTemplate>()),
                 CreateGoalButton("Add Achieve Rank Goal", () => AddGoal<AchieveRankGoalTemplate>())
             }

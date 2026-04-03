@@ -26,17 +26,18 @@ using Imcodec.ObjectProperty.TypeCache;
 using Imview.Core.Common.Constants;
 using System.Linq;
 using Imcodec.IO;
+using Imview.Core.Models;
 
 namespace Imview.Core.Controls.Goals;
 
-public class ScavengeGoalEditor : GoalEditorWindowBase {
+public class UsageGoalEditor : GoalEditorWindowBase {
 
     private readonly TextBox _itemAdjectivesBox;
     private readonly TextBox _itemTotalBox;
-    private ScavengeGoalTemplate ScavengeTemplate => (ScavengeGoalTemplate)Template;
+    private UsageGoalTemplate UsageTemplate => (UsageGoalTemplate)Template;
 
-    public ScavengeGoalEditor(ScavengeGoalTemplate? template = null)
-        : base(template ?? new ScavengeGoalTemplate(), "Edit Scavenge Goal") {
+    public UsageGoalEditor(UsageGoalTemplate? template = null)
+        : base(template ?? new UsageGoalTemplate(), "Edit Usage Goal") {
         _itemAdjectivesBox = new TextBox();
         _itemTotalBox = new TextBox();
 
@@ -46,7 +47,7 @@ public class ScavengeGoalEditor : GoalEditorWindowBase {
     public void InitializeEditor() {
         var mainPanel = CreateBaseControlsPanel();
 
-        var scavengeContent = new StackPanel {
+        var usageContent = new StackPanel {
             Spacing = EditorConstants.DEFAULT_CONTROL_SPACING,
             Children = {
                 CreateLabeledControl("Item Adjectives (comma-separated):", _itemAdjectivesBox),
@@ -54,24 +55,24 @@ public class ScavengeGoalEditor : GoalEditorWindowBase {
             }
         };
 
-        mainPanel.Children.Add(CreateGroupBox("Scavenge Settings", scavengeContent));
+        mainPanel.Children.Add(CreateGroupBox("Usage Settings", usageContent));
         mainPanel.Children.Add(CreateActionButtons(Save, Cancel));
 
-        if (ScavengeTemplate != null) {
-            _itemAdjectivesBox.Text = string.Join(", ", ScavengeTemplate.m_itemAdjectives ?? new List<string>());
-            _itemTotalBox.Text = ScavengeTemplate.m_itemTotal.ToString();
+        if (UsageTemplate != null) {
+            _itemAdjectivesBox.Text = string.Join(", ", UsageTemplate.m_itemAdjectives ?? new List<string>());
+            _itemTotalBox.Text = UsageTemplate.m_itemTotal.ToString();
         }
     }
 
-    public Control GetTypeSpecificControls() 
+    public Control GetTypeSpecificControls()
         => new StackPanel {
             Children = {
                 _itemAdjectivesBox,
-                 _itemTotalBox
+                _itemTotalBox
             }
         };
 
-    public bool ValidateState() 
+    public bool ValidateState()
         => !string.IsNullOrWhiteSpace(_itemTotalBox.Text) &&
             int.TryParse(_itemTotalBox.Text, out _);
 
@@ -82,8 +83,8 @@ public class ScavengeGoalEditor : GoalEditorWindowBase {
             .ToList();
 
         if (int.TryParse(_itemTotalBox.Text, out int itemTotal)) {
-            ScavengeTemplate.m_itemAdjectives = adjectives.Select(a => a.ToString()).ToList();
-            ScavengeTemplate.m_itemTotal = itemTotal;
+            UsageTemplate.m_itemAdjectives = adjectives.Select(a => a.ToString()).ToList();
+            UsageTemplate.m_itemTotal = itemTotal;
             // Note: m_goalType is set by the base class SaveValues() from the ComboBox selection
         }
     }

@@ -26,6 +26,7 @@ using Imcodec.ObjectProperty.TypeCache;
 using Avalonia.Controls.ApplicationLifetimes;
 using Imview.Core.Controls.Base;
 using System;
+using Imview.Core.Models;
 
 namespace Imview.Core.Controls.Goals;
 
@@ -46,6 +47,7 @@ public class GoalEditorFactory : IGoalEditorFactory {
             BountyGoalTemplate bountyTemplate => new BountyGoalEditor(bountyTemplate),
             PersonaGoalTemplate personaTemplate => new PersonaGoalEditor(personaTemplate),
             ScavengeGoalTemplate scavengeTemplate => new ScavengeGoalEditor(scavengeTemplate),
+            UsageGoalTemplate usageTemplate => new UsageGoalEditor(usageTemplate),
             WaypointGoalTemplate waypointTemplate => new WaypointGoalEditor(waypointTemplate),
             _ => throw new ArgumentException($"Unsupported goal type: {template?.GetType().Name ?? "null"}")
         };

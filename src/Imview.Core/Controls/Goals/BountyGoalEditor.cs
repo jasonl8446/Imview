@@ -92,7 +92,7 @@ public class BountyGoalEditor : GoalEditorWindowBase {
             BountyTemplate.m_npcAdjectives = adjectives;
             BountyTemplate.m_bountyTotal = bountyTotal;
             BountyTemplate.m_bountyType = (BOUNTY_TYPE) _bountyTypeBox.SelectedItem!;
-            BountyTemplate.m_goalType = GOAL_TYPE.GOAL_TYPE_BOUNTY;
+            // Note: m_goalType is set by the base class SaveValues() from the ComboBox selection
         }
     }
     

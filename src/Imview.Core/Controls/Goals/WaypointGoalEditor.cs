@@ -88,7 +88,7 @@ public class WaypointGoalEditor : GoalEditorWindowBase {
         WaypointTemplate.m_zoneExit = _zoneExitBox.IsChecked ?? false;
         WaypointTemplate.m_zoneTag = new ByteString(_zoneTagBox.Text ?? string.Empty);
         WaypointTemplate.m_proximityTag = new ByteString(_proximityTagBox.Text ?? string.Empty);
-        WaypointTemplate.m_goalType = GOAL_TYPE.GOAL_TYPE_WAYPOINT;
+        // Note: m_goalType is set by the base class SaveValues() from the ComboBox selection
     }
 
     protected override void Save() {

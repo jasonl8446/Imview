@@ -66,7 +66,7 @@ public class AchieveRankGoalEditor : GoalEditorWindowBase {
 
     public void SaveTypeSpecificValues() {
         RankTemplate.m_rank = (int)(_rankBox.Value ?? 1);
-        RankTemplate.m_goalType = GOAL_TYPE.GOAL_TYPE_ACHIEVERANK;
+        // Note: m_goalType is set by the base class SaveValues() from the ComboBox selection
     }
 
     protected override void Save() {
