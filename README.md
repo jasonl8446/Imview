@@ -30,6 +30,8 @@ Available from the splash page:
 - [.NET 9 SDK](https://dotnet.microsoft.com/download) — projects target `net9.0`
 - A reachable RavenDB instance, for the database-backed editors
 - Git, for the submodules
+- Your own copy of the game client, for the two source-generator inputs described below —
+  Imcodec ships no game data and will not build without them
 
 On NixOS, `nix shell nixpkgs#dotnet-sdk_9` provides the SDK.
 
@@ -49,7 +51,44 @@ Already cloned without them:
 git submodule update --init --recursive
 ```
 
-Build and run:
+### Generator inputs (bring your own data)
+
+Imcodec follows a BYOD (bring-your-own-data) philosophy: it ships no copyrighted game
+files. Two source generators need input that you must supply from your own game client, or
+the build fails:
+
+| Directory | Input | Source |
+| --- | --- | --- |
+| `submodule/Imcodec/src/Imcodec.ObjectProperty/GeneratorInput/` | a type dump `*.json` | generate with [wiztype](https://github.com/wizspoil/wiztype) |
+| `submodule/Imcodec/src/Imcodec.MessageLayer/GeneratorInput/` | `*Messages.xml` | unpack `Root.wad` with the Imcodec CLI |
+
+Both directories start out holding only an empty `!base` placeholder. Without the type dump
+the `Imcodec.ObjectProperty` build fails with ~165 `CS0246`/`CS0234` errors about missing
+base types (`Result`, `CoreObjectInfo`, `BehaviorTemplate`, ...). Without the message XML,
+`Imcodec.MessageLayer` fails with `CS0234` on the `Imcodec.MessageLayer.Generated`
+namespace, preceded by warning `IMC001: No XML files found`.
+
+The message XML lives inside the client's `Root.wad`, so bootstrap in this order:
+
+```bash
+# 1. Drop your wiztype dump into the ObjectProperty generator input
+cp /path/to/dump.json submodule/Imcodec/src/Imcodec.ObjectProperty/GeneratorInput/
+
+# 2. Build the Imcodec CLI — it does not depend on the message layer, so it builds now
+dotnet build submodule/Imcodec/src/Imcodec.Cli/Imcodec.Cli.csproj
+
+# 3. Unpack Root.wad and copy the message definitions out of it
+# (adjust the runtime-identifier folder for your platform)
+./submodule/Imcodec/src/Imcodec.Cli/bin/Debug/net9.0/linux-x64/imcodec \
+    wad unpack /path/to/Root.wad /tmp/root
+find /tmp/root -name '*Messages.xml' \
+    -exec cp {} submodule/Imcodec/src/Imcodec.MessageLayer/GeneratorInput/ \;
+```
+
+A `Root.wad` for a chosen revision can be downloaded from within the app itself once it
+runs, but for this first build you need one obtained independently.
+
+### Build and run
 
 ```bash
 dotnet build src/Imview.Core/Imview.Core.csproj
@@ -58,6 +97,9 @@ dotnet run --project src/Imview.Core
 
 In VS Code, <kbd>F5</kbd> runs the **Launch Avalonia App** configuration, which builds
 first and launches with the repository root as the working directory.
+
+If an analyzer complains that source-generated classes are missing, run `dotnet build`
+once to make the generators produce them.
 
 ## Configuration
 
